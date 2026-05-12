@@ -1,0 +1,20 @@
+{
+  "name": "deckrypt",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deck builder & analyse Magic: The Gathering. Vanilla JS, sans backend.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "happy-dom": "^14.12.3",
+    "http-server": "^14.1.1",
+    "vitest": "^1.6.0"
+  }
+}

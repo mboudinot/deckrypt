@@ -1,0 +1,550 @@
+/* Play view — commanders, battlefield, lands, hand, graveyard, game
+ * bar, hand stats, basic-land buttons + game actions + drag-and-drop +
+ * play-specific modal openers (commander/instance/graveyard).
+ *
+ * Reads `state` and `els` from app.js. Calls shared helpers from
+ * app.js (`showModal`, `closeModal`, `setStatus`) and from the pure
+ * modules (`game.js`, `scryfall.js`, `deck-suggestions.js`, etc.).
+ * Load order: after all pure modules, after util/scryfall, before
+ * the view files that depend on `placeholderText` / `makeCardEl`
+ * (app-analyze.js, app-manage.js) and before app.js. */
+
+// Five basic lands. The `name` matches Scryfall's English card name —
+// `fetchByName` does an exact match, so a mono-blue deck (no Plains in
+// its library) will keep the W button disabled. Order is WUBRG.
+const BASIC_LANDS = [
+  { color: "W", name: "Plains",   labelFr: "Plaine"   },
+  { color: "U", name: "Island",   labelFr: "Île"      },
+  { color: "B", name: "Swamp",    labelFr: "Marais"   },
+  { color: "R", name: "Mountain", labelFr: "Montagne" },
+  { color: "G", name: "Forest",   labelFr: "Forêt"    },
+];
+
+// ============================================================
+// Rendering helpers (shared with manage + analyze views)
+// ============================================================
+function placeholderText(text) {
+  const div = document.createElement("div");
+  div.className = "placeholder-empty";
+  div.textContent = text;
+  return div;
+}
+
+/* Trash-can SVG built via DOM APIs rather than innerHTML — avoids the
+ * pattern of "innerHTML with template literal" that's only safe when
+ * the content is fully static, and trivially copy-pasted into unsafe
+ * contexts later. */
+const SVG_NS = "http://www.w3.org/2000/svg";
+function makeTrashIcon(size = 14) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+
+  const polyline = document.createElementNS(SVG_NS, "polyline");
+  polyline.setAttribute("points", "3 6 5 6 21 6");
+  svg.appendChild(polyline);
+
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2");
+  svg.appendChild(path);
+
+  return svg;
+}
+
+/* Build a card DOM node. Generic — same builder for commanders and
+ * game instances; the caller supplies tap state, aria text, and the
+ * activation callback (clicking or pressing Enter/Space). */
+function makeCardEl(card, { tapped = false, ariaLabel, onActivate, instanceId, sourceZone }) {
+  const el = document.createElement("div");
+  el.className = "card" + (tapped ? " tapped" : "");
+  el.tabIndex = 0;
+  el.setAttribute("role", "button");
+  if (ariaLabel) el.setAttribute("aria-label", ariaLabel);
+  if (instanceId && sourceZone) {
+    el.draggable = true;
+    el.dataset.instanceId = instanceId;
+    el.addEventListener("dragstart", (e) => onCardDragStart(e, instanceId, sourceZone));
+    el.addEventListener("dragend", onCardDragEnd);
+  }
+
+  const skel = document.createElement("div");
+  skel.className = "skeleton";
+  el.appendChild(skel);
+
+  const label = document.createElement("div");
+  label.className = "skeleton-label";
+  label.textContent = card.name;
+  el.appendChild(label);
+
+  const src = cardImage(card, "small");
+  if (src) {
+    const img = document.createElement("img");
+    img.alt = card.name;
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.addEventListener("load", () => {
+      skel.style.display = "none";
+      label.style.display = "none";
+    });
+    img.addEventListener("error", () => {
+      el.classList.add("error");
+      label.textContent = card.name + " (image indisponible)";
+    });
+    img.src = src;
+    el.appendChild(img);
+  } else {
+    el.classList.add("error");
+    label.textContent = card.name + " (introuvable sur Scryfall)";
+  }
+
+  if (onActivate) {
+    el.addEventListener("click", onActivate);
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onActivate();
+      }
+    });
+  }
+  return el;
+}
+
+// ============================================================
+// Play-view rendering
+// ============================================================
+
+/* Three rendering paths:
+ *   - no deck loaded                      → placeholder
+ *   - deck resolved but game not yet built → static read-only cards
+ *   - game running                         → instances drawn from
+ *     game.command, draggable to the battlefield (see DRAG_TRANSITIONS)
+ * The header counter shows "X sur Y" when some commanders have been
+ * cast — useful for multi-commander partner decks. */
+function renderCommanders() {
+  els.commanderZone.replaceChildren();
+
+  if (!state.resolved || state.resolved.commanders.length === 0) {
+    els.commanderZone.appendChild(placeholderText("Aucun commandant."));
+    els.commanderInfo.textContent = "0 carte";
+    return;
+  }
+
+  if (!state.game) {
+    for (const c of state.resolved.commanders) {
+      els.commanderZone.appendChild(makeCardEl(c, {
+        ariaLabel: `${c.name}, agrandir`,
+        onActivate: () => openCommanderModal(c),
+      }));
+    }
+    const n = state.resolved.commanders.length;
+    els.commanderInfo.textContent = pluralFr(n, "carte");
+    return;
+  }
+
+  const cmd = state.game.command;
+  const total = state.resolved.commanders.length;
+
+  if (cmd.length === 0) {
+    els.commanderZone.appendChild(placeholderText(
+      total === 1 ? "Commandant en jeu." : "Commandants en jeu.",
+    ));
+  } else {
+    for (const inst of cmd) {
+      els.commanderZone.appendChild(makeCardEl(inst.card, {
+        ariaLabel: `${inst.card.name}, actions`,
+        onActivate: () => openInstanceModal(inst),
+        instanceId: inst.instanceId,
+        sourceZone: "command",
+      }));
+    }
+  }
+
+  els.commanderInfo.textContent = cmd.length === total
+    ? pluralFr(total, "carte")
+    : `${cmd.length} sur ${total}`;
+}
+
+function renderInstanceZone(elem, instances, emptyText, sourceZone) {
+  elem.replaceChildren();
+  if (!instances || instances.length === 0) {
+    elem.appendChild(placeholderText(emptyText));
+    return;
+  }
+  for (const inst of instances) {
+    elem.appendChild(makeCardEl(inst.card, {
+      tapped: inst.tapped,
+      ariaLabel: `${inst.card.name}${inst.tapped ? " (engagé)" : ""}, actions`,
+      onActivate: () => openInstanceModal(inst),
+      instanceId: inst.instanceId,
+      sourceZone,
+    }));
+  }
+}
+
+/* The game's `battlefield` array holds every permanent (lands too — MTG
+ * rule). The UI splits them into two visual blocks: lands on their own
+ * row, other permanents above. Drag-and-drop targets both blocks at the
+ * same underlying zone, so a card lands in the right block automatically
+ * after the move. */
+function renderBattlefield() {
+  const all = state.game ? state.game.battlefield : [];
+  const lands = all.filter((inst) => isLand(inst.card));
+  const others = all.filter((inst) => !isLand(inst.card));
+
+  renderInstanceZone(els.battlefield, others, "Champ de bataille vide.", "battlefield");
+  els.battlefieldInfo.textContent = others.length === 0
+    ? "vide"
+    : pluralFr(others.length, "permanent");
+
+  renderInstanceZone(els.lands, lands, "Aucun terrain.", "battlefield");
+  els.landsInfo.textContent = lands.length === 0
+    ? "vide"
+    : pluralFr(lands.length, "terrain");
+}
+
+function renderHand() {
+  const list = state.game ? state.game.hand : [];
+  renderInstanceZone(els.hand, list, "Aucune carte en main.", "hand");
+  if (!state.game) {
+    els.handInfo.textContent = "—";
+  } else {
+    els.handInfo.textContent = pluralFr(state.game.hand.length, "carte");
+  }
+}
+
+/* The graveyard is a pile, not a strip: render only the top card and
+ * use CSS pseudo-elements to suggest depth (1 layer = `has-stack`,
+ * 3+ layers = `has-deep-stack`). Click the visible card → graveyard
+ * modal with the full list and per-card actions. The top card stays
+ * a drag source so flick-back-to-hand still works without opening
+ * the modal. */
+function renderGraveyard() {
+  const list = state.game ? state.game.graveyard : [];
+  els.graveyard.replaceChildren();
+  els.graveyard.classList.toggle("has-stack", list.length >= 2);
+  els.graveyard.classList.toggle("has-deep-stack", list.length >= 3);
+  if (list.length === 0) {
+    els.graveyard.appendChild(placeholderText("Cimetière vide."));
+    els.graveyardInfo.textContent = "vide";
+    return;
+  }
+  const top = list[list.length - 1];
+  const ariaLabel = list.length === 1
+    ? `${top.card.name}, ouvrir le cimetière`
+    : `${top.card.name}, ${pluralFr(list.length, "carte")} en cimetière, ouvrir le cimetière`;
+  els.graveyard.appendChild(makeCardEl(top.card, {
+    tapped: top.tapped,
+    ariaLabel,
+    onActivate: openGraveyardModal,
+    instanceId: top.instanceId,
+    sourceZone: "graveyard",
+  }));
+  els.graveyardInfo.textContent = pluralFr(list.length, "carte");
+}
+
+function renderGameBar() {
+  if (!state.game) {
+    els.turnCounter.textContent = "—";
+    els.libraryCount.textContent = "—";
+    return;
+  }
+  els.turnCounter.textContent = state.game.turn;
+  els.libraryCount.textContent = state.game.library.length;
+}
+
+function renderStats() {
+  const hand = state.game ? state.game.hand : [];
+  let lands = 0, spells = 0, cmcSum = 0;
+  const sources = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+  for (const inst of hand) {
+    const c = inst.card;
+    if (isLand(c)) {
+      lands++;
+      for (const m of manaSourcesOf(c)) sources[m]++;
+    } else {
+      spells++;
+      cmcSum += (typeof c.cmc === "number" ? c.cmc : 0);
+    }
+  }
+  els.statLands.textContent = lands;
+  els.statSpells.textContent = spells;
+  els.statCmc.textContent = spells === 0 ? "—" : (cmcSum / spells).toFixed(2);
+
+  const colors = state.resolved ? deckProducedColors(state.resolved) : COLOR_ORDER;
+  els.statSources.replaceChildren();
+  if (colors.length === 0) {
+    const span = document.createElement("span");
+    span.className = "deck-status";
+    span.textContent = "aucune source colorée";
+    els.statSources.appendChild(span);
+    return;
+  }
+  for (const c of colors) {
+    const pip = document.createElement("span");
+    pip.className = `pip ${c}`;
+    pip.title = COLOR_NAMES[c];
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    pip.appendChild(dot);
+    pip.append(` ${c} `);
+    const strong = document.createElement("strong");
+    strong.textContent = String(sources[c]);
+    pip.appendChild(strong);
+    els.statSources.appendChild(pip);
+  }
+}
+
+function renderAll() {
+  renderCommanders();
+  renderBattlefield();
+  renderHand();
+  renderGraveyard();
+  renderGameBar();
+  renderStats();
+  updateButtons();
+}
+
+function updateButtons() {
+  const hasDeck = !!state.resolved;
+  const hasGame = !!state.game;
+  els.btnNew.disabled = !hasDeck;
+  els.btnDraw.disabled = !hasGame || state.game.library.length === 0;
+  els.btnNextTurn.disabled = !hasGame;
+  for (const btn of els.basicLandButtons) {
+    const name = btn.dataset.landName;
+    const labelFr = btn.dataset.landLabel;
+    const count = hasGame ? libraryCount(state.game, name) : 0;
+    btn.disabled = count === 0;
+    btn.querySelector(".land-btn-label").textContent = `+ ${labelFr} (${count})`;
+    btn.setAttribute("aria-label", count === 0
+      ? `${labelFr} : aucun exemplaire dans la pioche`
+      : `Ajouter ${labelFr} en main, ${count} dans la pioche`);
+    btn.title = count === 0
+      ? `Aucune ${labelFr} dans la pioche`
+      : `Ajouter ${labelFr} (${pluralFr(count, "restant")} dans la pioche)`;
+  }
+}
+
+/* Build the five colored "add a basic land" buttons once at init.
+ * Their label, count, disabled state and aria-label are refreshed by
+ * updateButtons after every render. */
+function buildBasicLandButtons() {
+  for (const land of BASIC_LANDS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `land-btn ${land.color}`;
+    btn.dataset.landName = land.name;
+    btn.dataset.landLabel = land.labelFr;
+
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    btn.appendChild(dot);
+
+    const lbl = document.createElement("span");
+    lbl.className = "land-btn-label";
+    btn.appendChild(lbl);
+
+    btn.addEventListener("click", () => addBasicLand(land.name));
+    els.basicLands.appendChild(btn);
+    els.basicLandButtons.push(btn);
+  }
+}
+
+function addBasicLand(name) {
+  if (!state.game) return;
+  if (fetchByName(state.game, name)) renderAll();
+}
+
+// ============================================================
+// Game actions
+// ============================================================
+function startNewGame() {
+  if (!state.resolved) return;
+  state.game = createGame(state.resolved);
+  renderAll();
+}
+
+function drawOne() {
+  if (!state.game) return;
+  if (drawCards(state.game, 1) === 0) {
+    setStatus("Bibliothèque vide.", "error");
+    return;
+  }
+  renderAll();
+}
+
+function advanceTurn() {
+  if (!state.game) return;
+  nextTurn(state.game);
+  renderAll();
+}
+
+function moveInstanceTo(instanceId, zone) {
+  if (!state.game) return;
+  if (moveInstance(state.game, instanceId, zone)) renderAll();
+}
+
+function tapInstance(instanceId) {
+  if (!state.game) return;
+  if (toggleTap(state.game, instanceId)) renderAll();
+}
+
+// ============================================================
+// Drag and drop between zones
+// ============================================================
+function onCardDragStart(e, instanceId, sourceZone) {
+  e.dataTransfer.setData("text/instance-id", instanceId);
+  e.dataTransfer.effectAllowed = "move";
+  state.dragSourceZone = sourceZone;
+  e.currentTarget.classList.add("dragging");
+}
+
+function onCardDragEnd(e) {
+  state.dragSourceZone = null;
+  e.currentTarget.classList.remove("dragging");
+  // Defensive cleanup: a drop outside any target leaves the highlight on.
+  for (const { el } of els.dropZones) el.classList.remove("drop-target");
+}
+
+function canDropOn(toZone) {
+  return canTransition(state.dragSourceZone, toZone);
+}
+
+function setupDropTargets() {
+  for (const { el, zone } of els.dropZones) {
+    el.addEventListener("dragover", (e) => {
+      if (!canDropOn(zone)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      el.classList.add("drop-target");
+    });
+    el.addEventListener("dragleave", (e) => {
+      // dragleave also fires when the cursor enters a child element.
+      // Only clear the highlight when we've truly left the zone.
+      if (!el.contains(e.relatedTarget)) el.classList.remove("drop-target");
+    });
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      el.classList.remove("drop-target");
+      if (!canDropOn(zone)) return;
+      const id = e.dataTransfer.getData("text/instance-id");
+      if (id) moveInstanceTo(id, zone);
+    });
+  }
+}
+
+// ============================================================
+// Play-specific modal openers (shared modal infra lives in app.js)
+// ============================================================
+function openCommanderModal(card) {
+  showModal(card, []); // commanders are read-only
+}
+
+function openInstanceModal(instance) {
+  if (!state.game) return;
+  const found = findInstance(state.game, instance.instanceId);
+  if (!found) return;
+  const id = instance.instanceId;
+  const actions = [];
+  if (found.zone === "hand") {
+    actions.push({ label: "Jouer", primary: true, fn: () => moveInstanceTo(id, "battlefield") });
+    actions.push({ label: "Défausser", fn: () => moveInstanceTo(id, "graveyard") });
+  } else if (found.zone === "battlefield") {
+    actions.push({
+      label: found.instance.tapped ? "Dégager" : "Engager",
+      primary: true,
+      fn: () => tapInstance(id),
+    });
+    actions.push({ label: "→ Cimetière", fn: () => moveInstanceTo(id, "graveyard") });
+    actions.push({ label: "→ Main", fn: () => moveInstanceTo(id, "hand") });
+  } else if (found.zone === "graveyard") {
+    actions.push({ label: "→ Main", primary: true, fn: () => moveInstanceTo(id, "hand") });
+    actions.push({ label: "→ Champ de bataille", fn: () => moveInstanceTo(id, "battlefield") });
+  } else if (found.zone === "command") {
+    actions.push({ label: "Jouer", primary: true, fn: () => moveInstanceTo(id, "battlefield") });
+  }
+  showModal(instance.card, actions);
+}
+
+/* Graveyard "open the pile" modal. Renders all graveyard cards as a
+ * grid with two action buttons each (→ Main, → Champ de bataille).
+ * Acting on a card re-renders the modal in place; once empty, closes. */
+function openGraveyardModal() {
+  if (!state.game || state.game.graveyard.length === 0) return;
+  state.focusBeforeModal = document.activeElement;
+  els.modalImg.removeAttribute("src");
+  els.modalImg.alt = "";
+  els.modal.classList.add("open");
+  els.modal.focus();
+  renderGraveyardModalContent();
+}
+
+function renderGraveyardModalContent() {
+  if (!state.game) { closeModal(); return; }
+  const cards = state.game.graveyard;
+  els.modalActions.replaceChildren();
+  if (cards.length === 0) { closeModal(); return; }
+
+  const wrap = document.createElement("div");
+  wrap.className = "graveyard-picker";
+
+  const title = document.createElement("h3");
+  title.className = "graveyard-picker-title";
+  title.textContent = `Cimetière — ${pluralFr(cards.length, "carte")}`;
+  wrap.appendChild(title);
+
+  const grid = document.createElement("div");
+  grid.className = "graveyard-grid";
+  // Top of the pile first — matches the visual order the user just clicked.
+  for (let i = cards.length - 1; i >= 0; i--) {
+    grid.appendChild(makeGraveyardTile(cards[i]));
+  }
+  wrap.appendChild(grid);
+
+  els.modalActions.appendChild(wrap);
+}
+
+function makeGraveyardTile(inst) {
+  const tile = document.createElement("div");
+  tile.className = "graveyard-tile";
+
+  const src = cardImage(inst.card, "normal");
+  if (src) {
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = inst.card.name;
+    img.loading = "lazy";
+    tile.appendChild(img);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "graveyard-tile-actions";
+  const toHand = document.createElement("button");
+  toHand.type = "button";
+  toHand.className = "primary";
+  toHand.textContent = "→ Main";
+  toHand.addEventListener("click", () => moveFromGraveyard(inst.instanceId, "hand"));
+  const toBattlefield = document.createElement("button");
+  toBattlefield.type = "button";
+  toBattlefield.textContent = "→ Champ";
+  toBattlefield.addEventListener("click", () => moveFromGraveyard(inst.instanceId, "battlefield"));
+  actions.append(toHand, toBattlefield);
+  tile.appendChild(actions);
+
+  return tile;
+}
+
+function moveFromGraveyard(instanceId, zone) {
+  if (!state.game) return;
+  if (!moveInstance(state.game, instanceId, zone)) return;
+  renderAll();
+  renderGraveyardModalContent();
+}

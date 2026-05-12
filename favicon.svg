@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <circle cx="32" cy="32" r="30" fill="#1d232b" stroke="#3a4554" stroke-width="1"/>
+  <!-- Color-pie connectors (WUBRG ally pairs around the wheel) -->
+  <g stroke="#4cc2ff" stroke-width="1.6" opacity="0.55" fill="none" stroke-linecap="round">
+    <line x1="32" y1="14" x2="49" y2="26"/>
+    <line x1="49" y1="26" x2="43" y2="48"/>
+    <line x1="43" y1="48" x2="21" y2="48"/>
+    <line x1="21" y1="48" x2="15" y2="26"/>
+    <line x1="15" y1="26" x2="32" y2="14"/>
+  </g>
+  <!-- WUBRG pips at the canonical color-wheel positions -->
+  <circle cx="32" cy="14" r="6.5" fill="#f5e9c0"/>
+  <circle cx="49" cy="26" r="6.5" fill="#4ea8de"/>
+  <circle cx="43" cy="48" r="6.5" fill="#a78bfa"/>
+  <circle cx="21" cy="48" r="6.5" fill="#ff8a73"/>
+  <circle cx="15" cy="26" r="6.5" fill="#6ee7b7"/>
+</svg>

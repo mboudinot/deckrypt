@@ -1,0 +1,2044 @@
+:root {
+  --bg: #14181d;
+  --panel: #1d232b;
+  --panel-2: #262e38;
+  --border: #2f3845;
+  --text: #e6edf3;
+  --muted: #8a96a8;
+  --accent: #4cc2ff;
+  --success: #6ee7b7;
+  --error: #ff8a8a;
+  --w: #f5e9c0;
+  --u: #4ea8de;
+  --b: #a78bfa;
+  --r: #ff8a73;
+  --g: #6ee7b7;
+  --shadow: 0 6px 18px rgba(0,0,0,0.45);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+/* Visually hidden but available to screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Keyboard focus indicator (only shown for keyboard users). */
+button:focus-visible,
+.card:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.modal:focus { outline: none; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: linear-gradient(180deg, #0d1117 0%, #14181d 100%);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 16px;
+}
+header { text-align: center; margin-bottom: 16px; }
+header h1 { margin: 0; font-size: 1.4rem; letter-spacing: 0.5px; }
+header .sub { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+.container { max-width: 1500px; margin: 0 auto; }
+
+/* Header row: tabs centered, Import action pinned to the right.
+   Grid `1fr auto 1fr` keeps the tabs visually centered regardless of
+   the import button's width. */
+.header-actions {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.header-actions .view-tabs { grid-column: 2; justify-self: center; }
+.header-actions .header-action { grid-column: 3; justify-self: end; }
+.header-action {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+}
+
+/* View tabs (Jouer / Gérer / Analyser). Sidebar stays visible across
+   both views; only the right column swaps (see .play-area /
+   .manage-area below). The pill background for the active tab is a
+   single absolutely-positioned indicator that slides via JS (see
+   positionViewTabIndicator in app.js), giving the click feedback its
+   animated feel. */
+.view-tabs {
+  position: relative;
+  display: inline-flex;
+  gap: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+}
+.view-tab-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  background: var(--accent);
+  border-radius: 999px;
+  transform: translateX(0);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-tab-indicator { transition: none; }
+}
+.view-tab {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 6px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.view-tab:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+  border: none;
+}
+.view-tab.active {
+  color: #06121b;
+}
+.view-tab.active:hover:not(:disabled) {
+  color: #06121b;
+}
+
+/* Two-column layout: deck info on the left, play area on the right.
+   Sidebar sticks to the viewport so deck/commanders/stats stay visible
+   while you scroll through battlefield/hand/graveyard. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 360px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.sidebar,
+.play-area,
+.manage-area,
+.analyze-area,
+.gallery-area {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0; /* let flex children shrink to fit */
+}
+/* All four views share the same right-column cell by default; only
+   one is visible at a time. The author `display: flex` rule above
+   has the same specificity as the UA's `[hidden]{display:none}` and
+   wins by origin, so we override `hidden` explicitly here. */
+.play-area, .manage-area, .analyze-area, .gallery-area {
+  grid-column: 2;
+  grid-row: 1;
+}
+.play-area[hidden],
+.manage-area[hidden],
+.analyze-area[hidden],
+.gallery-area[hidden] {
+  display: none;
+}
+/* Gallery is the lone full-width view: when it's active, the sidebar
+   disappears and the layout collapses to a single column so the
+   gallery occupies the entire viewport width. The `gallery-active`
+   class on <body> is toggled by switchView. */
+body.gallery-active .layout { grid-template-columns: 1fr; }
+body.gallery-active .sidebar { display: none; }
+body.gallery-active .gallery-area { grid-column: 1 / -1; }
+.sidebar { grid-column: 1; grid-row: 1; }
+.sidebar {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+/* Hide the sidebar's scrollbar visually while keeping it functional. */
+.sidebar::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+.layout section { margin-bottom: 0; }
+
+section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  flex-wrap: wrap;
+}
+.section-title strong {
+  color: var(--text);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.deck-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.deck-bar label { color: var(--muted); font-size: 0.9rem; }
+.deck-bar select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  flex: 1;
+  min-width: 0;
+}
+/* The status line sits below the deck bar — it's now reserved for
+   transient ops feedback (loading, errors, save failures). The
+   persistent deck-composition info lives in the Analyze view's
+   "Conformité au format" section. */
+.deck-status {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.deck-status:empty { display: none; }
+.deck-status.error { color: var(--error); }
+.deck-status.success { color: var(--success); }
+
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  min-height: 200px;
+}
+.commander-row .cards { justify-content: flex-start; }
+
+/* Hand and graveyard share a row below the battlefield. The graveyard
+   takes a single-card column; cards stack vertically inside it (a real
+   pile/z-stacking pass will come later). */
+.play-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: start;
+}
+.play-row > section { margin-bottom: 0; }
+
+/* Bottom row: "ajouter un terrain" and "actions" share the width.
+   1fr 1fr keeps them balanced; auto-flow lets them stack on narrow
+   viewports. */
+.bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.bottom-row > section { margin-bottom: 0; }
+@media (max-width: 720px) {
+  .bottom-row { grid-template-columns: 1fr; }
+}
+.graveyard-section { width: 190px; }
+/* Pile-of-cards layout: one card visible on top, depth suggested by
+   pseudo-elements (cheap — no extra DOM, no extra image loads). */
+.graveyard-section .cards {
+  position: relative;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-height: 210px;
+  /* Allow the staggered pseudo-card edges to peek past the box. */
+  overflow: visible;
+}
+.graveyard-section .cards.has-stack::before,
+.graveyard-section .cards.has-deep-stack::after {
+  content: "";
+  position: absolute;
+  width: 146px;
+  aspect-ratio: 488 / 680;
+  top: 0;
+  left: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 0;
+}
+.graveyard-section .cards.has-stack::before {
+  transform: translate(-50%, 0) rotate(-2deg) translate(-3px, 4px);
+}
+.graveyard-section .cards.has-deep-stack::after {
+  transform: translate(-50%, 0) rotate(3deg) translate(4px, 7px);
+}
+.graveyard-section .cards .card {
+  z-index: 1; /* sit above the depth pseudo-elements */
+}
+@media (max-width: 600px) {
+  .graveyard-section .cards.has-stack::before,
+  .graveyard-section .cards.has-deep-stack::after {
+    width: 110px;
+  }
+}
+
+/* Skeleton placeholders shown while a deck resolves on a cold cache.
+   Shimmer animation tells the user something's loading without the
+   layout thrashing once real content lands. */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-row, .skeleton-block {
+  background: linear-gradient(90deg,
+    var(--panel-2) 25%,
+    rgba(255, 255, 255, 0.06) 50%,
+    var(--panel-2) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+  border-radius: 8px;
+}
+.skeleton-row { height: 56px; margin-bottom: 6px; }
+.skeleton-row:last-child { margin-bottom: 0; }
+.skeleton-block { height: 80px; }
+
+/* "Add a basic land" panel: its own dedicated section below the
+   hand+graveyard row. One pill per color, with the remaining count
+   in the library shown explicitly so the affordance is unambiguous. */
+.basic-lands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.land-btn {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  letter-spacing: 0.2px;
+  background: var(--panel-2);
+}
+.land-btn .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3) inset;
+}
+.land-btn.W { color: var(--w); border-color: rgba(245, 233, 192, 0.35); }
+.land-btn.U { color: var(--u); border-color: rgba(78, 168, 222, 0.35); }
+.land-btn.B { color: var(--b); border-color: rgba(167, 139, 250, 0.35); }
+.land-btn.R { color: var(--r); border-color: rgba(255, 138, 115, 0.35); }
+.land-btn.G { color: var(--g); border-color: rgba(110, 231, 183, 0.35); }
+.land-btn.W .dot { background: var(--w); }
+.land-btn.U .dot { background: var(--u); }
+.land-btn.B .dot { background: var(--b); }
+.land-btn.R .dot { background: var(--r); }
+.land-btn.G .dot { background: var(--g); }
+
+/* Coloured hover keeps the colour cue (the default button:hover would
+   flatten everything to --accent and lose the WUBRG identity). */
+.land-btn.W:hover:not(:disabled) { background: rgba(245, 233, 192, 0.18); border-color: var(--w); color: var(--w); }
+.land-btn.U:hover:not(:disabled) { background: rgba(78, 168, 222, 0.18); border-color: var(--u); color: var(--u); }
+.land-btn.B:hover:not(:disabled) { background: rgba(167, 139, 250, 0.18); border-color: var(--b); color: var(--b); }
+.land-btn.R:hover:not(:disabled) { background: rgba(255, 138, 115, 0.18); border-color: var(--r); color: var(--r); }
+.land-btn.G:hover:not(:disabled) { background: rgba(110, 231, 183, 0.18); border-color: var(--g); color: var(--g); }
+.land-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* Strong disabled state: heavily dimmed, desaturated, struck through.
+   Overrides the default button:disabled (opacity 0.4) — for these
+   buttons, "épuisé" needs to read at a glance. */
+.land-btn:disabled {
+  opacity: 0.28;
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
+  filter: grayscale(0.85);
+  text-decoration: line-through;
+}
+.land-btn:disabled .dot { opacity: 0.5; }
+
+/* Drag-and-drop visual feedback. */
+.card[draggable="true"] { cursor: grab; }
+.card[draggable="true"]:active { cursor: grabbing; }
+.card.dragging { opacity: 0.4; }
+.cards.drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  background: rgba(76, 194, 255, 0.06);
+  border-radius: 8px;
+}
+
+.card {
+  position: relative;
+  width: 146px;
+  aspect-ratio: 488 / 680;
+  border-radius: 10px;
+  background: var(--panel-2);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+}
+.card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.6);
+  z-index: 2;
+}
+.card img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.card .skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #232b35 0%, #2e3744 50%, #232b35 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.card .skeleton-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 8px;
+  line-height: 1.3;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.card.error .skeleton { display: none; }
+.card.error img { display: none; }
+.card.error .skeleton-label { color: var(--error); }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.stat {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.stat .label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.stat .value { font-size: 1.4rem; font-weight: 600; margin-top: 2px; }
+.pip-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.pip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  background: rgba(255,255,255,0.04);
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.pip .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.pip.W .dot { background: var(--w); } .pip.W { color: var(--w); }
+.pip.U .dot { background: var(--u); } .pip.U { color: var(--u); }
+.pip.B .dot { background: var(--b); } .pip.B { color: var(--b); }
+.pip.R .dot { background: var(--r); } .pip.R { color: var(--r); }
+.pip.G .dot { background: var(--g); } .pip.G { color: var(--g); }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+button:hover:not(:disabled) {
+  background: var(--accent);
+  color: #06121b;
+  border-color: var(--accent);
+}
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.primary {
+  background: var(--accent);
+  color: #06121b;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled) { background: #6cd1ff; }
+button.ghost {
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 12px;
+}
+button.ghost:hover:not(:disabled) {
+  background: var(--error);
+  color: #06121b;
+  border-color: var(--error);
+}
+/* Square icon-only buttons (e.g. delete-deck trash). Padding is balanced
+   so the SVG sits centred without external whitespace. */
+button.icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  line-height: 1;
+}
+button.icon-only svg { display: block; }
+
+/* ============================================================
+   Manage view
+   ============================================================ */
+.manage-area .manage-meta {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.manage-format {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.manage-format select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Deck-level action buttons in the Manage view (export, future:
+   duplicate, reset…). One row, right-aligned. */
+.manage-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* EN | FR pill switch in the manage view's section title. Mirrors
+   the look of the global view-tabs at a smaller scale. */
+.lang-switch {
+  display: inline-flex;
+  margin-left: auto;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+}
+.lang-switch button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 3px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+}
+.lang-switch button:hover:not(.active):not(:disabled) {
+  background: transparent;
+  color: var(--text);
+  border: none;
+}
+.lang-switch button.active {
+  background: var(--accent);
+  color: #06121b;
+}
+.lang-switch button.active:hover:not(:disabled) {
+  background: #6cd1ff;
+  color: #06121b;
+}
+/* While translations are fetching: hide the label and spin a small
+   indicator in its place. Disabled prevents double-clicks. */
+.lang-switch button.is-loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+.lang-switch button.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 11px; height: 11px;
+  margin: -6px 0 0 -6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #06121b;
+  border-radius: 50%;
+  animation: lang-spin 0.7s linear infinite;
+}
+@keyframes lang-spin { to { transform: rotate(360deg); } }
+
+/* Visible status banner shown while a French-translation fetch is
+   in flight. Sits between the deck-info section and the cards list,
+   so it can't be missed. The 200 ms debounce in the JS prevents it
+   from flashing when the cache is already warm. */
+.translation-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(76, 194, 255, 0.10);
+  border: 1px solid rgba(76, 194, 255, 0.35);
+  border-radius: 10px;
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+/* Author `display: flex` outranks the UA's `[hidden] { display: none }`,
+   so we override `hidden` explicitly here (same trick as the view
+   panels). */
+.translation-banner[hidden] { display: none; }
+.translation-banner-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(76, 194, 255, 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: lang-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+.manage-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* Card groups in the Manage view — one section per primary type
+   (Land, Creature, Artifact …). Each group has a header with the
+   type label + a running total. */
+/* Each card-group is a native <details>; the <summary> doubles as
+   the type header. Default open; the user can fold individual types
+   away (state lives in state.collapsedManageGroups for the session). */
+.card-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0 4px;
+  margin-top: 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  cursor: pointer;
+  list-style: none;            /* hide the default disclosure triangle */
+  user-select: none;
+}
+.card-group-title::-webkit-details-marker { display: none; }
+.card-group-title:hover { color: var(--text); }
+.card-group-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.card-group:first-child .card-group-title { margin-top: 0; }
+.card-group-count {
+  margin-left: auto;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+.card-group-chevron {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-left: 6px;
+  transition: transform 0.2s ease;
+}
+.card-group[open] > .card-group-title > .card-group-chevron {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-group-chevron { transition: none; }
+}
+.card-group-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-row {
+  display: grid;
+  grid-template-columns: 50px 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+/* The thumb is a button — clicking it opens the modal preview at full
+   size. Override the global button styles (padding/font/colour-flip
+   on hover) since this is a media affordance, not a text button. */
+.card-row-thumb {
+  width: 50px;
+  aspect-ratio: 488 / 680;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.3);
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+  flex-shrink: 0;
+}
+.card-row-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.card-row-thumb:hover:not(:disabled) {
+  background: rgba(0,0,0,0.3);
+  color: var(--text);
+  border-color: var(--accent);
+  transform: scale(1.04);
+}
+.card-row-thumb:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.card-row-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Per-row "translating to FR…" feedback. The name dims, a small
+   inline spinner sits next to it. Removed once the batch carrying
+   this card's translation lands. */
+.card-row.is-translating .card-row-name {
+  opacity: 0.55;
+}
+.card-row-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-left: 8px;
+  vertical-align: middle;
+  border: 1.5px solid rgba(76, 194, 255, 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: lang-spin 0.7s linear infinite;
+}
+.card-row-printing {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  border-radius: 6px;
+}
+.card-row-printing:hover:not(:disabled) {
+  background: var(--accent);
+  color: #06121b;
+  border-color: var(--accent);
+}
+.card-row-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.card-row-qty button {
+  padding: 2px 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 26px;
+}
+.card-row-qty span {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.card-row-remove { padding: 6px; }
+
+/* Add-card panel */
+.add-card-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) {
+  .add-card-block { grid-template-columns: 1fr; }
+}
+.add-card-search { position: relative; }
+.add-card-search input {
+  width: 100%;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.suggestions {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  position: absolute;
+  inset-inline: 0;
+  z-index: 5;
+}
+.suggestions li {
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.suggestions li:hover { background: var(--accent); color: #06121b; }
+/* Two-tier suggestion: French (primary) + English (muted). When only
+   English is available, .suggestion-primary stands alone. */
+.suggestion-primary { font-weight: 500; }
+.suggestion-secondary {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+.suggestions li:hover .suggestion-secondary { color: rgba(6, 18, 27, 0.7); }
+
+/* Add-card draft slot: appears after the user picks a suggestion.
+   Lets them choose an edition + a quantity before committing — so
+   "Island BFZ ×6" and "Island MOM ×4" become two distinct entries. */
+.add-card-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.add-card-draft[hidden] { display: none; }
+.add-card-draft-name {
+  font-size: 1rem;
+  color: var(--text);
+}
+.add-card-draft-preview {
+  align-self: center;
+  width: 200px;
+  max-width: 100%;
+  aspect-ratio: 488 / 680;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  background: var(--panel);
+}
+.add-card-draft-preview[hidden] { display: none; }
+.add-card-draft label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.add-card-draft select,
+.add-card-draft input[type=number] {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.add-card-draft input[type=number] {
+  font-variant-numeric: tabular-nums;
+  width: 80px;
+}
+.add-card-draft select:disabled { opacity: 0.5; }
+.add-card-draft-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.add-card-paste textarea {
+  width: 100%;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  min-height: 100px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+/* ============================================================
+   Analyze view
+   ============================================================ */
+.analyze-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.analyze-row > section { margin-bottom: 0; }
+@media (max-width: 720px) {
+  .analyze-row { grid-template-columns: 1fr; }
+}
+
+/* Bracket panel: big number + label + tooltip-style note. */
+.bracket-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.bracket-badge {
+  flex: 0 0 auto;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  font-weight: 700;
+  background: var(--panel-2);
+  border: 2px solid var(--accent);
+  color: var(--accent);
+}
+.bracket-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bracket-meta strong { font-size: 1rem; }
+.bracket-meta .gc-count { color: var(--muted); font-size: 0.85rem; }
+.bracket-meta .note { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+
+/* Game-changer accordion. Native <summary> bullet replaced by a
+   chevron that rotates on open. Body uses .cards/.card styles so
+   GCs render at the same 146px thumbnail size as the play view. */
+/* Amber accent — Game Changers are prestigious / power-tier cards,
+   not warnings. Red (var(--r)) used to read as "something's wrong";
+   amber (same hue as Planeswalker in TYPE_COLORS) signals
+   "noteworthy / legendary" instead. */
+.gc-details {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-left: 4px solid #fbbf24;
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.gc-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.gc-summary::-webkit-details-marker { display: none; }
+.gc-summary:hover { background: rgba(251, 191, 36, 0.10); }
+.gc-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.gc-summary .gc-count {
+  color: #fbbf24;
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex: 1;
+}
+.gc-chevron {
+  color: #fbbf24;
+  font-size: 0.85rem;
+  transition: transform 0.2s ease;
+}
+.gc-details[open] .gc-chevron { transform: rotate(180deg); }
+.gc-details[open] .gc-summary { border-bottom: 1px solid var(--border); }
+@media (prefers-reduced-motion: reduce) {
+  .gc-chevron { transition: none; }
+}
+.gc-cards {
+  padding: 12px;
+  justify-content: flex-start;
+  min-height: 0;
+}
+
+/* Suggestion rows: status (ok/low/high/info) drives the left-border
+   colour. Each row carries a label, a current/target counter and a
+   one-line piece of advice. */
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.suggestion-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+.suggestion-row.suggestion-ok   { border-left-color: var(--success); }
+.suggestion-row.suggestion-low,
+.suggestion-row.suggestion-high { border-left-color: #f5a623; }
+.suggestion-row.suggestion-info { border-left-color: var(--muted); }
+.suggestion-icon {
+  font-size: 1.1rem;
+  line-height: 1.4;
+  flex-shrink: 0;
+  width: 1.2rem;
+  text-align: center;
+}
+.suggestion-row.suggestion-ok   .suggestion-icon { color: var(--success); }
+.suggestion-row.suggestion-low  .suggestion-icon,
+.suggestion-row.suggestion-high .suggestion-icon { color: #f5a623; }
+.suggestion-row.suggestion-info .suggestion-icon { color: var(--muted); }
+.suggestion-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.suggestion-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.suggestion-head strong { font-size: 0.95rem; }
+.suggestion-value {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+.suggestion-current {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.suggestion-target {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+/* Colour the big current value by status — that's the at-a-glance
+   signal the user actually scans. */
+.suggestion-row.suggestion-ok   .suggestion-current { color: var(--success); }
+.suggestion-row.suggestion-low  .suggestion-current,
+.suggestion-row.suggestion-high .suggestion-current { color: #f5a623; }
+.suggestion-row.suggestion-info .suggestion-current { color: var(--text); }
+.suggestion-advice {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Archetype detection: top 1–3 strategy classifications with a
+   confidence bar. The fill width is set inline (computed from the
+   heuristic score / max ratio). */
+.archetypes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.archetype-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.archetype-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.archetype-percent {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.archetype-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.archetype-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #6cd1ff);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Theme pills: descriptive (no status), one per detected pattern.
+   The pill carries the theme name + the matching card count. */
+.themes-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.theme-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.theme-pill strong {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.theme-pill {
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.theme-pill:hover:not(.active) { border-color: var(--accent); }
+.theme-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06121b;
+}
+.theme-pill.active strong { color: #06121b; }
+.theme-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Cards panel revealed below the theme pills when one is selected.
+   Single instance — content is swapped when the user picks another
+   theme, hidden when the active theme is toggled off. */
+.theme-panel {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.theme-panel[hidden] { display: none; }
+.theme-panel-cards {
+  justify-content: flex-start;
+  min-height: 0;
+}
+
+/* Composition summary above the legality list: deck-count breakdown
+   (commanders, deck cards, total) with a conformity badge derived from
+   the format's expected total (e.g. 100 for commander). */
+.legality-composition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.legality-composition:empty { display: none; }
+.legality-composition .composition-counts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 0.95rem;
+}
+.legality-composition .composition-counts strong { color: var(--text); }
+.legality-composition .composition-counts .sep {
+  color: var(--border);
+  margin: 0 2px;
+}
+.legality-composition .composition-badge {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.legality-composition .composition-badge.badge-ok      { color: var(--success); border-color: var(--success); }
+.legality-composition .composition-badge.badge-warning { color: #f5a623;       border-color: #f5a623; }
+
+/* Legality rows: prescriptive checks for Commander-format decks. */
+.legality-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.legality-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+.legality-row.legality-ok      { border-left-color: var(--success); }
+.legality-row.legality-warning { border-left-color: #f5a623; }
+.legality-row.legality-error   { border-left-color: var(--error); }
+.legality-icon {
+  font-size: 1.1rem;
+  font-weight: 700;
+  width: 1.2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+.legality-row.legality-ok      .legality-icon { color: var(--success); }
+.legality-row.legality-warning .legality-icon { color: #f5a623; }
+.legality-row.legality-error   .legality-icon { color: var(--error); }
+.legality-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.legality-detail {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Mana curve: vertical bars in a row, height proportional to count. */
+.mana-curve {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  align-items: end;
+  height: 180px;
+  padding: 0 4px;
+}
+.mana-curve-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.mana-curve-bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--accent) 0%, #2c92c8 100%);
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  min-height: 2px;
+  transition: height 0.2s ease;
+}
+.mana-curve-bar-value {
+  position: absolute;
+  inset: -18px 0 auto 0;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.mana-curve-label {
+  font-size: 0.78rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--muted);
+}
+
+/* Card-types: stacked horizontal bar + legend. Simpler to read at
+   a glance than a donut and avoids SVG label positioning headaches. */
+.type-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.type-chart-bar {
+  display: flex;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.type-chart-segment {
+  height: 100%;
+  min-width: 0; /* allows flex-basis to shrink */
+}
+.type-chart-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 4px 12px;
+  font-size: 0.82rem;
+}
+.type-chart-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.type-chart-legend-row .swatch {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.type-chart-legend-row .name { color: var(--muted); flex: 1; min-width: 0; }
+.type-chart-legend-row .num { font-weight: 600; }
+
+/* Subtype list: pills with count badges, sorted by frequency. */
+.subtype-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.subtype-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+.subtype-pill .count {
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mana-base panel: counters on top (multicolor / fetches), per-colour
+   ratio bars below. The bar's width visualises sources/symbols (clamped
+   at 100 % so bigger ratios don't blow out the row). */
+.mana-base-counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.mana-base-counter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.mana-base-counter strong {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.mana-base-counter span {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.mana-base-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mana-base-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+.mana-base-row .pip { padding: 2px 10px; font-size: 0.85rem; }
+.mana-base-bar {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.mana-base-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.25s ease;
+}
+.mana-base-row.mana-base-low .mana-base-bar { box-shadow: 0 0 0 1px rgba(245, 166, 35, 0.5); }
+.mana-base-row.mana-base-low .mana-base-meta strong { color: #f5a623; }
+.mana-base-meta {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.mana-base-meta strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.mana-base-sep { color: var(--muted); font-size: 0.78rem; }
+.mana-base-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* Token grid: small thumbnails of each token the deck can produce. */
+.token-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+.token-tile {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 488 / 680;
+  position: relative;
+}
+.token-tile img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.token-tile-cap {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: linear-gradient(0deg, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0));
+  color: var(--text);
+  padding: 10px 6px 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Graveyard "open the pile" modal — same width as the printing
+   picker so the layout stays consistent. Each tile has two action
+   buttons sized to fit the column. */
+.graveyard-picker {
+  width: 94vw;
+  max-width: 1600px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.graveyard-picker-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+.graveyard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  max-height: 78vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+.graveyard-tile {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.graveyard-tile img {
+  width: 100%;
+  aspect-ratio: 488 / 680;
+  object-fit: cover;
+  display: block;
+}
+.graveyard-tile-actions {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+}
+.graveyard-tile-actions button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Printing picker — a wider grid in the existing modal. The wrapper's
+   explicit width is what lets the grid expand into multiple columns
+   inside the modal-actions flex container (a bare grid would size to
+   its content's min-width and collapse to a single column). */
+.printing-picker {
+  width: 94vw;
+  max-width: 1600px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.printing-picker-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+/* 220 px ≈ a Magic card at near-real-life size on a typical screen.
+   At our 1600 px max-width that gives 6 columns; on a 1280 px viewport
+   ~5. Below ~520 px it falls to 2 columns automatically. */
+.printing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  max-height: 82vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+.printing-tile {
+  position: relative;
+  padding: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 488 / 680;
+}
+.printing-tile img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.printing-tile-cap {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: linear-gradient(0deg, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0));
+  color: var(--text);
+  padding: 12px 8px 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.4px;
+  pointer-events: none;
+}
+.printing-tile {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+/* Hover: scale up + raise z-index so the tile floats above its
+   neighbours. Lets the user inspect the art and the set/cn caption
+   without opening anything. */
+.printing-tile:hover:not(:disabled),
+.printing-tile:focus-visible:not(:disabled) {
+  border-color: var(--accent);
+  transform: scale(1.18);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+  z-index: 5;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  cursor: zoom-out;
+}
+.modal.open { display: flex; }
+
+/* Import / Export modal — separate from the card-preview modal
+   because it has editable content (textarea) and we DON'T want a
+   backdrop click to discard it. Closed only by the X button or
+   Escape key. */
+.ie-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.ie-modal.open { display: flex; }
+.ie-modal[hidden] { display: none; }
+.ie-modal-content {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  width: min(90vw, 720px);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ie-modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.ie-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.ie-modal-close:hover:not(:disabled) {
+  background: var(--panel-2);
+  color: var(--text);
+  border: none;
+}
+.ie-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  align-self: flex-start;
+}
+.ie-tab {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 6px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.ie-tab:hover:not(.active):not(:disabled) {
+  background: transparent;
+  color: var(--text);
+  border: none;
+}
+.ie-tab.active {
+  background: var(--accent);
+  color: #06121b;
+}
+.ie-tab.active:hover:not(:disabled) {
+  background: #6cd1ff;
+  color: #06121b;
+}
+.ie-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ie-panel[hidden] { display: none; }
+
+/* Import panel inherits some of the old import-panel styling
+   (input + textarea + preview + action row). */
+.ie-panel input[type="text"],
+.ie-panel textarea,
+.ie-panel select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  width: 100%;
+}
+.ie-panel textarea {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  min-height: 220px;
+  resize: vertical;
+}
+#export-output {
+  min-height: 280px;
+  background: #0f1419;
+}
+.import-preview {
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.import-preview .ok { color: var(--success); }
+.import-preview .err { color: var(--error); display: block; margin-top: 4px; }
+.import-actions, .export-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.export-actions .export-feedback {
+  margin-right: auto;
+  color: var(--success);
+  font-size: 0.85rem;
+}
+.export-description {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-style: italic;
+}
+.modal-content {
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  /* 96vw lets the printing picker (94vw) breathe; the image preview
+     keeps its own 90vw cap below so that path is unaffected. */
+  max-width: 96vw;
+  max-height: 96vh;
+}
+/* Scope to the main preview image — child images of the printing
+   picker grid have their own sizing rules. */
+#modal-img {
+  max-width: 90vw;
+  max-height: calc(90vh - 80px);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+}
+#modal-img:not([src]) { display: none; }
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.modal-actions:empty { display: none; }
+
+.game-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.game-bar strong { color: var(--text); }
+.game-bar .sep { opacity: 0.5; }
+
+/* Engaged (tapped) cards: dimmed + corner badge. A 90° rotation would
+   break flex-row layout, so we use an in-place visual cue. */
+.card.tapped { filter: brightness(0.55) saturate(0.8); }
+.card.tapped::after {
+  content: "ENGAGÉ";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--accent);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.placeholder-empty {
+  color: var(--muted);
+  text-align: center;
+  width: 100%;
+  padding: 40px 0;
+  font-size: 0.9rem;
+}
+
+/* Stack the two columns once the sidebar can no longer host two
+   commanders side-by-side comfortably. On mobile the play-area is
+   promoted above the sidebar — the hand is the primary content. */
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; }
+  .play-area { order: 1; }
+  .sidebar {
+    order: 2;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 600px) {
+  body { padding: 8px; }
+  .card { width: 110px; }
+  section { padding: 10px; }
+  header h1 { font-size: 1.15rem; }
+  .layout { gap: 10px; }
+  .sidebar, .play-area { gap: 10px; }
+  .graveyard-section { width: 145px; }
+  .graveyard-section .cards { min-height: 165px; }
+}
+
+/* ============================================================
+   Flash messages: bottom-right transient toasts. The container is
+   ARIA-live polite so screen readers announce each message without
+   interrupting. Items slide up on append and fade out on dismissal;
+   prefers-reduced-motion strips both animations.
+
+   API: flash(message, kind?) — see js/app.js. Kinds: success, info,
+   error, warning. Each gets a left-border accent color.
+   ============================================================ */
+#flash-container {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  max-width: min(360px, calc(100vw - 32px));
+  pointer-events: none;            /* container ignores clicks; items don't */
+}
+.flash {
+  pointer-events: auto;
+  padding: 10px 14px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  animation: flash-in 0.22s ease-out;
+}
+.flash-success { border-left-color: var(--success); }
+.flash-info    { border-left-color: var(--accent); }
+.flash-warning { border-left-color: #f5a623; }
+.flash-error   { border-left-color: var(--error); }
+.flash-leaving { animation: flash-out 0.22s ease-in forwards; }
+.flash-dismiss {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 1rem;
+  line-height: 1;
+}
+.flash-dismiss:hover { color: var(--text); }
+@keyframes flash-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes flash-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flash, .flash-leaving { animation: none; }
+}
+
+/* ============================================================
+   Gallery view: full-width visual layout, one tile per deck entry,
+   grouped by type. Tiles are ~200px wide — bigger than the play
+   view's 146px thumbnails, smaller than the modal preview, so the
+   user can scan ~6 columns at a typical viewport. Images are
+   lazy-loaded so the gallery is cheap to pre-render: nothing
+   fetches until the user actually opens the Galerie tab.
+   ============================================================ */
+.gallery-area {
+  gap: 24px;
+}
+.gallery-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gallery-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 0 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+.gallery-group-count {
+  margin-left: auto;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+}
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+.gallery-tile {
+  position: relative;
+  display: block;
+  aspect-ratio: 488 / 680;
+  padding: 0;
+  border: 0;
+  background: var(--panel-2);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.gallery-tile:hover:not(:disabled),
+.gallery-tile:focus-visible {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6);
+  outline: none;
+  z-index: 2;
+}
+.gallery-tile:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent), 0 10px 26px rgba(0, 0, 0, 0.6);
+}
+.gallery-tile img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.gallery-tile-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  width: 100%;
+  height: 100%;
+}
+.gallery-tile-qty {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gallery-tile { transition: none; }
+  .gallery-tile:hover:not(:disabled),
+  .gallery-tile:focus-visible { transform: none; }
+}
+@media (max-width: 600px) {
+  .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Deckrypt — deck builder & analyse Magic: The Gathering. Stats et images via Scryfall.">
+<!-- Defense-in-depth CSP: even if an XSS slipped through, this would
+     block inline scripts, third-party image hosts, and any fetch to a
+     non-Scryfall server (preventing data exfiltration). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://*.scryfall.io https://*.scryfall.com; connect-src https://api.scryfall.com; form-action 'none'; base-uri 'none'; frame-ancestors 'none';">
+<meta name="referrer" content="no-referrer">
+<title>Deckrypt</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="styles.css">
+<script defer src="js/util.js"></script>
+<script defer src="js/decks.js"></script>
+<script defer src="js/scryfall.js"></script>
+<script defer src="js/parser.js"></script>
+<script defer src="js/storage.js"></script>
+<script defer src="js/card-cache.js"></script>
+<script defer src="js/translations.js"></script>
+<script defer src="js/deck-edit.js"></script>
+<script defer src="js/deck-analytics.js"></script>
+<script defer src="js/deck-archetypes.js"></script>
+<script defer src="js/deck-suggestions.js"></script>
+<script defer src="js/deck-mana-base.js"></script>
+<script defer src="js/deck-export.js"></script>
+<script defer src="js/game.js"></script>
+<script defer src="js/drag.js"></script>
+<script defer src="js/app-play.js"></script>
+<script defer src="js/app-manage.js"></script>
+<script defer src="js/app-analyze.js"></script>
+<script defer src="js/app-gallery.js"></script>
+<script defer src="js/app.js"></script>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Deckrypt</h1>
+    <div class="sub">Stats &amp; images via Scryfall — importe tes propres decks</div>
+    <div class="header-actions">
+      <nav class="view-tabs" role="tablist" aria-label="Vues">
+        <span class="view-tab-indicator" aria-hidden="true"></span>
+        <button id="tab-play" type="button" class="view-tab active" role="tab" aria-selected="true" aria-controls="view-play">Jouer</button>
+        <button id="tab-manage" type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="view-manage">Gérer</button>
+        <button id="tab-analyze" type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="view-analyze">Analyser</button>
+        <button id="tab-gallery" type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="view-gallery">Galerie</button>
+      </nav>
+      <button id="btn-import-toggle" type="button" class="header-action">+ Importer un deck</button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <aside class="sidebar">
+      <section>
+        <div class="deck-bar">
+          <label for="deck-select">Deck</label>
+          <select id="deck-select"></select>
+          <button id="btn-delete-deck" type="button" class="ghost icon-only" title="Supprimer ce deck" aria-label="Supprimer ce deck" hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+          </button>
+        </div>
+        <p class="deck-status" id="deck-status" aria-live="polite"></p>
+      </section>
+
+      <section>
+        <div class="section-title"><span>Partie en cours</span></div>
+        <div class="game-bar" aria-live="polite">
+          <span>Tour <strong id="turn-counter">—</strong></span>
+          <span class="sep">·</span>
+          <span>Bibliothèque : <strong id="library-count">—</strong></span>
+        </div>
+      </section>
+
+      <section class="commander-row">
+        <div class="section-title">
+          <span>Zone de commandement</span>
+          <strong id="commander-info"></strong>
+        </div>
+        <div class="cards" id="commander-zone"></div>
+      </section>
+
+      <section>
+        <div class="section-title"><span>Statistiques de la main</span></div>
+        <div class="stats" aria-live="polite">
+          <div class="stat">
+            <div class="label">Terrains</div>
+            <div class="value" id="stat-lands">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Sorts</div>
+            <div class="value" id="stat-spells">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">CMC en main</div>
+            <div class="value" id="stat-cmc">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Sources de mana</div>
+            <div class="pip-row" id="stat-sources"></div>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <div class="play-area" id="view-play" role="tabpanel" aria-labelledby="tab-play">
+      <section class="battlefield-section">
+        <div class="section-title">
+          <span>Champ de bataille</span>
+          <strong id="battlefield-info">vide</strong>
+        </div>
+        <div class="cards" id="battlefield"></div>
+      </section>
+
+      <section class="lands-section">
+        <div class="section-title">
+          <span>Terrains</span>
+          <strong id="lands-info">vide</strong>
+        </div>
+        <div class="cards" id="lands"></div>
+      </section>
+
+      <div class="play-row">
+        <section class="hand-section">
+          <div class="section-title">
+            <span>Main</span>
+            <strong id="hand-info" aria-live="polite">—</strong>
+          </div>
+          <div class="cards" id="hand"></div>
+        </section>
+
+        <section class="graveyard-section">
+          <div class="section-title">
+            <span>Cimetière</span>
+            <strong id="graveyard-info">vide</strong>
+          </div>
+          <div class="cards" id="graveyard"></div>
+        </section>
+      </div>
+
+      <div class="bottom-row">
+        <section class="basic-lands-section">
+          <div class="section-title">
+            <span>Ajouter un terrain de base</span>
+            <strong>depuis la pioche</strong>
+          </div>
+          <div class="basic-lands" id="basic-lands" role="group" aria-label="Boutons d'ajout d'un terrain de base"></div>
+        </section>
+
+        <section class="actions-section">
+          <div class="section-title"><span>Actions</span></div>
+          <div class="actions">
+            <button id="btn-draw" type="button">Pioche +1</button>
+            <button id="btn-next-turn" type="button" class="primary">Tour suivant</button>
+            <button id="btn-new" type="button">Nouvelle main</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="manage-area" id="view-manage" role="tabpanel" aria-labelledby="tab-manage" hidden>
+    <section class="manage-info">
+      <div class="section-title">
+        <span>Deck</span>
+        <strong id="manage-deck-name">—</strong>
+        <div class="lang-switch" role="radiogroup" aria-label="Langue d'affichage des cartes">
+          <button id="lang-switch-en" type="button" class="active" aria-pressed="true">EN</button>
+          <button id="lang-switch-fr" type="button" aria-pressed="false">FR</button>
+        </div>
+      </div>
+      <div class="manage-meta" id="manage-meta" aria-live="polite"></div>
+      <div class="manage-format">
+        <label for="manage-format-select">Format :</label>
+        <select id="manage-format-select">
+          <option value="commander">Commander</option>
+          <option value="limited">Format libre (40+ cartes)</option>
+        </select>
+      </div>
+      <div class="manage-actions">
+        <button id="btn-export" type="button">Exporter ce deck</button>
+      </div>
+    </section>
+
+    <div class="translation-banner" id="translation-banner" role="status" aria-live="polite" hidden>
+      <div class="translation-banner-spinner" aria-hidden="true"></div>
+      <span>Récupération des noms français via Scryfall…</span>
+    </div>
+
+    <section>
+      <div class="section-title"><span>Ajouter une carte</span></div>
+      <div class="add-card-block">
+        <div class="add-card-search">
+          <label for="add-card-input" class="sr-only">Nom de la carte</label>
+          <input id="add-card-input" type="text" placeholder="Tape un nom — Sol Ring, Counterspell…" autocomplete="off">
+          <ul id="add-card-suggestions" class="suggestions" role="listbox" hidden></ul>
+          <div id="add-card-draft" class="add-card-draft" hidden>
+            <strong id="add-card-draft-name" class="add-card-draft-name"></strong>
+            <img id="add-card-draft-preview" class="add-card-draft-preview" alt="" hidden>
+            <label>
+              Édition
+              <select id="add-card-draft-printing">
+                <option value="">Édition par défaut</option>
+              </select>
+            </label>
+            <label>
+              Quantité
+              <input id="add-card-draft-qty" type="number" min="1" max="999" value="1">
+            </label>
+            <div class="add-card-draft-actions">
+              <button id="add-card-draft-cancel" type="button" class="ghost">Annuler</button>
+              <button id="add-card-draft-submit" type="button" class="primary">Ajouter au deck</button>
+            </div>
+          </div>
+        </div>
+        <div class="add-card-paste">
+          <label for="add-card-paste-text" class="sr-only">Coller une ligne</label>
+          <textarea id="add-card-paste-text" placeholder="Ou colle une liste MTGA / Moxfield :
+1 Sol Ring (CMD) 259
+2 Forest"></textarea>
+          <button id="add-card-paste-btn" type="button">Ajouter depuis la liste</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title"><span>Commandants</span></div>
+      <div class="manage-cards" id="manage-commanders"></div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <span>Cartes</span>
+        <strong id="manage-cards-count"></strong>
+      </div>
+      <div class="manage-cards" id="manage-cards"></div>
+    </section>
+    </div>
+
+    <div class="analyze-area" id="view-analyze" role="tabpanel" aria-labelledby="tab-analyze" hidden>
+      <section>
+        <div class="section-title">
+          <span>Bracket estimé</span>
+          <strong id="analyze-bracket-label">—</strong>
+        </div>
+        <div class="bracket-panel" id="analyze-bracket"></div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span>Conformité au format</span>
+        </div>
+        <div class="legality-composition" id="analyze-composition"></div>
+        <div class="legality-list" id="analyze-legality"></div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span>Orientation du deck</span>
+          <strong id="analyze-archetypes-info"></strong>
+        </div>
+        <div class="archetypes-list" id="analyze-archetypes"></div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span>Améliorations possibles</span>
+          <strong id="analyze-suggestions-info"></strong>
+        </div>
+        <div class="suggestions-list" id="analyze-suggestions"></div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span>Thèmes détectés</span>
+          <strong id="analyze-themes-info"></strong>
+        </div>
+        <div class="themes-list" id="analyze-themes"></div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span>Courbe de mana</span>
+          <strong id="analyze-curve-info">—</strong>
+        </div>
+        <div class="mana-curve" id="analyze-curve"></div>
+      </section>
+
+      <div class="analyze-row">
+        <section>
+          <div class="section-title"><span>Types de cartes</span></div>
+          <div class="type-chart" id="analyze-types"></div>
+        </section>
+        <section>
+          <div class="section-title"><span>Sources de mana</span></div>
+          <div class="pip-row" id="analyze-sources"></div>
+        </section>
+      </div>
+
+      <section>
+        <div class="section-title">
+          <span>Base de mana</span>
+          <strong id="analyze-mana-base-info"></strong>
+        </div>
+        <div class="mana-base-panel" id="analyze-mana-base"></div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span>Sous-types de créatures</span>
+          <strong id="analyze-subtypes-info">—</strong>
+        </div>
+        <div class="subtype-list" id="analyze-subtypes"></div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span>Jetons produits</span>
+          <strong id="analyze-tokens-info">—</strong>
+        </div>
+        <div class="token-grid" id="analyze-tokens"></div>
+      </section>
+    </div>
+
+    <div class="gallery-area" id="view-gallery" role="tabpanel" aria-labelledby="tab-gallery" hidden>
+      <div id="gallery-content"></div>
+    </div>
+
+  </main>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Carte" tabindex="-1">
+  <div class="modal-content" id="modal-content">
+    <img id="modal-img" alt="">
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<div class="ie-modal" id="ie-modal" role="dialog" aria-modal="true" aria-labelledby="ie-modal-title" tabindex="-1" hidden>
+  <div class="ie-modal-content">
+    <button id="ie-modal-close" class="ie-modal-close" type="button" aria-label="Fermer">×</button>
+    <h2 id="ie-modal-title" class="ie-modal-title">Decks</h2>
+    <div class="ie-tabs" role="tablist">
+      <button id="ie-tab-import" type="button" class="ie-tab active" role="tab" aria-selected="true">Importer</button>
+      <button id="ie-tab-export" type="button" class="ie-tab" role="tab" aria-selected="false">Exporter</button>
+    </div>
+
+    <div class="ie-panel" id="ie-panel-import" role="tabpanel" aria-labelledby="ie-tab-import">
+      <label for="import-name" class="sr-only">Nom du deck</label>
+      <input id="import-name" type="text" placeholder="Nom du deck (ex: Meren EDH)">
+      <label for="import-text" class="sr-only">Liste de cartes</label>
+      <textarea id="import-text" placeholder="Colle ta liste ici. Format MTGA / Moxfield :
+// Commanders
+1 Meren of Clan Nel Toth (C15) 49
+
+// Mainboard
+1 Sol Ring (CMD) 259
+1 Command Tower (CMD) 269
+8 Forest (UNH) 140
+..."></textarea>
+      <div class="import-preview" id="import-preview" aria-live="polite">Colle une liste pour voir le récap.</div>
+      <div class="import-actions">
+        <button id="import-cancel" type="button">Annuler</button>
+        <button id="import-confirm" type="button" class="primary" disabled>Importer</button>
+      </div>
+    </div>
+
+    <div class="ie-panel" id="ie-panel-export" role="tabpanel" aria-labelledby="ie-tab-export" hidden>
+      <label for="export-format">Format</label>
+      <select id="export-format"></select>
+      <div class="export-description" id="export-description" aria-live="polite"></div>
+      <label for="export-output" class="sr-only">Decklist exportée</label>
+      <textarea id="export-output" readonly></textarea>
+      <div class="export-actions">
+        <button id="export-copy" type="button" class="primary">Copier dans le presse-papier</button>
+        <button id="export-download" type="button">Télécharger</button>
+        <span class="export-feedback" id="export-feedback" aria-live="polite"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Flash messages — ephemeral action feedback. Populated by flash(). -->
+<div id="flash-container" aria-live="polite" aria-atomic="false"></div>
+</body>
+</html>

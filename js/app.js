@@ -1,0 +1,1000 @@
+/* App spine: state, deck resolution, switchDeck, view-tab switching,
+ * skeletons, refresh-resolved state-sync, modal infra (showModal /
+ * closeModal), import/export modal, bindEvents + init.
+ *
+ * Per-view rendering lives in:
+ *   js/app-play.js     → commanders / battlefield / hand / graveyard
+ *                        + drag-and-drop + game actions
+ *   js/app-manage.js   → deck-editor, printing picker, add-card UI
+ *   js/app-analyze.js  → bracket, composition, legality, archetypes,
+ *                        suggestions, mana curve, tokens, etc.
+ *
+ * All four files share the same `state` and `els` globals; load order
+ * (set in index.html) puts app-* before app.js, but function bodies
+ * cross-reference at call time so the order is forgiving once init()
+ * runs. Pure modules (util / scryfall / game / deck-* / storage /
+ * card-cache / drag / translations / parser) are loaded earlier and
+ * provide all the building blocks. */
+
+// ============================================================
+// State (single source of truth — never mutate from outside)
+// ============================================================
+const state = {
+  // Set in init() once defaults are seeded; null means "no deck loaded".
+  currentDeckId: null,
+  /* In-memory snapshot of the active deck, shape:
+   *   { def, commanders: [Card], deck: [Card], notFound: [string] }
+   * `deck` is expanded by qty (a 4-of becomes 4 references to the same
+   * card object). Invariant: if non-null, this mirrors `(def, card-cache)`
+   * for the active deck. Maintained by refreshResolved(def), which is the
+   * ONLY function allowed to update it after switchDeck/resolveDeck have
+   * established the initial value. Never mutate fields in place — assign
+   * a fresh object so identity-based change detection still works. */
+  resolved: null,
+  // Active game state (null until a deck loads). See game.js for shape.
+  game: null,
+  // Incremented on every switchDeck. Lets us discard stale Scryfall
+  // resolutions when the user switches faster than the API responds.
+  switchToken: 0,
+  // Incremented on every refreshResolved call. Lets _refreshResolvedAsync
+  // discard its in-flight fetch when a newer refresh starts (sync or async).
+  refreshToken: 0,
+  deckCache: new Map(),
+  // Saved before opening the modal so we can restore focus on close.
+  focusBeforeModal: null,
+  // Source zone of the card currently being dragged. Cleared on dragend.
+  // Set in dragstart and read in dragover (where dataTransfer.getData is
+  // unavailable for security reasons), so we can validate transitions live.
+  dragSourceZone: null,
+  // Card-name display language for the manage view ("en" | "fr").
+  // Persisted in localStorage. Translations themselves live in their
+  // own cache (see js/translations.js).
+  manageLang: "en",
+  // Type-buckets the user collapsed in the manage view (string keys
+  // like "Land", "Creature"). Survives re-renders within a session
+  // so editing a card doesn't reopen a closed group. Not persisted
+  // to localStorage — it's a working-set preference, not a setting.
+  collapsedManageGroups: new Set(),
+};
+
+
+// ============================================================
+// DOM elements (cached during init)
+// ============================================================
+const els = {};
+
+function cacheElements() {
+  els.deckSelect = document.getElementById("deck-select");
+  els.deckStatus = document.getElementById("deck-status");
+  els.btnDeleteDeck = document.getElementById("btn-delete-deck");
+  els.btnImportToggle = document.getElementById("btn-import-toggle");
+  els.btnDraw = document.getElementById("btn-draw");
+  els.btnNextTurn = document.getElementById("btn-next-turn");
+  els.btnNew = document.getElementById("btn-new");
+  els.turnCounter = document.getElementById("turn-counter");
+  els.libraryCount = document.getElementById("library-count");
+  els.commanderZone = document.getElementById("commander-zone");
+  els.commanderInfo = document.getElementById("commander-info");
+  els.battlefield = document.getElementById("battlefield");
+  els.battlefieldInfo = document.getElementById("battlefield-info");
+  els.lands = document.getElementById("lands");
+  els.landsInfo = document.getElementById("lands-info");
+  els.hand = document.getElementById("hand");
+  els.handInfo = document.getElementById("hand-info");
+  els.graveyard = document.getElementById("graveyard");
+  els.graveyardInfo = document.getElementById("graveyard-info");
+  els.basicLands = document.getElementById("basic-lands");
+  els.statLands = document.getElementById("stat-lands");
+  els.statSpells = document.getElementById("stat-spells");
+  els.statCmc = document.getElementById("stat-cmc");
+  els.statSources = document.getElementById("stat-sources");
+  els.modal = document.getElementById("modal");
+  els.modalImg = document.getElementById("modal-img");
+  els.modalActions = document.getElementById("modal-actions");
+  els.importName = document.getElementById("import-name");
+  els.importText = document.getElementById("import-text");
+  els.importPreview = document.getElementById("import-preview");
+  els.importCancel = document.getElementById("import-cancel");
+  els.importConfirm = document.getElementById("import-confirm");
+  els.btnExport = document.getElementById("btn-export");
+  els.ieModal = document.getElementById("ie-modal");
+  els.ieModalClose = document.getElementById("ie-modal-close");
+  els.ieTabImport = document.getElementById("ie-tab-import");
+  els.ieTabExport = document.getElementById("ie-tab-export");
+  els.iePanelImport = document.getElementById("ie-panel-import");
+  els.iePanelExport = document.getElementById("ie-panel-export");
+  els.exportFormat = document.getElementById("export-format");
+  els.exportDescription = document.getElementById("export-description");
+  els.exportOutput = document.getElementById("export-output");
+  els.exportCopy = document.getElementById("export-copy");
+  els.exportDownload = document.getElementById("export-download");
+  els.exportFeedback = document.getElementById("export-feedback");
+
+  els.tabPlay = document.getElementById("tab-play");
+  els.tabManage = document.getElementById("tab-manage");
+  els.tabAnalyze = document.getElementById("tab-analyze");
+  els.tabGallery = document.getElementById("tab-gallery");
+  els.viewTabIndicator = document.querySelector(".view-tab-indicator");
+  els.viewPlay = document.getElementById("view-play");
+  els.viewManage = document.getElementById("view-manage");
+  els.viewAnalyze = document.getElementById("view-analyze");
+  els.viewGallery = document.getElementById("view-gallery");
+  els.galleryContent = document.getElementById("gallery-content");
+
+  els.analyzeBracket = document.getElementById("analyze-bracket");
+  els.analyzeBracketLabel = document.getElementById("analyze-bracket-label");
+  els.analyzeSuggestions = document.getElementById("analyze-suggestions");
+  els.analyzeSuggestionsInfo = document.getElementById("analyze-suggestions-info");
+  els.analyzeArchetypes = document.getElementById("analyze-archetypes");
+  els.analyzeArchetypesInfo = document.getElementById("analyze-archetypes-info");
+  els.analyzeThemes = document.getElementById("analyze-themes");
+  els.analyzeThemesInfo = document.getElementById("analyze-themes-info");
+  els.analyzeLegality = document.getElementById("analyze-legality");
+  els.analyzeComposition = document.getElementById("analyze-composition");
+  els.analyzeCurve = document.getElementById("analyze-curve");
+  els.analyzeCurveInfo = document.getElementById("analyze-curve-info");
+  els.analyzeTypes = document.getElementById("analyze-types");
+  els.analyzeSources = document.getElementById("analyze-sources");
+  els.analyzeSubtypes = document.getElementById("analyze-subtypes");
+  els.analyzeSubtypesInfo = document.getElementById("analyze-subtypes-info");
+  els.analyzeTokens = document.getElementById("analyze-tokens");
+  els.analyzeTokensInfo = document.getElementById("analyze-tokens-info");
+  els.analyzeManaBase = document.getElementById("analyze-mana-base");
+  els.analyzeManaBaseInfo = document.getElementById("analyze-mana-base-info");
+
+  els.manageDeckName = document.getElementById("manage-deck-name");
+  els.manageMeta = document.getElementById("manage-meta");
+  els.manageCommanders = document.getElementById("manage-commanders");
+  els.manageCards = document.getElementById("manage-cards");
+  els.manageCardsCount = document.getElementById("manage-cards-count");
+  els.addCardInput = document.getElementById("add-card-input");
+  els.addCardSuggestions = document.getElementById("add-card-suggestions");
+  els.addCardPasteText = document.getElementById("add-card-paste-text");
+  els.addCardPasteBtn = document.getElementById("add-card-paste-btn");
+  els.addCardDraft = document.getElementById("add-card-draft");
+  els.addCardDraftName = document.getElementById("add-card-draft-name");
+  els.addCardDraftPreview = document.getElementById("add-card-draft-preview");
+  els.addCardDraftPrinting = document.getElementById("add-card-draft-printing");
+  els.addCardDraftQty = document.getElementById("add-card-draft-qty");
+  els.addCardDraftCancel = document.getElementById("add-card-draft-cancel");
+  els.addCardDraftSubmit = document.getElementById("add-card-draft-submit");
+  els.langSwitchEn = document.getElementById("lang-switch-en");
+  els.langSwitchFr = document.getElementById("lang-switch-fr");
+  els.translationBanner = document.getElementById("translation-banner");
+  els.flashContainer = document.getElementById("flash-container");
+  els.formatSelect = document.getElementById("manage-format-select");
+
+  // Build once: which DOM zones receive drops, and which game zone they
+  // resolve to. The lands block resolves to the same `battlefield`
+  // game zone (renderBattlefield filters the array for display).
+  els.dropZones = [
+    { el: els.hand, zone: "hand" },
+    { el: els.battlefield, zone: "battlefield" },
+    { el: els.lands, zone: "battlefield" },
+    { el: els.graveyard, zone: "graveyard" },
+    { el: els.commanderZone, zone: "command" },
+  ];
+  // NodeList of basic-land buttons, populated by buildBasicLandButtons.
+  // Cached here as an array so updateButtons doesn't re-query the DOM
+  // every render.
+  els.basicLandButtons = [];
+}
+
+// ============================================================
+// Deck registry — single source: localStorage user decks.
+// Defaults are seeded on first run (see init); after that, every deck
+// is a normal user deck, fully editable.
+// ============================================================
+function allDecks() { return loadUserDecks(); }
+function findDeck(id) { return allDecks().find((d) => d.id === id); }
+
+// ============================================================
+// Deck resolution (Scryfall + cache)
+// ============================================================
+function _identifiersOf(deckDef) {
+  return [
+    ...deckDef.commanders.map(makeIdentifier),
+    ...deckDef.cards.map(makeIdentifier),
+  ];
+}
+
+function _populateMaps(cards, byKey, byName) {
+  /* byKey is per-printing, so distinct entries can never collide.
+   * byName is per-name and CAN collide when the deck holds multiple
+   * entries with the same name but different printings — e.g. a
+   * default-printing Swamp + a user-picked Swamp from another set.
+   * First-win is the right semantic: the first card we encounter
+   * for a given name keeps the byName mapping, so a name-only entry
+   * (no set/cn) resolves to its ORIGINAL printing rather than
+   * borrowing the printing data from a more recent same-name entry.
+   * Last-win would let a freshly-added "Swamp MOM #278" overwrite
+   * the original "Swamp" mapping, making the original entry render
+   * with the new art on next refresh. */
+  for (const c of cards) {
+    if (c.set && c.collector_number) byKey.set(cardKey(c), c);
+    if (c.name && !byName.has(c.name.toLowerCase())) {
+      byName.set(c.name.toLowerCase(), c);
+    }
+  }
+}
+
+/* Resolve a single entry, avoiding any (set, cn) already claimed by
+ * an explicit entry elsewhere in the deck. Necessary because two
+ * entries can share a name (e.g. Swamp default + Swamp MOM #278) and
+ * the name-keyed map alone would have both entries resolve to the
+ * same printing — see resolveEntry in scryfall.js for the simple
+ * version this builds on. */
+function _resolveEntryDistinct(entry, byKey, byName, usedPrintings) {
+  if (entry.set && entry.collector_number) {
+    const card = byKey.get(`set:${entry.set.toLowerCase()}:${entry.collector_number}`);
+    if (card) return card;
+  }
+  const byNameCard = byName.get(entry.name.toLowerCase());
+  if (!byNameCard) return null;
+  const byNameKey = byNameCard.set && byNameCard.collector_number
+    ? `${byNameCard.set.toLowerCase()}:${byNameCard.collector_number}`
+    : null;
+  if (!byNameKey || !usedPrintings.has(byNameKey)) return byNameCard;
+  /* byName's pick is already claimed by an explicit-printing entry.
+   * Scan byKey for an alternate same-name card whose printing isn't
+   * taken — that's the printing the user implicitly meant for the
+   * name-only entry. */
+  const target = entry.name.toLowerCase();
+  for (const card of byKey.values()) {
+    if (card.name && card.name.toLowerCase() === target) {
+      const key = `${card.set.toLowerCase()}:${card.collector_number}`;
+      if (!usedPrintings.has(key)) return card;
+    }
+  }
+  /* No untaken printing left — fall back to whatever byName had. The
+   * two entries will visually duplicate, but better than rendering a
+   * placeholder. */
+  return byNameCard;
+}
+
+function _buildResolved(deckDef, byKey, byName, notFound) {
+  /* Collect the (set, cn) tuples that explicit entries already claim
+   * so name-only entries can route around them. We include both
+   * commanders and main-deck cards — a commander with an explicit
+   * printing shouldn't have a deck entry steal its art. */
+  const usedPrintings = new Set();
+  for (const e of [...deckDef.commanders, ...deckDef.cards]) {
+    if (e.set && e.collector_number) {
+      usedPrintings.add(`${e.set.toLowerCase()}:${e.collector_number}`);
+    }
+  }
+  const commanders = deckDef.commanders.map((c) =>
+    _resolveEntryDistinct(c, byKey, byName, usedPrintings) || makePlaceholder(c.name));
+  const deck = [];
+  for (const entry of deckDef.cards) {
+    const card = _resolveEntryDistinct(entry, byKey, byName, usedPrintings)
+      || makePlaceholder(entry.name);
+    for (let i = 0; i < entry.qty; i++) deck.push(card);
+  }
+  return { def: deckDef, commanders, deck, notFound };
+}
+
+/* Synchronous resolution from the persistent card-cache. Returns null
+ * if anything's missing — caller falls back to the async network path.
+ * On a warm cache (typical F5 after the first load) this lets us skip
+ * the "Chargement…" flash and render the deck instantly. */
+function tryResolveSync(deckDef) {
+  if (state.deckCache.has(deckDef.id)) return state.deckCache.get(deckDef.id);
+  const ids = _identifiersOf(deckDef);
+  const { found, missing } = lookupMany(ids);
+  if (missing.length > 0) return null;
+  const byKey = new Map();
+  const byName = new Map();
+  _populateMaps(found, byKey, byName);
+  const resolved = _buildResolved(deckDef, byKey, byName, []);
+  state.deckCache.set(deckDef.id, resolved);
+  return resolved;
+}
+
+async function resolveDeck(deckDef) {
+  const sync = tryResolveSync(deckDef);
+  if (sync) return sync;
+
+  // Cold path — at least one card not in the cache. Look up what we
+  // have, then fetch the rest from Scryfall in one pass.
+  const ids = _identifiersOf(deckDef);
+  const { found, missing } = lookupMany(ids);
+  const byKey = new Map();
+  const byName = new Map();
+  _populateMaps(found, byKey, byName);
+
+  const fetched = await fetchScryfallCards(missing);
+  for (const [k, v] of fetched.byKey) byKey.set(k, v);
+  for (const [k, v] of fetched.byName) byName.set(k, v);
+  cacheCards([...fetched.byKey.values()]);
+
+  const resolved = _buildResolved(deckDef, byKey, byName, fetched.notFound);
+  state.deckCache.set(deckDef.id, resolved);
+  return resolved;
+}
+
+/* Status-line message used after a successful resolution (sync or async). */
+/* Sidebar status line — reserved for transient ops feedback. The
+ * persistent deck-composition info (X commandant + Y cartes) lives in
+ * the Analyze view's "Conformité au format" section (see
+ * renderCompositionPanel). We only surface a sidebar message here
+ * when there's something to flag, like cards Scryfall didn't find. */
+function formatLoadIssues(r) {
+  if (!r.notFound.length) return "";
+  return `⚠ ${pluralFr(r.notFound.length, "introuvable")} : ${r.notFound.slice(0, 5).join(", ")}${r.notFound.length > 5 ? "…" : ""}`;
+}
+
+
+function showModal(card, actions) {
+  state.focusBeforeModal = document.activeElement;
+
+  const src = cardImage(card, "normal");
+  if (src) {
+    els.modalImg.src = src;
+    els.modalImg.alt = card.name;
+  } else {
+    els.modalImg.removeAttribute("src");
+    els.modalImg.alt = "";
+  }
+
+  els.modalActions.replaceChildren();
+  for (const action of actions) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    if (action.primary) btn.className = "primary";
+    btn.textContent = action.label;
+    btn.addEventListener("click", () => {
+      action.fn();
+      closeModal();
+    });
+    els.modalActions.appendChild(btn);
+  }
+
+  els.modal.classList.add("open");
+  els.modal.focus();
+}
+
+function closeModal() {
+  els.modal.classList.remove("open");
+  // removeAttribute is the safe way to clear an <img> — empty string
+  // would trigger a request for the page URL in some browsers.
+  els.modalImg.removeAttribute("src");
+  els.modalImg.alt = "";
+  els.modalActions.replaceChildren();
+  if (state.focusBeforeModal && document.contains(state.focusBeforeModal)) {
+    state.focusBeforeModal.focus();
+  }
+  state.focusBeforeModal = null;
+}
+
+// ============================================================
+// Deck selector + loading
+// ============================================================
+function populateDeckSelect() {
+  els.deckSelect.replaceChildren();
+  const decks = loadUserDecks();
+  for (const d of decks) {
+    const opt = document.createElement("option");
+    opt.value = d.id;
+    opt.textContent = d.name;
+    els.deckSelect.appendChild(opt);
+  }
+  if (!findDeck(state.currentDeckId)) {
+    state.currentDeckId = decks[0]?.id || null;
+  }
+  if (state.currentDeckId) els.deckSelect.value = state.currentDeckId;
+  updateDeleteButton();
+}
+
+function updateDeleteButton() {
+  els.btnDeleteDeck.hidden = !findDeck(state.currentDeckId);
+}
+
+function setStatus(msg, kind = "") {
+  els.deckStatus.textContent = msg;
+  els.deckStatus.classList.remove("error", "success");
+  if (kind === "error" || kind === "success") els.deckStatus.classList.add(kind);
+}
+
+/* Transient toast notification. `kind` controls accent color + auto-
+ * dismiss timing. Multiple flashes stack vertically (most recent at
+ * the bottom). The container is aria-live="polite" so screen readers
+ * announce each message without interrupting.
+ *
+ * Use this for ephemeral action feedback ("added X", "saved Y") —
+ * NOT for persistent state (use setStatus or a dedicated UI for
+ * that). Empty messages are no-ops. */
+function flash(message, kind = "info") {
+  if (!message || !els.flashContainer) return;
+  const validKinds = new Set(["success", "info", "warning", "error"]);
+  const k = validKinds.has(kind) ? kind : "info";
+  const node = document.createElement("div");
+  node.className = `flash flash-${k}`;
+  node.setAttribute("role", k === "error" ? "alert" : "status");
+  const text = document.createElement("span");
+  text.className = "flash-text";
+  text.textContent = message;
+  node.appendChild(text);
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "flash-dismiss";
+  dismiss.setAttribute("aria-label", "Fermer la notification");
+  dismiss.textContent = "×";
+  dismiss.addEventListener("click", () => removeFlash(node));
+  node.appendChild(dismiss);
+  els.flashContainer.appendChild(node);
+  // Errors linger longer (5s vs 3s) — they're more likely to need
+  // reading and the user may want a moment to react.
+  const ttl = k === "error" ? 5000 : 3000;
+  const timer = setTimeout(() => removeFlash(node), ttl);
+  /* Pausing the dismissal when the user hovers a flash mirrors what
+   * most toast systems do — keeps a slow reader from missing the
+   * message. Click on the dismiss button also clears the timer via
+   * removeFlash's idempotency. */
+  node.addEventListener("mouseenter", () => clearTimeout(timer));
+}
+
+function removeFlash(node) {
+  if (!node || !node.parentNode || node.classList.contains("flash-leaving")) return;
+  node.classList.add("flash-leaving");
+  // Match the fade-out duration in CSS; if prefers-reduced-motion is
+  // on the animation is no-op and we still remove after the same
+  // tick budget.
+  setTimeout(() => { if (node.parentNode) node.remove(); }, 220);
+}
+
+/* Reset the play view to an empty state — used when the user deletes
+ * their last deck, or on first run before any deck has been seeded. */
+function clearActiveView() {
+  state.resolved = null;
+  state.game = null;
+  for (const el of [els.commanderZone, els.hand, els.battlefield, els.lands, els.graveyard]) {
+    el.replaceChildren(placeholderText("Aucun deck chargé."));
+  }
+  setStatus("Aucun deck. Importez-en un pour commencer.");
+  renderGameBar();
+  updateButtons();
+}
+
+async function switchDeck(deckId) {
+  const myToken = ++state.switchToken;
+  state.currentDeckId = deckId;
+  updateDeleteButton();
+  const def = findDeck(deckId);
+  if (!def) return;
+
+  state.resolved = null;
+  state.game = null;
+
+  // Warm-cache fast path: tryResolveSync hits localStorage only, no
+  // network. This is the common case on F5 after the first load and
+  // it skips the "Chargement…" flash entirely.
+  const sync = tryResolveSync(def);
+  if (sync) {
+    state.resolved = sync;
+    setStatus(formatLoadIssues(sync), sync.notFound.length ? "error" : "");
+    renderCommanders();
+    startNewGame();
+    rerenderDeckViews();
+    return;
+  }
+
+  // Cold path — show placeholders, then fetch.
+  els.commanderZone.replaceChildren(placeholderText("Chargement des données Scryfall…"));
+  els.hand.replaceChildren(placeholderText("Chargement…"));
+  els.battlefield.replaceChildren(placeholderText("Chargement…"));
+  els.lands.replaceChildren(placeholderText("Chargement…"));
+  els.graveyard.replaceChildren(placeholderText("Chargement…"));
+  setStatus("Chargement…");
+  renderGameBar();
+  updateButtons();
+  // Pre-render the hidden views with skeletons so a tab switch mid-load
+  // shows something rather than empty containers.
+  showManageSkeleton();
+  showAnalyzeSkeleton();
+
+  try {
+    const r = await resolveDeck(def);
+    if (myToken !== state.switchToken) return; // stale: user already switched
+    state.resolved = r;
+    setStatus(formatLoadIssues(r), r.notFound.length ? "error" : "");
+    renderCommanders();
+    startNewGame();
+    rerenderDeckViews();
+  } catch (err) {
+    if (myToken !== state.switchToken) return;
+    console.error(err);
+    setStatus(`Erreur Scryfall : ${err.message}`, "error");
+    els.commanderZone.replaceChildren(placeholderText("Échec du chargement."));
+    els.battlefield.replaceChildren();
+    els.lands.replaceChildren();
+    els.hand.replaceChildren();
+    els.graveyard.replaceChildren();
+  }
+}
+
+function deleteCurrentDeck() {
+  const def = findDeck(state.currentDeckId);
+  if (!def) return;
+  if (!confirm(`Supprimer le deck "${def.name}" ?`)) return;
+  const remaining = loadUserDecks().filter((d) => d.id !== def.id);
+  if (!saveUserDecks(remaining)) {
+    setStatus("Échec de la suppression (localStorage indisponible).", "error");
+    return;
+  }
+  state.deckCache.delete(def.id);
+  state.currentDeckId = remaining[0]?.id || null;
+  populateDeckSelect();
+  if (state.currentDeckId) switchDeck(state.currentDeckId);
+  else clearActiveView();
+}
+
+// ============================================================
+// Import UI
+// ============================================================
+function openImportPanel() {
+  els.importName.value = "";
+  els.importText.value = "";
+  els.importPreview.replaceChildren();
+  els.importPreview.textContent = "Colle une liste pour voir le récap.";
+  els.importConfirm.disabled = true;
+  openIeModal("import");
+  els.importName.focus();
+}
+function closeImportPanel() { closeIeModal(); }
+
+/* Import / Export modal — separate from the card-preview modal
+ * because it owns editable content (textarea). Closed only by the
+ * X button or Escape — backdrop clicks are intentionally ignored
+ * so an accidental click outside doesn't wipe a pasted decklist. */
+function openIeModal(initialTab = "import") {
+  state.focusBeforeModal = document.activeElement;
+  switchIeTab(initialTab);
+  els.ieModal.hidden = false;
+  els.ieModal.classList.add("open");
+  els.ieModal.focus();
+}
+
+function closeIeModal() {
+  els.ieModal.classList.remove("open");
+  els.ieModal.hidden = true;
+  if (state.focusBeforeModal && document.contains(state.focusBeforeModal)) {
+    state.focusBeforeModal.focus();
+  }
+  state.focusBeforeModal = null;
+}
+
+function switchIeTab(tab) {
+  const isImport = tab === "import";
+  els.ieTabImport.classList.toggle("active", isImport);
+  els.ieTabExport.classList.toggle("active", !isImport);
+  els.ieTabImport.setAttribute("aria-selected", String(isImport));
+  els.ieTabExport.setAttribute("aria-selected", String(!isImport));
+  els.iePanelImport.hidden = !isImport;
+  els.iePanelExport.hidden = isImport;
+  if (!isImport) {
+    setupExportPanel();
+  }
+}
+
+/* (Re)populate the format select on first open, then render the
+ * output for the currently-selected format. */
+function setupExportPanel() {
+  if (els.exportFormat.options.length === 0) {
+    for (const fmt of EXPORT_FORMATS) {
+      const opt = document.createElement("option");
+      opt.value = fmt.key;
+      opt.textContent = fmt.label;
+      els.exportFormat.appendChild(opt);
+    }
+    els.exportFormat.value = "moxfield"; // sensible default
+  }
+  els.exportFeedback.textContent = "";
+  refreshExportOutput();
+}
+
+function refreshExportOutput() {
+  const def = findDeck(state.currentDeckId);
+  if (!def) {
+    els.exportOutput.value = "";
+    els.exportDescription.textContent = "Aucun deck sélectionné.";
+    return;
+  }
+  const fmtKey = els.exportFormat.value;
+  const fmt = EXPORT_FORMATS.find((f) => f.key === fmtKey);
+  els.exportDescription.textContent = fmt ? fmt.description : "";
+  try {
+    els.exportOutput.value = exportDeck(def, fmtKey);
+  } catch (err) {
+    els.exportOutput.value = "";
+    els.exportDescription.textContent = `Erreur : ${err.message}`;
+  }
+}
+
+async function onExportCopy() {
+  if (!els.exportOutput.value) return;
+  els.exportFeedback.textContent = "";
+  try {
+    await navigator.clipboard.writeText(els.exportOutput.value);
+    els.exportFeedback.textContent = "Copié dans le presse-papier";
+  } catch (err) {
+    // Fallback: select the textarea content so the user can Ctrl+C.
+    els.exportOutput.select();
+    els.exportFeedback.textContent = "Sélectionné — Ctrl+C pour copier";
+  }
+  setTimeout(() => { els.exportFeedback.textContent = ""; }, 2500);
+}
+
+function onExportDownload() {
+  const def = findDeck(state.currentDeckId);
+  if (!def || !els.exportOutput.value) return;
+  const fmtKey = els.exportFormat.value;
+  const fmt = EXPORT_FORMATS.find((f) => f.key === fmtKey);
+  const ext = fmt ? fmt.extension : "txt";
+  // Slug the deck name to a file-safe filename.
+  const slug = (def.name || "deck")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // strip Unicode combining accents
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "deck";
+  const blob = new Blob([els.exportOutput.value], {
+    type: ext === "json" ? "application/json" : "text/plain",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${slug}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function refreshImportPreview() {
+  const text = els.importText.value;
+  els.importPreview.replaceChildren();
+
+  if (!text.trim()) {
+    els.importPreview.textContent = "Colle une liste pour voir le récap.";
+    els.importConfirm.disabled = true;
+    return;
+  }
+  const parsed = parseDecklist(text);
+  const total = parsed.counts.commanders + parsed.counts.main;
+
+  const summary = document.createElement("span");
+  summary.className = "ok";
+  let s = `${pluralFr(parsed.counts.commanders, "commandant")}, ${parsed.counts.main} cartes principales`;
+  if (parsed.counts.sideboard) s += `, ${parsed.counts.sideboard} en sideboard (ignorées)`;
+  s += `. Total deck : ${total}.`;
+  summary.textContent = s;
+  els.importPreview.appendChild(summary);
+
+  for (const e of parsed.errors) {
+    const errEl = document.createElement("span");
+    errEl.className = "err";
+    errEl.textContent = "⚠ " + e;
+    els.importPreview.appendChild(errEl);
+  }
+  els.importConfirm.disabled =
+    parsed.cards.length === 0 && parsed.commanders.length === 0;
+}
+
+async function confirmImport() {
+  const text = els.importText.value;
+  const parsed = parseDecklist(text);
+  if (parsed.cards.length === 0 && parsed.commanders.length === 0) {
+    setStatus("Aucune carte détectée dans la liste.", "error");
+    return;
+  }
+  const name = (els.importName.value || "Deck importé").trim();
+  const id = "user-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  const def = {
+    id, name,
+    format: "commander", // sensible default — user can change in Manage
+    commanders: parsed.commanders,
+    cards: parsed.cards,
+  };
+
+  els.importConfirm.disabled = true;
+  setStatus("Vérification du deck via Scryfall…");
+  try {
+    await resolveDeck(def);
+  } catch (err) {
+    setStatus("Erreur Scryfall : " + err.message, "error");
+    els.importConfirm.disabled = false;
+    return;
+  }
+
+  const users = loadUserDecks();
+  users.push(def);
+  if (!saveUserDecks(users)) {
+    setStatus("⚠ Sauvegarde impossible (localStorage plein ou indisponible). Le deck est chargé pour cette session uniquement.", "error");
+  }
+
+  closeImportPanel();
+  populateDeckSelect();
+  els.deckSelect.value = id;
+  state.currentDeckId = id;
+  switchDeck(id);
+}
+
+// ============================================================
+// View toggle (Jouer / Gérer)
+// ============================================================
+/* Tab switching is now a pure visibility toggle — content is
+ * pre-rendered by switchDeck (and on every commitDeckChange) so the
+ * panels are always populated when the user clicks the tab. The
+ * only async hook here is the FR translation fetch on first entry
+ * to the manage view (cheap if cached, banner if not). */
+function switchView(view) {
+  const tabs = [
+    { name: "play", tab: els.tabPlay, panel: els.viewPlay },
+    { name: "manage", tab: els.tabManage, panel: els.viewManage },
+    { name: "analyze", tab: els.tabAnalyze, panel: els.viewAnalyze },
+    { name: "gallery", tab: els.tabGallery, panel: els.viewGallery },
+  ];
+  let activeTab = null;
+  for (const t of tabs) {
+    const active = t.name === view;
+    t.panel.hidden = !active;
+    t.tab.classList.toggle("active", active);
+    t.tab.setAttribute("aria-selected", String(active));
+    if (active) activeTab = t.tab;
+  }
+  positionViewTabIndicator(activeTab, /* animate */ true);
+  /* The gallery is a full-width template — sidebar disappears and the
+   * layout's two-column grid collapses to one. Toggling a body class
+   * keeps the CSS aware without forcing every view to know about it. */
+  document.body.classList.toggle("gallery-active", view === "gallery");
+  if (view === "manage" && state.manageLang === "fr") {
+    ensureFrenchTranslationsForCurrentDeck();
+  }
+}
+
+/* Move the sliding indicator under the active tab. Reads layout from
+ * the live DOM rather than tracking widths ourselves — that way the
+ * indicator stays correct even if labels are localized or fonts shift.
+ * Pass animate=false on the initial paint so the pill doesn't slide in
+ * from x=0 on page load. */
+function positionViewTabIndicator(activeTab, animate) {
+  const indicator = els.viewTabIndicator;
+  if (!indicator || !activeTab) return;
+  const left = activeTab.offsetLeft;
+  const width = activeTab.offsetWidth;
+  if (!animate) {
+    const prev = indicator.style.transition;
+    indicator.style.transition = "none";
+    indicator.style.transform = `translateX(${left}px)`;
+    indicator.style.width = `${width}px`;
+    // Force a reflow so the next style change re-enables transitions
+    // cleanly, otherwise the browser may coalesce them.
+    void indicator.offsetWidth;
+    indicator.style.transition = prev;
+    return;
+  }
+  indicator.style.transform = `translateX(${left}px)`;
+  indicator.style.width = `${width}px`;
+}
+
+// ============================================================
+// State sync + skeletons (called from switchDeck / commit handlers)
+// ============================================================
+
+/* Pre-render Manage and Analyze on every deck-state change so a
+ * subsequent tab switch is a pure visibility toggle (instant). The
+ * cost is one extra render of each per resolve / commit, which is
+ * cheap (~50 ms total) and pays for itself the first time the user
+ * clicks a tab. The FR translation fetch fires only when the user
+ * actually opens the manage view (not pre-emptively, to save API). */
+function rerenderDeckViews() {
+  if (!state.resolved) return;
+  /* Share one cardCacheReader + one findDeck result across all view
+   * renders. Both used to be re-fetched per-renderer, causing 3-4
+   * `localStorage.getItem` + `JSON.parse` calls on the same data per
+   * cycle — measurable in the F5 critical path once the cache grew
+   * past a few hundred entries. The shared `ctx` is also the natural
+   * hook for any future per-cycle memoization. */
+  const def = findDeck(state.resolved.def.id);
+  const ctx = {
+    def,
+    cacheReader: cardCacheReader(),
+  };
+  renderManageView(ctx);
+  renderAnalyzeView();
+  renderGalleryView(ctx);
+  if (state.manageLang === "fr" && !els.viewManage.hidden) {
+    ensureFrenchTranslationsForCurrentDeck();
+  }
+}
+
+/* Skeleton helpers: cheap visual placeholders shown while the deck
+ * resolves on a cold cache. Avoids the "empty container" flash if
+ * the user lands directly on the Manage / Analyze tab. */
+function showManageSkeleton() {
+  els.manageCommanders.replaceChildren(makeSkeletonRows(2));
+  els.manageCards.replaceChildren(makeSkeletonRows(8));
+  els.manageMeta.textContent = "";
+  els.manageCardsCount.textContent = "";
+}
+
+function showAnalyzeSkeleton() {
+  for (const el of [
+    els.analyzeBracket, els.analyzeLegality, els.analyzeArchetypes,
+    els.analyzeSuggestions, els.analyzeThemes, els.analyzeCurve,
+    els.analyzeTypes, els.analyzeSources, els.analyzeManaBase,
+    els.analyzeSubtypes, els.analyzeTokens,
+  ]) {
+    el.replaceChildren(makeSkeletonBlock());
+  }
+}
+
+function makeSkeletonRows(count) {
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < count; i++) {
+    const row = document.createElement("div");
+    row.className = "skeleton-row";
+    frag.appendChild(row);
+  }
+  return frag;
+}
+
+function makeSkeletonBlock() {
+  const block = document.createElement("div");
+  block.className = "skeleton-block";
+  return block;
+}
+
+function commitDeckChange(def) {
+  const all = loadUserDecks();
+  const idx = all.findIndex((d) => d.id === def.id);
+  if (idx === -1) all.push(def); else all[idx] = def;
+  if (!saveUserDecks(all)) {
+    setStatus("Sauvegarde impossible (localStorage indisponible).", "error");
+    return false;
+  }
+  state.deckCache.delete(def.id);
+  refreshResolved(def);
+  return true;
+}
+
+/* The single point where state.resolved is brought back in sync with
+ * a freshly-committed def. Everything that mutates the deck on disk
+ * goes through commitDeckChange, so this is the only place we need
+ * the sync logic — no scattered "patch state.resolved.def = def" or
+ * similar band-aids. No-op when state.resolved tracks a different
+ * deck or hasn't been initialised yet.
+ *
+ * Two paths:
+ *   - Sync (printing change, qty edit, format flip, removal): all
+ *     identifiers are already in the per-printing card-cache, so
+ *     tryResolveSync returns a fresh resolved immediately.
+ *   - Async (addByName / paste-add of a never-fetched card name):
+ *     tryResolveSync returns null because the new identifier isn't
+ *     cached. We fire `_refreshResolvedAsync` to fetch from Scryfall
+ *     and re-render when the response lands.
+ *
+ * Both paths bump refreshToken so any in-flight async fetch from a
+ * prior call is discarded when its response arrives — guarantees the
+ * final state.resolved reflects the last commit, not a stale fetch. */
+function refreshResolved(def) {
+  if (!state.resolved || state.resolved.def.id !== def.id) return;
+  const myToken = ++state.refreshToken;
+  const fresh = tryResolveSync(def);
+  if (fresh) {
+    state.resolved = fresh;
+    return;
+  }
+  void _refreshResolvedAsync(def.id, myToken);
+}
+
+async function _refreshResolvedAsync(deckId, myToken) {
+  try {
+    const def = findDeck(deckId);
+    if (!def) return;
+    const fresh = await resolveDeck(def);
+    // Discard if a newer refresh has started, the user switched decks,
+    // or state.resolved was nulled out (deck deletion, reset).
+    if (myToken !== state.refreshToken) return;
+    if (!state.resolved || state.resolved.def.id !== deckId) return;
+    state.resolved = fresh;
+    rerenderDeckViews();
+  } catch (err) {
+    if (myToken !== state.refreshToken) return;
+    console.error(err);
+    setStatus(`Erreur Scryfall : ${err.message}`, "error");
+  }
+}
+
+
+
+// ============================================================
+// Wire up + init
+// ============================================================
+function bindEvents() {
+  els.tabPlay.addEventListener("click", () => switchView("play"));
+  els.tabManage.addEventListener("click", () => switchView("manage"));
+  els.tabAnalyze.addEventListener("click", () => switchView("analyze"));
+  els.tabGallery.addEventListener("click", () => switchView("gallery"));
+  els.langSwitchEn.addEventListener("click", () => setManageLanguage("en"));
+  els.langSwitchFr.addEventListener("click", () => setManageLanguage("fr"));
+  els.formatSelect.addEventListener("change", (e) => setDeckFormat(e.target.value));
+  els.btnDraw.addEventListener("click", drawOne);
+  els.btnNextTurn.addEventListener("click", advanceTurn);
+  els.btnNew.addEventListener("click", startNewGame);
+  els.btnDeleteDeck.addEventListener("click", deleteCurrentDeck);
+  els.btnImportToggle.addEventListener("click", openImportPanel);
+  els.btnExport.addEventListener("click", () => openIeModal("export"));
+  els.ieModalClose.addEventListener("click", closeIeModal);
+  els.ieTabImport.addEventListener("click", () => switchIeTab("import"));
+  els.ieTabExport.addEventListener("click", () => switchIeTab("export"));
+  els.exportFormat.addEventListener("change", refreshExportOutput);
+  els.exportCopy.addEventListener("click", onExportCopy);
+  els.exportDownload.addEventListener("click", onExportDownload);
+  els.importCancel.addEventListener("click", closeImportPanel);
+  els.importConfirm.addEventListener("click", confirmImport);
+  els.importText.addEventListener("input", refreshImportPreview);
+  els.deckSelect.addEventListener("change", (e) => switchDeck(e.target.value));
+  // Click on the backdrop closes the modal; clicks on the inner content
+  // (image, action buttons) don't propagate to the backdrop comparison.
+  els.modal.addEventListener("click", (e) => {
+    if (e.target === els.modal) closeModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (els.modal.classList.contains("open")) closeModal();
+    else if (els.ieModal.classList.contains("open")) closeIeModal();
+  });
+}
+
+function init() {
+  cacheElements();
+  buildBasicLandButtons();
+  bindEvents();
+  setupDropTargets();
+  setupAddCardUI();
+  // Position the view-tab indicator under the default-active tab
+  // *before* the first paint, so it doesn't visibly slide in from x=0.
+  positionViewTabIndicator(els.tabPlay, /* animate */ false);
+
+  // Restore the user's last manage-view language preference. Done
+  // before any render so the first paint is in the right language.
+  try {
+    const saved = localStorage.getItem(MANAGE_LANG_KEY);
+    if (saved === "en" || saved === "fr") {
+      state.manageLang = saved;
+      els.langSwitchEn.classList.toggle("active", saved === "en");
+      els.langSwitchFr.classList.toggle("active", saved === "fr");
+      els.langSwitchEn.setAttribute("aria-pressed", String(saved === "en"));
+      els.langSwitchFr.setAttribute("aria-pressed", String(saved === "fr"));
+    }
+  } catch (e) { /* localStorage blocked */ }
+
+  // Default-deck seeding runs once per user (migration flag is
+  // independent from the user-decks key, so an existing user whose
+  // local list predates the seeding feature still gets the defaults
+  // appended on next load). After the flag is set, deletions stick —
+  // we don't fight the user's intent.
+  if (!hasSeededDefaults()) {
+    const merged = mergeDefaultsForSeeding(loadUserDecks(), DEFAULT_DECKS);
+    saveUserDecks(merged);
+    markDefaultsSeeded();
+  }
+
+  populateDeckSelect();
+  if (state.currentDeckId) switchDeck(state.currentDeckId);
+  else clearActiveView();
+
+  // Cache eviction is amortised once per session, scheduled off the
+  // critical render path so F5 doesn't pay for it. resolveDeck used
+  // to call evictExpired() inline — that added ~5–15 ms to every
+  // page load for no UX benefit.
+  setTimeout(() => evictExpired(), 1000);
+}
+
+// Auto-init in browser context. The presence-check skips this when the
+// file is required by a unit test (no DOM — pure modules are tested instead).
+if (typeof document !== "undefined" && document.getElementById("deck-select")) {
+  init();
+}
