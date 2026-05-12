@@ -6,8 +6,13 @@
 <meta name="description" content="Deckrypt — deck builder & analyse Magic: The Gathering. Stats et images via Scryfall.">
 <!-- Defense-in-depth CSP: even if an XSS slipped through, this would
      block inline scripts, third-party image hosts, and any fetch to a
-     non-Scryfall server (preventing data exfiltration). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://*.scryfall.io https://*.scryfall.com; connect-src https://api.scryfall.com; form-action 'none'; base-uri 'none'; frame-ancestors 'none';">
+     non-Scryfall/non-Firebase server (preventing data exfiltration).
+     Firebase additions:
+       script-src + gstatic.com  - Firebase SDK loaded via ESM CDN
+       connect-src + googleapis  - Firestore reads/writes + Auth REST
+       frame-src                 - Google sign-in popup
+       img-src + googleusercontent - user avatar from Google login -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self'; img-src 'self' https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src https://api.scryfall.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none'; frame-ancestors 'none';">
 <meta name="referrer" content="no-referrer">
 <title>Deckrypt</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -32,6 +37,7 @@
 <script defer src="js/app-analyze.js"></script>
 <script defer src="js/app-gallery.js"></script>
 <script defer src="js/app.js"></script>
+<script type="module" src="js/sync.js"></script>
 </head>
 <body>
 <div class="container">

@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Deckrypt — per-user isolation.
+//
+// Every piece of data lives under /users/{uid}/... and only that user
+// can read or write it. There is no public/shared data yet. When we
+// add public decks, add a separate top-level collection (e.g.,
+// /public-decks/) with its own rules — never relax these.
+//
+// To deploy: copy this file's content into the Firestore Rules tab
+// of the Firebase console and click Publish. (Or use the Firebase CLI
+// later: `firebase deploy --only firestore:rules`.)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A signed-in user owns everything under /users/{their-uid}/.
+    // request.auth is null for unauthenticated requests, so this also
+    // implicitly denies access to anonymous traffic.
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
+
+    // Everything else: deny by default. (Implicit, but stated for
+    // clarity — future contributors won't wonder if there's a hole.)
+  }
+}
