@@ -105,6 +105,18 @@ function makeCardEl(card, { tapped = false, ariaLabel, onActivate, instanceId, s
     label.textContent = card.name + " (introuvable sur Scryfall)";
   }
 
+  /* Game Changer pin: amber circle in the top-left corner whenever
+   * Scryfall flags the card. Same data the Manage view's GC
+   * accordion uses, surfaced visually on each card here. */
+  if (card.game_changer === true) {
+    const gc = document.createElement("span");
+    gc.className = "gc-mark";
+    gc.textContent = "GC";
+    gc.title = "Game Changer";
+    gc.setAttribute("aria-label", "Game Changer");
+    el.appendChild(gc);
+  }
+
   if (onActivate) {
     el.addEventListener("click", onActivate);
     el.addEventListener("keydown", (e) => {
@@ -199,7 +211,7 @@ function renderBattlefield() {
   const lands = all.filter((inst) => isLand(inst.card));
   const others = all.filter((inst) => !isLand(inst.card));
 
-  renderInstanceZone(els.battlefield, others, "Champ de bataille vide.", "battlefield");
+  renderInstanceZone(els.battlefield, others, "Aucun permanent sur le champ.", "battlefield");
   els.battlefieldInfo.textContent = others.length === 0
     ? "vide"
     : pluralFr(others.length, "permanent");
@@ -215,49 +227,106 @@ function renderHand() {
   renderInstanceZone(els.hand, list, "Aucune carte en main.", "hand");
   if (!state.game) {
     els.handInfo.textContent = "—";
+    if (els.gameStateHand) els.gameStateHand.textContent = "—";
   } else {
     els.handInfo.textContent = pluralFr(state.game.hand.length, "carte");
+    if (els.gameStateHand) els.gameStateHand.textContent = String(state.game.hand.length);
   }
 }
 
-/* The graveyard is a pile, not a strip: render only the top card and
- * use CSS pseudo-elements to suggest depth (1 layer = `has-stack`,
- * 3+ layers = `has-deep-stack`). Click the visible card → graveyard
- * modal with the full list and per-card actions. The top card stays
- * a drag source so flick-back-to-hand still works without opening
- * the modal. */
+/* The graveyard is a pile, not a strip: top card on top, up to two
+ * backing cards behind it (rotated, dimmed) so the depth is implied
+ * with real Scryfall art instead of placeholder rectangles. Click
+ * the top card → graveyard modal with the full list and per-card
+ * actions. The top card stays a drag source so flick-back-to-hand
+ * still works without opening the modal. Backings are static (no
+ * drag, no click). */
 function renderGraveyard() {
   const list = state.game ? state.game.graveyard : [];
   els.graveyard.replaceChildren();
-  els.graveyard.classList.toggle("has-stack", list.length >= 2);
-  els.graveyard.classList.toggle("has-deep-stack", list.length >= 3);
+  /* Legacy depth classes are no longer used (the visual is now
+   * driven by real card layers); clear them defensively in case
+   * any external CSS still keys off them. */
+  els.graveyard.classList.remove("has-stack", "has-deep-stack");
   if (list.length === 0) {
-    els.graveyard.appendChild(placeholderText("Cimetière vide."));
+    /* Card-shaped phantom slot so the empty state reads as "drop a
+     * card here" and the drag drop-target outlines a card-sized
+     * area instead of a tiny rectangle. */
+    const slot = document.createElement("div");
+    slot.className = "graveyard-empty-slot";
+    slot.textContent = "Cimetière vide";
+    els.graveyard.appendChild(slot);
     els.graveyardInfo.textContent = "vide";
     return;
+  }
+  const stack = document.createElement("div");
+  stack.className = "graveyard-stack";
+
+  /* Backing layers — render bottom-up so DOM order matches z-index.
+   * 3+ cards: gs-2 (3rd) then gs-1 (2nd) sit behind the top. */
+  if (list.length >= 3) {
+    const c3 = list[list.length - 3];
+    const el3 = makeCardEl(c3.card, { tapped: c3.tapped });
+    el3.classList.add("gs-2");
+    el3.setAttribute("aria-hidden", "true");
+    stack.appendChild(el3);
+  }
+  if (list.length >= 2) {
+    const c2 = list[list.length - 2];
+    const el2 = makeCardEl(c2.card, { tapped: c2.tapped });
+    el2.classList.add("gs-1");
+    el2.setAttribute("aria-hidden", "true");
+    stack.appendChild(el2);
   }
   const top = list[list.length - 1];
   const ariaLabel = list.length === 1
     ? `${top.card.name}, ouvrir le cimetière`
     : `${top.card.name}, ${pluralFr(list.length, "carte")} en cimetière, ouvrir le cimetière`;
-  els.graveyard.appendChild(makeCardEl(top.card, {
+  const topEl = makeCardEl(top.card, {
     tapped: top.tapped,
     ariaLabel,
     onActivate: openGraveyardModal,
     instanceId: top.instanceId,
     sourceZone: "graveyard",
-  }));
+  });
+  topEl.classList.add("gs-top");
+  stack.appendChild(topEl);
+  els.graveyard.appendChild(stack);
   els.graveyardInfo.textContent = pluralFr(list.length, "carte");
 }
 
 function renderGameBar() {
+  /* Single pass: the same numbers feed the sidebar's "Partie en
+   * cours" panel AND the top game-state bar, so the user sees the
+   * same truth wherever they look. */
   if (!state.game) {
     els.turnCounter.textContent = "—";
     els.libraryCount.textContent = "—";
+    if (els.graveyardCount) els.graveyardCount.textContent = "—";
+    if (els.battlefieldCount) els.battlefieldCount.textContent = "—";
+    if (els.gameStateTurn) els.gameStateTurn.textContent = "—";
+    if (els.gameStateLibrary) els.gameStateLibrary.textContent = "—";
+    if (els.btnNextTurnLabel) els.btnNextTurnLabel.textContent = "Tour suivant";
     return;
   }
-  els.turnCounter.textContent = state.game.turn;
-  els.libraryCount.textContent = state.game.library.length;
+  const turn = state.game.turn;
+  const lib = state.game.library.length;
+  const gy = state.game.graveyard.length;
+  /* Champ de bataille = tout ce qui est en jeu (terrains inclus —
+   * ils vivent dans battlefield, pas dans une zone séparée; la vue
+   * les filtre à l'affichage pour les afficher dans leur propre
+   * section). */
+  const bf = state.game.battlefield.length;
+
+  els.turnCounter.textContent = turn;
+  els.libraryCount.textContent = lib;
+  if (els.graveyardCount) els.graveyardCount.textContent = String(gy);
+  if (els.battlefieldCount) els.battlefieldCount.textContent = String(bf);
+  if (els.gameStateTurn) els.gameStateTurn.textContent = String(turn);
+  if (els.gameStateLibrary) els.gameStateLibrary.textContent = String(lib);
+  /* "Tour suivant" → "Tour N+1" so the user knows where the click
+   * sends them. Reverts to the plain label when no game is loaded. */
+  if (els.btnNextTurnLabel) els.btnNextTurnLabel.textContent = `Tour ${turn + 1}`;
 }
 
 function renderStats() {
@@ -275,8 +344,14 @@ function renderStats() {
     }
   }
   els.statLands.textContent = lands;
+  if (els.statLandsSub) {
+    els.statLandsSub.textContent = `${hand.length} carte${hand.length > 1 ? "s" : ""} en main`;
+  }
   els.statSpells.textContent = spells;
-  els.statCmc.textContent = spells === 0 ? "—" : (cmcSum / spells).toFixed(2);
+  const avgCmc = spells === 0 ? "—" : (cmcSum / spells).toFixed(2);
+  if (els.statSpellsSub) {
+    els.statSpellsSub.textContent = `CMC moy. ${avgCmc}`;
+  }
 
   const colors = state.resolved ? deckProducedColors(state.resolved) : COLOR_ORDER;
   els.statSources.replaceChildren();

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockScryfall, switchDeckById } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
@@ -172,7 +172,7 @@ test("switching deck from the sidebar refreshes the analyze view", async ({ page
   // we should see the token tile appear.
   await expect(page.locator("#analyze-tokens")).toContainText(/Aucun jeton/);
 
-  await page.locator("#deck-select").selectOption("deck-b");
+  await switchDeckById(page, "deck-b");
   await expect(page.locator(".token-tile").first()).toBeVisible({ timeout: 5000 });
   await expect(page.locator("#analyze-tokens")).not.toContainText(/Aucun jeton/);
 });

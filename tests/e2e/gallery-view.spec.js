@@ -20,17 +20,16 @@ test("Galerie tab activates the view and hides the others", async ({ page }) => 
   await expect(page.locator("#tab-gallery")).toHaveClass(/active/);
 });
 
-test("Galerie hides the sidebar (full-width template)", async ({ page }) => {
-  /* On the other three views the sidebar is visible. The Galerie is
-   * the first view that takes over the full width — sidebar hidden
-   * via body.gallery-active. */
-  await expect(page.locator(".sidebar")).toBeVisible();
+test("Galerie body class flips to gallery-active for legacy hooks", async ({ page }) => {
+  /* The global outer sidebar was removed when each view started
+   * owning its own (play has .play-sidebar inside #view-play, manage
+   * has .manage-side, etc.). The body.gallery-active class is still
+   * toggled by switchView in case any future styling needs to
+   * special-case the gallery's full-width layout. */
   await page.click("#tab-gallery");
-  await expect(page.locator(".sidebar")).toBeHidden();
   await expect(page.locator("body")).toHaveClass(/gallery-active/);
-
   await page.click("#tab-play");
-  await expect(page.locator(".sidebar")).toBeVisible();
+  await expect(page.locator("body")).not.toHaveClass(/gallery-active/);
 });
 
 test("Galerie groups cards by type with section titles + counts", async ({ page }) => {

@@ -140,33 +140,85 @@
       pwdInput.disabled = busy;
     }
 
-    /* Account button toggles between "open overlay" and "log out"
-     * based on auth state. The full account menu (dropdown with
-     * settings, profile, etc.) lands in step 6. */
+    /* The account button has two modes:
+     *   - Anonymous: renders as a primary CTA "Connexion" pill.
+     *     Clicking it opens the login overlay.
+     *   - Logged in: renders as a circular avatar + display name.
+     *     Clicking it toggles the account dropdown menu (sign out,
+     *     and eventually Settings / Profil — wired in step 5+). */
+    const accountMenu = document.getElementById("account-dropdown-menu");
+    const accountLabel = document.getElementById("account-label");
+    const accountMenuName = document.getElementById("account-menu-name");
+    const accountMenuEmail = document.getElementById("account-menu-email");
+    const accountSignoutBtn = document.getElementById("btn-account-signout");
+
+    function initialsOf(user) {
+      const src = user.displayName || user.email || "?";
+      const parts = src.split(/[\s@.]+/).filter(Boolean);
+      const first = parts[0]?.[0] || "?";
+      const second = parts[1]?.[0] || "";
+      return (first + second).toUpperCase().slice(0, 2);
+    }
+
     function refreshAccountButton(user) {
+      accountBtn.replaceChildren();
       if (user) {
-        const label = user.displayName || user.email || "Mon compte";
-        accountBtn.textContent = `${label} · Déconnexion`;
-        accountBtn.title = `Connecté en tant que ${user.email || label}`;
+        accountBtn.classList.remove("account-anon");
+        accountBtn.classList.add("account-authed");
+        const avatar = document.createElement("span");
+        avatar.className = "account-avatar";
+        avatar.textContent = initialsOf(user);
+        const name = document.createElement("span");
+        name.className = "account-name";
+        name.id = "account-label";
+        name.textContent = user.displayName || user.email || "Mon compte";
+        const chev = document.createElement("span");
+        chev.className = "account-chev";
+        chev.setAttribute("aria-hidden", "true");
+        chev.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+        accountBtn.appendChild(avatar);
+        accountBtn.appendChild(name);
+        accountBtn.appendChild(chev);
+        if (accountMenuName) accountMenuName.textContent = user.displayName || user.email || "";
+        if (accountMenuEmail) accountMenuEmail.textContent = user.email || "";
       } else {
-        accountBtn.textContent = "Connexion";
-        accountBtn.removeAttribute("title");
+        accountBtn.classList.remove("account-authed");
+        accountBtn.classList.add("account-anon");
+        const span = document.createElement("span");
+        span.className = "account-name";
+        span.id = "account-label";
+        span.textContent = "Connexion";
+        accountBtn.appendChild(span);
+        if (accountMenu) accountMenu.hidden = true;
       }
     }
 
-    accountBtn.addEventListener("click", async () => {
+    /* Account dropdown machinery (outside-click close, Escape close,
+     * aria-expanded sync) handled by setupDropdown. We pass
+     * autoToggle:false because the trigger does different things
+     * depending on auth state — opening the login overlay when anon
+     * vs toggling the menu when authed. */
+    const accountDropdown = setupDropdown({
+      trigger: accountBtn,
+      menu: accountMenu,
+      autoToggle: false,
+    });
+    accountBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
       const user = window.sync && window.sync.currentUser();
       if (user) {
-        /* No confirm() popup — the button label already reads
-         * "<email> · Déconnexion" so the intent is unambiguous, and
-         * the native browser alert clashes with the themed UI. The
-         * proper account menu (avatar dropdown with "Settings,
-         * Logout, ...") lands in step 6. */
-        try { await window.sync.signOut(); } catch (e) { console.error(e); }
+        if (accountDropdown) accountDropdown.toggle();
       } else {
         openOverlay();
       }
     });
+
+    if (accountSignoutBtn) {
+      accountSignoutBtn.addEventListener("click", async () => {
+        if (accountDropdown) accountDropdown.close();
+        try { await window.sync.signOut(); } catch (e) { console.error(e); }
+      });
+    }
 
     closeBtn.addEventListener("click", closeOverlay);
     document.addEventListener("keydown", (e) => {

@@ -72,11 +72,12 @@ export async function mockScryfall(page) {
         // doesn't flag them in the default e2e setup. Other cards get
         // a plain "Creature" type, which is realistic enough for the
         // analyze panels that don't care about legendary-ness.
-        const SEEDED_COMMANDERS = new Set([
-          "Ukkima, Stalking Shadow",
-          "Cazur, Ruthless Stalker",
+        const SEEDED_COMMANDERS = new Map([
+          ["Ukkima, Stalking Shadow", ["U", "B"]],
+          ["Cazur, Ruthless Stalker", ["B", "G"]],
         ]);
         const isCommander = id.name && SEEDED_COMMANDERS.has(id.name);
+        const colorIdentity = isCommander ? SEEDED_COMMANDERS.get(id.name) : [];
         const typeLine = isBasicLand
           ? `Basic Land — ${id.name}`
           : isCommander
@@ -102,14 +103,22 @@ export async function mockScryfall(page) {
             uri: "https://api.scryfall.com/cards/tokn-2",
           },
         ] : undefined;
+        /* Flag a couple of well-known Game Changers from the seeded
+         * Sultai deck so tests can assert the GC pin renders.
+         * Sol Ring and Rhystic Study are on Scryfall's actual GC
+         * list; using them keeps the mock realistic. */
+        const GAME_CHANGERS = new Set(["Sol Ring", "Rhystic Study"]);
+        const isGameChanger = id.name && GAME_CHANGERS.has(id.name);
         return {
           name: id.name || `Test Card ${cn}`,
           set, collector_number: cn,
           cmc: 1,
           type_line: typeLine,
           colors: [],
+          color_identity: colorIdentity,
           produced_mana: producedMana,
           image_uris: fakeImageUris(set, cn),
+          ...(isGameChanger ? { game_changer: true } : {}),
           ...(all_parts ? { all_parts } : {}),
         };
       });
@@ -201,4 +210,26 @@ export async function presetStorage(page, state) {
       localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
     }
   }, state);
+}
+
+/* Open the header deck-pill dropdown so its menu items (Importer,
+ * Supprimer ce deck, deck list) become visible to Playwright. Tests
+ * that previously clicked a top-level "+ Importer" button now have
+ * to expand the deck menu first — Playwright won't click an element
+ * whose ancestor has [hidden]. */
+export async function openDeckMenu(page) {
+  await page.click("#btn-deck-pill");
+  await page.locator("#deck-dropdown-menu").waitFor({ state: "visible" });
+}
+
+/* Switch decks without going through the visible dropdown — useful
+ * when the test cares about the post-switch state, not the picker
+ * UX. Mutates the hidden #deck-select and dispatches change, which
+ * is what the deck-pill click handler does internally. */
+export async function switchDeckById(page, deckId) {
+  await page.evaluate((id) => {
+    const sel = document.getElementById("deck-select");
+    sel.value = id;
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }, deckId);
 }

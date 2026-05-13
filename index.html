@@ -21,6 +21,11 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Apply the saved theme BEFORE any stylesheet evaluates, otherwise
+     a user with "editorial" saved would flash studio on every load.
+     Non-defer on purpose; the script is ~10 lines + a single
+     localStorage read. -->
+<script src="js/boot-theme.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="styles.css">
@@ -46,219 +51,417 @@
 <script defer src="js/app-analyze.js"></script>
 <script defer src="js/app-gallery.js"></script>
 <script defer src="js/app-login.js"></script>
+<script defer src="js/app-settings.js"></script>
 <script defer src="js/app.js"></script>
 <script type="module" src="js/sync.js"></script>
 </head>
 <body>
 <div class="container">
-  <header>
-    <h1>Deckrypt</h1>
-    <div class="sub">Stats &amp; images via Scryfall — importe tes propres decks</div>
-    <div class="header-actions">
-      <nav class="view-tabs" role="tablist" aria-label="Vues">
-        <span class="view-tab-indicator" aria-hidden="true"></span>
-        <button id="tab-play" type="button" class="view-tab active" role="tab" aria-selected="true" aria-controls="view-play">Jouer</button>
-        <button id="tab-manage" type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="view-manage">Gérer</button>
-        <button id="tab-analyze" type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="view-analyze">Analyser</button>
-        <button id="tab-gallery" type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="view-gallery">Galerie</button>
-      </nav>
-      <div class="header-right">
-        <button id="btn-import-toggle" type="button" class="header-action">+ Importer un deck</button>
-        <button id="btn-account" type="button" class="header-action header-action-account" aria-haspopup="dialog" aria-expanded="false">Connexion</button>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="28" height="28" focusable="false">
+          <circle cx="32" cy="32" r="28" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.4"/>
+          <g stroke="var(--accent)" stroke-width="1.2" opacity="0.5" fill="none" stroke-linecap="round">
+            <line x1="32" y1="14" x2="49" y2="26"/>
+            <line x1="49" y1="26" x2="43" y2="48"/>
+            <line x1="43" y1="48" x2="21" y2="48"/>
+            <line x1="21" y1="48" x2="15" y2="26"/>
+            <line x1="15" y1="26" x2="32" y2="14"/>
+          </g>
+          <circle cx="32" cy="14" r="5.5" fill="var(--mtg-w)"/>
+          <circle cx="49" cy="26" r="5.5" fill="var(--mtg-u)"/>
+          <circle cx="43" cy="48" r="5.5" fill="var(--mtg-b)"/>
+          <circle cx="21" cy="48" r="5.5" fill="var(--mtg-r)"/>
+          <circle cx="15" cy="26" r="5.5" fill="var(--mtg-g)"/>
+        </svg>
+      </span>
+      <span class="brand-name">Deckrypt</span>
+    </div>
+
+    <nav class="nav" role="tablist" aria-label="Vues">
+      <button id="tab-play" type="button" class="nav-tab active" role="tab" aria-selected="true" aria-controls="view-play">Jouer</button>
+      <button id="tab-manage" type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="view-manage">Gérer</button>
+      <button id="tab-analyze" type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="view-analyze">Analyser</button>
+      <button id="tab-gallery" type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="view-gallery">Galerie</button>
+    </nav>
+
+    <div class="header-right">
+      <!-- Deck picker, persistent across views. Owns the deck list +
+           Import + Delete actions. Mirrors a hidden <select> so the
+           rest of the JS keeps reading from els.deckSelect.value. -->
+      <div class="dropdown" id="deck-dropdown">
+        <button id="btn-deck-pill" type="button" class="deck-pill" aria-haspopup="menu" aria-expanded="false">
+          <span class="color-pips" id="deck-pill-pips" aria-hidden="true"></span>
+          <span class="deck-pill-name" id="deck-pill-name">Aucun deck</span>
+          <span class="deck-pill-meta deck-pill-sep" aria-hidden="true">·</span>
+          <span class="deck-pill-meta num" id="deck-pill-count">0 cartes</span>
+          <span class="deck-pill-chev" aria-hidden="true">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </span>
+        </button>
+        <div class="dropdown-menu deck-dropdown-menu" id="deck-dropdown-menu" role="menu" hidden>
+          <div class="dropdown-head">
+            <div class="name">Tes decks</div>
+            <div class="email" id="deck-dropdown-count">0 actifs</div>
+          </div>
+          <div class="dropdown-sep" role="separator"></div>
+          <div class="dropdown-list" id="deck-dropdown-list" role="none"></div>
+          <div class="dropdown-sep" role="separator"></div>
+          <button type="button" id="btn-import-toggle" class="dropdown-item" role="menuitem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Importer une liste
+          </button>
+          <button type="button" id="btn-delete-deck" class="dropdown-item danger" role="menuitem" hidden>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+            Supprimer ce deck
+          </button>
+        </div>
+        <!-- Hidden mirror of the deck selection — kept so existing JS
+             that reads/writes els.deckSelect.value keeps working
+             without a full refactor through every call site. -->
+        <select id="deck-select" hidden aria-hidden="true" tabindex="-1"></select>
+      </div>
+
+      <!-- Account: when anonymous, shows "Connexion" and opens the
+           login overlay. When logged in, shows avatar + name and
+           opens a dropdown menu. -->
+      <div class="dropdown" id="account-dropdown">
+        <button id="btn-account" type="button" class="account account-anon" aria-haspopup="menu" aria-expanded="false">
+          <span class="account-name" id="account-label">Connexion</span>
+        </button>
+        <div class="dropdown-menu account-dropdown-menu" id="account-dropdown-menu" role="menu" hidden>
+          <div class="dropdown-head">
+            <div class="name" id="account-menu-name"></div>
+            <div class="email" id="account-menu-email"></div>
+          </div>
+          <div class="dropdown-sep" role="separator"></div>
+          <button type="button" class="dropdown-item" id="btn-open-settings" role="menuitem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Paramètres
+            <span class="kbd-hint" aria-hidden="true">⌘,</span>
+          </button>
+          <div class="dropdown-sep" role="separator"></div>
+          <button type="button" class="dropdown-item" id="btn-account-signout" role="menuitem">Se déconnecter</button>
+        </div>
       </div>
     </div>
   </header>
 
   <main class="layout">
 
-    <aside class="sidebar">
-      <section>
-        <div class="deck-bar">
-          <label for="deck-select">Deck</label>
-          <select id="deck-select"></select>
-          <button id="btn-delete-deck" type="button" class="ghost icon-only" title="Supprimer ce deck" aria-label="Supprimer ce deck" hidden>
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
-        </div>
-        <p class="deck-status" id="deck-status" aria-live="polite"></p>
-      </section>
+    <div id="view-play" role="tabpanel" aria-labelledby="tab-play">
+      <div class="play-layout">
 
-      <section>
-        <div class="section-title"><span>Partie en cours</span></div>
-        <div class="game-bar" aria-live="polite">
-          <span>Tour <strong id="turn-counter">—</strong></span>
-          <span class="sep">·</span>
-          <span>Bibliothèque : <strong id="library-count">—</strong></span>
-        </div>
-      </section>
+        <aside class="play-sidebar">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Commandants</h3>
+              <span class="panel-meta" id="commander-info"></span>
+            </div>
+            <div class="cards" id="commander-zone"></div>
+          </section>
 
-      <section class="commander-row">
-        <div class="section-title">
-          <span>Zone de commandement</span>
-          <strong id="commander-info"></strong>
-        </div>
-        <div class="cards" id="commander-zone"></div>
-      </section>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Statistiques main</h3>
+            </div>
+            <div class="stats-grid" aria-live="polite">
+              <div class="stat-box">
+                <span class="label">Terrains</span>
+                <div class="v" id="stat-lands">—</div>
+                <div class="sub" id="stat-lands-sub">—</div>
+              </div>
+              <div class="stat-box">
+                <span class="label">Sorts</span>
+                <div class="v" id="stat-spells">—</div>
+                <div class="sub" id="stat-spells-sub">CMC moy. —</div>
+              </div>
+              <div class="stat-box stat-box-wide">
+                <span class="label">Sources de mana</span>
+                <div class="pip-row sources-row" id="stat-sources"></div>
+              </div>
+            </div>
+          </section>
 
-      <section>
-        <div class="section-title"><span>Statistiques de la main</span></div>
-        <div class="stats" aria-live="polite">
-          <div class="stat">
-            <div class="label">Terrains</div>
-            <div class="value" id="stat-lands">—</div>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Partie en cours</h3>
+            </div>
+            <div class="game-side" aria-live="polite">
+              <div class="game-side-row">
+                <span>Tour</span>
+                <strong class="num game-side-turn" id="turn-counter">—</strong>
+              </div>
+              <div class="game-side-row">
+                <span>Bibliothèque</span>
+                <strong class="num" id="library-count">—</strong>
+              </div>
+              <div class="game-side-row">
+                <span>Cimetière</span>
+                <strong class="num" id="graveyard-count">—</strong>
+              </div>
+              <div class="game-side-row">
+                <span>Champ de bataille</span>
+                <strong class="num" id="battlefield-count">—</strong>
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <main class="play-main">
+          <!-- Game state bar: status + actions, always visible at the top. -->
+          <div class="game-state">
+            <div class="game-state-tile">
+              <span class="label">Tour</span>
+              <strong class="num" id="game-state-turn">—</strong>
+            </div>
+            <span class="game-state-sep" aria-hidden="true"></span>
+            <div class="game-state-tile">
+              <span class="label">Bibli.</span>
+              <strong class="num" id="game-state-library">—</strong>
+            </div>
+            <span class="game-state-sep" aria-hidden="true"></span>
+            <div class="game-state-tile">
+              <span class="label">Main</span>
+              <strong class="num" id="game-state-hand">—</strong>
+            </div>
+            <div class="game-state-actions">
+              <button id="btn-draw" type="button" class="btn btn-sm">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Piocher
+              </button>
+              <button id="btn-next-turn" type="button" class="btn btn-sm primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                </svg>
+                <span id="btn-next-turn-label">Tour suivant</span>
+              </button>
+              <button id="btn-new" type="button" class="btn btn-sm">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <polyline points="1 4 1 10 7 10"/>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                </svg>
+                Nouvelle main
+              </button>
+            </div>
           </div>
-          <div class="stat">
-            <div class="label">Sorts</div>
-            <div class="value" id="stat-spells">—</div>
-          </div>
-          <div class="stat">
-            <div class="label">CMC en main</div>
-            <div class="value" id="stat-cmc">—</div>
-          </div>
-          <div class="stat">
-            <div class="label">Sources de mana</div>
-            <div class="pip-row" id="stat-sources"></div>
-          </div>
-        </div>
-      </section>
-    </aside>
 
-    <div class="play-area" id="view-play" role="tabpanel" aria-labelledby="tab-play">
-      <section class="battlefield-section">
-        <div class="section-title">
-          <span>Champ de bataille</span>
-          <strong id="battlefield-info">vide</strong>
-        </div>
-        <div class="cards" id="battlefield"></div>
-      </section>
+          <section class="play-section">
+            <div class="play-section-head">
+              <span class="title">Champ de bataille</span>
+              <span class="meta" id="battlefield-info">vide</span>
+            </div>
+            <div class="cards play-zone" id="battlefield"></div>
+          </section>
 
-      <section class="lands-section">
-        <div class="section-title">
-          <span>Terrains</span>
-          <strong id="lands-info">vide</strong>
-        </div>
-        <div class="cards" id="lands"></div>
-      </section>
+          <section class="play-section">
+            <div class="play-section-head">
+              <span class="title">Terrains</span>
+              <span class="meta" id="lands-info">vide</span>
+            </div>
+            <div class="cards play-zone" id="lands"></div>
+          </section>
 
-      <div class="play-row">
-        <section class="hand-section">
-          <div class="section-title">
-            <span>Main</span>
-            <strong id="hand-info" aria-live="polite">—</strong>
+          <div class="hand-row">
+            <section class="play-section">
+              <div class="play-section-head">
+                <span class="title">Main</span>
+                <span class="meta" id="hand-info" aria-live="polite">—</span>
+              </div>
+              <div class="cards hand-strip" id="hand"></div>
+            </section>
+
+            <section class="play-section">
+              <div class="play-section-head">
+                <span class="title">Cimetière</span>
+                <span class="meta" id="graveyard-info">vide</span>
+              </div>
+              <div class="cards graveyard-zone" id="graveyard"></div>
+            </section>
           </div>
-          <div class="cards" id="hand"></div>
-        </section>
 
-        <section class="graveyard-section">
-          <div class="section-title">
-            <span>Cimetière</span>
-            <strong id="graveyard-info">vide</strong>
-          </div>
-          <div class="cards" id="graveyard"></div>
-        </section>
-      </div>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Jouer un terrain de base</h3>
+              <span class="panel-meta">depuis la pioche</span>
+            </div>
+            <div class="basic-lands" id="basic-lands" role="group" aria-label="Boutons d'ajout d'un terrain de base"></div>
+          </section>
+        </main>
 
-      <div class="bottom-row">
-        <section class="basic-lands-section">
-          <div class="section-title">
-            <span>Ajouter un terrain de base</span>
-            <strong>depuis la pioche</strong>
-          </div>
-          <div class="basic-lands" id="basic-lands" role="group" aria-label="Boutons d'ajout d'un terrain de base"></div>
-        </section>
-
-        <section class="actions-section">
-          <div class="section-title"><span>Actions</span></div>
-          <div class="actions">
-            <button id="btn-draw" type="button">Pioche +1</button>
-            <button id="btn-next-turn" type="button" class="primary">Tour suivant</button>
-            <button id="btn-new" type="button">Nouvelle main</button>
-          </div>
-        </section>
       </div>
     </div>
 
     <div class="manage-area" id="view-manage" role="tabpanel" aria-labelledby="tab-manage" hidden>
-    <section class="manage-info">
-      <div class="section-title">
-        <span>Deck</span>
-        <strong id="manage-deck-name">—</strong>
-        <div class="lang-switch" role="radiogroup" aria-label="Langue d'affichage des cartes">
-          <button id="lang-switch-en" type="button" class="active" aria-pressed="true">EN</button>
-          <button id="lang-switch-fr" type="button" aria-pressed="false">FR</button>
-        </div>
-      </div>
-      <div class="manage-meta" id="manage-meta" aria-live="polite"></div>
-      <div class="manage-format">
-        <label for="manage-format-select">Format :</label>
-        <select id="manage-format-select">
-          <option value="commander">Commander</option>
-          <option value="limited">Format libre (40+ cartes)</option>
-        </select>
-      </div>
-      <div class="manage-actions">
-        <button id="btn-export" type="button">Exporter ce deck</button>
-      </div>
-    </section>
+      <div class="manage-layout">
+        <main class="manage-main">
 
-    <div class="translation-banner" id="translation-banner" role="status" aria-live="polite" hidden>
-      <div class="translation-banner-spinner" aria-hidden="true"></div>
-      <span>Récupération des noms français via Scryfall…</span>
-    </div>
-
-    <section>
-      <div class="section-title"><span>Ajouter une carte</span></div>
-      <div class="add-card-block">
-        <div class="add-card-search">
-          <label for="add-card-input" class="sr-only">Nom de la carte</label>
-          <input id="add-card-input" type="text" placeholder="Tape un nom — Sol Ring, Counterspell…" autocomplete="off">
-          <ul id="add-card-suggestions" class="suggestions" role="listbox" hidden></ul>
-          <div id="add-card-draft" class="add-card-draft" hidden>
-            <strong id="add-card-draft-name" class="add-card-draft-name"></strong>
-            <img id="add-card-draft-preview" class="add-card-draft-preview" alt="" hidden>
-            <label>
-              Édition
-              <select id="add-card-draft-printing">
-                <option value="">Édition par défaut</option>
-              </select>
-            </label>
-            <label>
-              Quantité
-              <input id="add-card-draft-qty" type="number" min="1" max="999" value="1">
-            </label>
-            <div class="add-card-draft-actions">
-              <button id="add-card-draft-cancel" type="button" class="ghost">Annuler</button>
-              <button id="add-card-draft-submit" type="button" class="primary">Ajouter au deck</button>
+          <!-- Deck summary header — commander art + name + meta + actions -->
+          <header class="deck-summary panel">
+            <div class="deck-art">
+              <img id="manage-deck-art" alt="" loading="lazy">
             </div>
+            <div class="deck-summary-body">
+              <h1 id="manage-deck-name">—</h1>
+              <div class="deck-meta-row">
+                <span class="color-pips" id="manage-deck-pips" aria-hidden="true"></span>
+                <span class="deck-meta-sep" aria-hidden="true">·</span>
+                <span><strong id="manage-deck-format-label">Commander</strong></span>
+                <span class="deck-meta-sep" aria-hidden="true">·</span>
+                <span><strong class="num" id="manage-deck-size">0</strong> cartes</span>
+                <span class="deck-meta-sep" aria-hidden="true">·</span>
+                <span id="manage-deck-archetype">—</span>
+              </div>
+              <!-- Hidden mirror for legacy JS that writes the old summary
+                   text into #manage-meta. Kept to avoid a full sweep
+                   through the controllers; the visible meta lives in
+                   .deck-meta-row above. -->
+              <div id="manage-meta" hidden aria-hidden="true"></div>
+              <div class="deck-summary-tags">
+                <label class="deck-summary-format">
+                  <span class="label">Format</span>
+                  <select id="manage-format-select" class="select-field">
+                    <option value="commander">Commander</option>
+                    <option value="limited">Format libre (40+ cartes)</option>
+                  </select>
+                </label>
+                <div class="lang-switch" role="radiogroup" aria-label="Langue d'affichage des cartes">
+                  <button id="lang-switch-en" type="button" class="active" aria-pressed="true">EN</button>
+                  <button id="lang-switch-fr" type="button" aria-pressed="false">FR</button>
+                </div>
+              </div>
+              <div class="deck-summary-actions">
+                <button id="btn-play-deck" type="button" class="btn primary btn-sm">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Lancer une partie
+                </button>
+                <button id="btn-test-draw" type="button" class="btn btn-sm">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <polyline points="16 3 21 3 21 8"/>
+                    <line x1="4" y1="20" x2="21" y2="3"/>
+                    <polyline points="21 16 21 21 16 21"/>
+                    <line x1="15" y1="15" x2="21" y2="21"/>
+                    <line x1="4" y1="4" x2="9" y2="9"/>
+                  </svg>
+                  Pioche test
+                </button>
+                <button id="btn-export" type="button" class="btn btn-sm">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Exporter
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div class="translation-banner" id="translation-banner" role="status" aria-live="polite" hidden>
+            <div class="translation-banner-spinner" aria-hidden="true"></div>
+            <span>Récupération des noms français via Scryfall…</span>
           </div>
-        </div>
-        <div class="add-card-paste">
-          <label for="add-card-paste-text" class="sr-only">Coller une ligne</label>
-          <textarea id="add-card-paste-text" placeholder="Ou colle une liste MTGA / Moxfield :
+
+          <!-- Add card -->
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Ajouter une carte</h3>
+            </div>
+            <div class="add-card-block">
+              <div class="add-card-search">
+                <label for="add-card-input" class="sr-only">Nom de la carte</label>
+                <input id="add-card-input" type="text" placeholder="Tape un nom — Sol Ring, Counterspell…" autocomplete="off">
+                <ul id="add-card-suggestions" class="suggestions" role="listbox" hidden></ul>
+                <div id="add-card-draft" class="add-card-draft" hidden>
+                  <strong id="add-card-draft-name" class="add-card-draft-name"></strong>
+                  <img id="add-card-draft-preview" class="add-card-draft-preview" alt="" hidden>
+                  <label>
+                    Édition
+                    <select id="add-card-draft-printing">
+                      <option value="">Édition par défaut</option>
+                    </select>
+                  </label>
+                  <label>
+                    Quantité
+                    <input id="add-card-draft-qty" type="number" min="1" max="999" value="1">
+                  </label>
+                  <div class="add-card-draft-actions">
+                    <button id="add-card-draft-cancel" type="button" class="ghost">Annuler</button>
+                    <button id="add-card-draft-submit" type="button" class="primary">Ajouter au deck</button>
+                  </div>
+                </div>
+              </div>
+              <div class="add-card-paste">
+                <label for="add-card-paste-text" class="sr-only">Coller une ligne</label>
+                <textarea id="add-card-paste-text" placeholder="Ou colle une liste MTGA / Moxfield :
 1 Sol Ring (CMD) 259
 2 Forest"></textarea>
-          <button id="add-card-paste-btn" type="button">Ajouter depuis la liste</button>
-        </div>
-      </div>
-    </section>
+                <button id="add-card-paste-btn" type="button">Ajouter depuis la liste</button>
+              </div>
+            </div>
+          </section>
 
-    <section>
-      <div class="section-title"><span>Commandants</span></div>
-      <div class="manage-cards" id="manage-commanders"></div>
-    </section>
+          <!-- Commanders -->
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Commandants</h3>
+            </div>
+            <div class="manage-cards" id="manage-commanders"></div>
+          </section>
 
-    <section>
-      <div class="section-title">
-        <span>Cartes</span>
-        <strong id="manage-cards-count"></strong>
+          <!-- Cards -->
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Cartes</h3>
+              <span class="panel-meta"><strong class="num" id="manage-cards-count">—</strong></span>
+            </div>
+            <div class="manage-cards" id="manage-cards"></div>
+          </section>
+        </main>
+
+        <!-- Side panel: composition, bracket, activity -->
+        <aside class="manage-side">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Composition</h3>
+              <span class="panel-meta">aperçu</span>
+            </div>
+            <div id="manage-side-composition" class="composition-side"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Bracket</h3>
+              <span class="panel-meta" id="manage-side-bracket-label">—</span>
+            </div>
+            <div id="manage-side-bracket" class="manage-side-bracket"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Activité récente</h3>
+            </div>
+            <p class="manage-side-placeholder">Suivi des modifs et parties — <em>à venir</em>.</p>
+          </section>
+        </aside>
       </div>
-      <div class="manage-cards" id="manage-cards"></div>
-    </section>
     </div>
 
     <div class="analyze-area" id="view-analyze" role="tabpanel" aria-labelledby="tab-analyze" hidden>
@@ -406,6 +609,197 @@
 
 <!-- Flash messages — ephemeral action feedback. Populated by flash(). -->
 <div id="flash-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Settings modal — opened from the account dropdown "Paramètres"
+     item or ⌘+, / Ctrl+,. Markup ported from claude.design's
+     view-settings.jsx. Controller in js/app-settings.js. -->
+<div id="settings-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="settings-modal" role="document">
+    <header class="settings-head">
+      <div>
+        <h2 id="settings-title">Paramètres</h2>
+        <p>Personnalise ton expérience Deckrypt.</p>
+      </div>
+      <button type="button" id="btn-settings-close" class="icon-btn" aria-label="Fermer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </header>
+    <div class="settings-body">
+      <nav class="settings-nav" role="tablist" aria-label="Sections paramètres">
+        <button type="button" class="settings-nav-item active" role="tab" aria-selected="true" data-settings-tab="appearance">Apparence</button>
+        <button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-settings-tab="preferences">Préférences</button>
+        <button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-settings-tab="account">Compte</button>
+        <button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-settings-tab="shortcuts">Raccourcis</button>
+      </nav>
+
+      <div class="settings-content">
+        <!-- ===== Appearance ===== -->
+        <div class="settings-panel" data-settings-panel="appearance">
+          <div class="settings-section-wrap">
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Thème</h3>
+                <p>Le thème s'applique partout — il sera synchronisé sur ton compte une fois la sync préférences en place.</p>
+              </div>
+              <div class="theme-cards">
+                <button type="button" class="theme-card" data-theme="studio" aria-pressed="false">
+                  <div class="theme-preview theme-preview-studio" aria-hidden="true">
+                    <div class="tp-bar"><span class="tp-dot"></span><span class="tp-dot"></span><span class="tp-dot"></span></div>
+                    <div class="tp-content">
+                      <span class="tp-title"></span>
+                      <span class="tp-line tp-line-1"></span>
+                      <span class="tp-line tp-line-2"></span>
+                      <span class="tp-line tp-line-3"></span>
+                    </div>
+                    <span class="tp-cta"></span>
+                  </div>
+                  <div class="theme-card-meta">
+                    <strong>Studio</strong>
+                    <span>Sombre, indigo, équilibré</span>
+                  </div>
+                  <span class="theme-card-check" aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </span>
+                </button>
+                <button type="button" class="theme-card" data-theme="editorial" aria-pressed="false">
+                  <div class="theme-preview theme-preview-editorial" aria-hidden="true">
+                    <div class="tp-bar"><span class="tp-dot"></span><span class="tp-dot"></span><span class="tp-dot"></span></div>
+                    <div class="tp-content">
+                      <span class="tp-title"></span>
+                      <span class="tp-line tp-line-1"></span>
+                      <span class="tp-line tp-line-2"></span>
+                      <span class="tp-line tp-line-3"></span>
+                    </div>
+                    <span class="tp-cta"></span>
+                  </div>
+                  <div class="theme-card-meta">
+                    <strong>Editorial</strong>
+                    <span>Clair, bordeaux, éditorial</span>
+                  </div>
+                  <span class="theme-card-check" aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Densité d'affichage</h3>
+                <p>Compact gagne en information par écran. Confortable laisse respirer la mise en page. <em>(À venir — choix visuel sans effet pour l'instant.)</em></p>
+              </div>
+              <div class="segmented" data-segmented="density" aria-disabled="true">
+                <button type="button" data-value="compact">Compact</button>
+                <button type="button" data-value="comfortable" class="active">Confortable</button>
+                <button type="button" data-value="spacious">Spacieux</button>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ===== Preferences ===== -->
+        <div class="settings-panel" data-settings-panel="preferences" hidden>
+          <div class="settings-section-wrap">
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Vue par défaut à l'ouverture</h3>
+                <p>L'écran que Deckrypt affiche quand tu ouvres l'app.</p>
+              </div>
+              <div class="segmented" data-segmented="default-view">
+                <button type="button" data-value="play">Jouer</button>
+                <button type="button" data-value="manage">Gérer</button>
+                <button type="button" data-value="analyze">Analyser</button>
+                <button type="button" data-value="gallery">Galerie</button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Langue des cartes</h3>
+                <p>Affichage des noms de cartes dans la liste. Les images restent dans la langue d'origine du print.</p>
+              </div>
+              <div class="segmented" data-segmented="card-lang">
+                <button type="button" data-value="en">Anglais</button>
+                <button type="button" data-value="fr">Français</button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Format préféré <em>(À venir)</em></h3>
+                <p>Format sélectionné par défaut pour les nouveaux decks.</p>
+              </div>
+              <select class="select-field" id="settings-default-format" disabled>
+                <option value="commander">Commander / EDH</option>
+                <option value="limited">Format libre (40+)</option>
+              </select>
+            </section>
+          </div>
+        </div>
+
+        <!-- ===== Account ===== -->
+        <div class="settings-panel" data-settings-panel="account" hidden>
+          <div class="settings-section-wrap">
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Informations</h3>
+                <p>Ton profil sur Deckrypt.</p>
+              </div>
+              <div id="settings-account-card" class="account-card">
+                <!-- Filled in by the controller from window.sync.currentUser() -->
+              </div>
+            </section>
+
+            <section class="settings-section danger-zone">
+              <div class="settings-section-head">
+                <h3>Zone à risque <em>(À venir)</em></h3>
+                <p>Ces actions seront branchées dans une prochaine étape.</p>
+              </div>
+              <div class="setting-row">
+                <div>
+                  <strong>Supprimer mon compte</strong>
+                  <p>Compte + decks supprimés définitivement.</p>
+                </div>
+                <button type="button" class="btn btn-sm danger" disabled>Supprimer</button>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ===== Shortcuts ===== -->
+        <div class="settings-panel" data-settings-panel="shortcuts" hidden>
+          <div class="settings-section-wrap">
+            <section class="settings-section">
+              <div class="settings-section-head"><h3>Navigation</h3></div>
+              <div class="kbd-list">
+                <div class="kbd-row"><span>Vue Jouer</span><span class="kbd-keys"><kbd>1</kbd></span></div>
+                <div class="kbd-row"><span>Vue Gérer</span><span class="kbd-keys"><kbd>2</kbd></span></div>
+                <div class="kbd-row"><span>Vue Analyser</span><span class="kbd-keys"><kbd>3</kbd></span></div>
+                <div class="kbd-row"><span>Vue Galerie</span><span class="kbd-keys"><kbd>4</kbd></span></div>
+                <div class="kbd-row"><span>Ouvrir les paramètres</span><span class="kbd-keys"><kbd>⌘</kbd><span aria-hidden="true">+</span><kbd>,</kbd></span></div>
+              </div>
+            </section>
+            <section class="settings-section">
+              <div class="settings-section-head"><h3>Vue Jouer</h3></div>
+              <div class="kbd-list">
+                <div class="kbd-row"><span>Piocher</span><span class="kbd-keys"><kbd>D</kbd></span></div>
+                <div class="kbd-row"><span>Tour suivant</span><span class="kbd-keys"><kbd>T</kbd></span></div>
+                <div class="kbd-row"><span>Nouvelle main</span><span class="kbd-keys"><kbd>N</kbd></span></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Login overlay — full-viewport split-screen, hidden until the user
      clicks "Connexion". Markup ported from the claude.design bundle's

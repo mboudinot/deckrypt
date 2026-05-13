@@ -145,7 +145,21 @@ function makeManageCardRow(entry, resolvedCard, opts) {
   name.className = "card-row-name";
   // Accept a per-render displayName closure (bulk-translation-aware)
   // so a 100-card render doesn't read localStorage 100 times.
-  name.textContent = opts.displayName ? opts.displayName(entry) : getDisplayName(entry);
+  const labelText = opts.displayName ? opts.displayName(entry) : getDisplayName(entry);
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "card-row-name-label";
+  labelSpan.textContent = labelText;
+  name.appendChild(labelSpan);
+  /* Game Changer chip — small amber pill next to the name on
+   * Manage rows, mirroring the GC pin shown on Play cards. */
+  if (resolvedCard && resolvedCard.game_changer === true) {
+    const chip = document.createElement("span");
+    chip.className = "gc-chip";
+    chip.textContent = "GC";
+    chip.title = "Game Changer";
+    chip.setAttribute("aria-label", "Game Changer");
+    name.appendChild(chip);
+  }
   if (state.manageLang === "fr" && pendingTranslations.has(entry.name)) {
     row.classList.add("is-translating");
     const spinner = document.createElement("span");
@@ -208,6 +222,9 @@ function renderManageView(ctx = null) {
     els.manageCommanders.replaceChildren(placeholderText("—"));
     els.manageCards.replaceChildren(placeholderText("—"));
     els.manageCardsCount.textContent = "";
+    renderDeckSummary(null);
+    renderSideComposition();
+    renderSideBracket();
     return;
   }
   els.manageDeckName.textContent = def.name;
@@ -218,6 +235,14 @@ function renderManageView(ctx = null) {
   // Format selector: explicit field on the deck, fallback to commander
   // for legacy decks saved before the field existed.
   els.formatSelect.value = def.format || "commander";
+
+  /* Deck summary header (commander art + meta + actions) and the
+   * side panel (composition + bracket). These depend on
+   * state.resolved being populated; they degrade to a placeholder
+   * shape when it isn't (cold load / never-resolved deck). */
+  renderDeckSummary(def);
+  renderSideComposition();
+  renderSideBracket();
 
   const cacheReader = ctx?.cacheReader || cardCacheReader();
   const translate = state.manageLang === "fr" ? bulkTranslationLookup() : null;
@@ -791,4 +816,166 @@ function markRecentlyAdded(names) {
   setTimeout(() => {
     for (const n of names) state.recentlyAddedNames.delete(n);
   }, RECENTLY_ADDED_TTL_MS);
+}
+
+/* ============================================================
+ * Deck summary header (commander art + name + meta + actions)
+ * + side panel (composition + bracket).
+ *
+ * These fill the new manage-view shell. They lean on the same
+ * resolved deck data the rest of the view consumes — when
+ * state.resolved is null we render a minimal placeholder so the
+ * page doesn't look broken on cold load.
+ * ============================================================ */
+
+const COMPOSITION_ROWS = [
+  { label: "Terrains",     count: (cards) => countLands(cards) },
+  { label: "Rampe",        count: (cards) => countRamp(cards) },
+  { label: "Pioche",       count: (cards) => countDraw(cards) },
+  { label: "Interaction",  count: (cards) => countInteraction(cards) },
+  { label: "Board wipes",  count: (cards) => countBoardWipes(cards) },
+];
+
+function renderDeckSummary(def) {
+  const artEl = document.getElementById("manage-deck-art");
+  const nameEl = document.getElementById("manage-deck-name");
+  const formatEl = document.getElementById("manage-deck-format-label");
+  const sizeEl = document.getElementById("manage-deck-size");
+  const pipsEl = document.getElementById("manage-deck-pips");
+  const archEl = document.getElementById("manage-deck-archetype");
+  if (!artEl) return; // legacy markup, refonte not applied
+
+  if (!def) {
+    artEl.removeAttribute("src");
+    artEl.alt = "";
+    nameEl.textContent = "—";
+    formatEl.textContent = "—";
+    sizeEl.textContent = "0";
+    pipsEl.replaceChildren();
+    archEl.textContent = "—";
+    return;
+  }
+  nameEl.textContent = def.name;
+  formatEl.textContent = (def.format === "limited") ? "Format libre" : "Commander";
+  const total = (def.commanders?.length || 0) + def.cards.reduce((s, c) => s + (c.qty || 0), 0);
+  sizeEl.textContent = String(total);
+
+  /* Commander art: prefer normal, fall back to faces[0] for DFCs. */
+  const cmdr = state.resolved && state.resolved.commanders && state.resolved.commanders[0];
+  const artUrl = cmdr && (
+    (cmdr.image_uris && cmdr.image_uris.normal)
+    || (cmdr.card_faces && cmdr.card_faces[0] && cmdr.card_faces[0].image_uris && cmdr.card_faces[0].image_uris.normal)
+  );
+  if (artUrl) {
+    artEl.src = artUrl;
+    artEl.alt = cmdr.name || "";
+  } else {
+    artEl.removeAttribute("src");
+    artEl.alt = "";
+  }
+
+  /* Color pips: union of commanders' color_identity. */
+  pipsEl.replaceChildren();
+  const colors = new Set();
+  if (state.resolved) {
+    for (const c of state.resolved.commanders) {
+      if (Array.isArray(c.color_identity)) for (const cid of c.color_identity) colors.add(cid);
+    }
+  }
+  for (const c of ["W", "U", "B", "R", "G"]) {
+    if (!colors.has(c)) continue;
+    const p = document.createElement("span");
+    p.className = `pip-dot dot-${c.toLowerCase()}`;
+    p.setAttribute("aria-label", c);
+    pipsEl.appendChild(p);
+  }
+
+  /* Top archetype, when one stands out. */
+  let archLabel = "Profil mixte";
+  if (state.resolved && typeof detectArchetypes === "function") {
+    const archs = detectArchetypes(state.resolved);
+    const top = archs.find((a) => a.confidence >= 0.35) || archs[0];
+    if (top) archLabel = top.label;
+  }
+  archEl.textContent = archLabel;
+}
+
+function renderSideComposition() {
+  const el = document.getElementById("manage-side-composition");
+  if (!el) return;
+  el.replaceChildren();
+  if (!state.resolved) {
+    const p = document.createElement("p");
+    p.className = "manage-side-placeholder";
+    p.textContent = "Chargement…";
+    el.appendChild(p);
+    return;
+  }
+  const cards = state.resolved.deck || [];
+  const total = cards.length || 1;
+  for (const row of COMPOSITION_ROWS) {
+    const n = row.count(cards);
+    const wrap = document.createElement("div");
+    wrap.className = "composition-row";
+    const head = document.createElement("div");
+    head.className = "composition-row-head";
+    const lab = document.createElement("span");
+    lab.className = "label";
+    lab.textContent = row.label;
+    const val = document.createElement("span");
+    val.className = "value num";
+    val.textContent = String(n);
+    head.appendChild(lab);
+    head.appendChild(val);
+    wrap.appendChild(head);
+    const bar = document.createElement("div");
+    bar.className = "composition-row-bar";
+    const fill = document.createElement("div");
+    fill.className = "composition-row-bar-fill";
+    fill.style.width = Math.min(100, (n / total) * 100) + "%";
+    bar.appendChild(fill);
+    wrap.appendChild(bar);
+    el.appendChild(wrap);
+  }
+}
+
+function renderSideBracket() {
+  const el = document.getElementById("manage-side-bracket");
+  const labelEl = document.getElementById("manage-side-bracket-label");
+  if (!el || !labelEl) return;
+  el.replaceChildren();
+  if (!state.resolved || typeof bracketEstimate !== "function") {
+    labelEl.textContent = "—";
+    const p = document.createElement("p");
+    p.className = "manage-side-placeholder";
+    p.textContent = "Chargement…";
+    el.appendChild(p);
+    return;
+  }
+  const fullDeck = [...state.resolved.commanders, ...state.resolved.deck];
+  const result = bracketEstimate(fullDeck);
+  labelEl.textContent = `min ${result.minBracket}`;
+
+  const head = document.createElement("div");
+  head.className = "manage-side-bracket-head";
+  const num = document.createElement("span");
+  num.className = "bracket-large";
+  num.textContent = String(result.minBracket);
+  head.appendChild(num);
+  const info = document.createElement("div");
+  const lab = document.createElement("div");
+  lab.className = "label";
+  lab.textContent = result.label;
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = `${result.gameChangerCount} Game Changer${result.gameChangerCount > 1 ? "s" : ""} détecté${result.gameChangerCount > 1 ? "s" : ""}`;
+  info.appendChild(lab);
+  info.appendChild(sub);
+  head.appendChild(info);
+  el.appendChild(head);
+
+  const verdict = document.createElement("p");
+  verdict.className = "manage-side-bracket-verdict";
+  verdict.textContent = result.note;
+  el.appendChild(verdict);
 }

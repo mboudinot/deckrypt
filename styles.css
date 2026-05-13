@@ -3,143 +3,316 @@
    component styles — it only adds what the theme doesn't provide. */
 .modal:focus { outline: none; }
 body { padding: 16px; }
-header { text-align: center; margin-bottom: 16px; }
-header h1 { margin: 0; font-size: 1.4rem; letter-spacing: 0.5px; }
-header .sub { color: var(--text-muted); font-size: 0.85rem; margin-top: 4px; }
 .container { max-width: 1500px; margin: 0 auto; }
 
-/* Header row: tabs centered, Import action pinned to the right.
-   Grid `1fr auto 1fr` keeps the tabs visually centered regardless of
-   the import button's width. */
-.header-actions {
+/* ============================================================
+   App header — brand on the left, view nav centered, deck pill +
+   account on the right. Replaces the previous view-tabs + sliding
+   indicator setup. Ported from the claude.design bundle (shell.jsx
+   + app.css header sections + dropdown rules from app-analyze.css).
+   ============================================================ */
+.app-header {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 16px;
-  margin-top: 12px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
-.header-actions .view-tabs { grid-column: 2; justify-self: center; }
-.header-actions .header-action { grid-column: 3; justify-self: end; }
-.header-action {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  border-radius: 999px;
-  letter-spacing: 0.2px;
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  flex-shrink: 0;
 }
+.brand-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+[data-direction="editorial"] .brand-name { letter-spacing: -0.02em; }
 
-/* View tabs (Jouer / Gérer / Analyser). Sidebar stays visible across
-   both views; only the right column swaps (see .play-area /
-   .manage-area below). The pill background for the active tab is a
-   single absolutely-positioned indicator that slides via JS (see
-   positionViewTabIndicator in app.js), giving the click feedback its
-   animated feel. */
-.view-tabs {
-  position: relative;
+.nav {
   display: inline-flex;
-  gap: 4px;
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px;
-}
-.view-tab-indicator {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 0;
-  width: 0;
-  background: var(--accent);
-  border-radius: 999px;
-  transform: translateX(0);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: none;
-  z-index: 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .view-tab-indicator { transition: none; }
-}
-.view-tab {
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  gap: 2px;
   position: relative;
-  z-index: 1;
+  justify-self: center;
+}
+[data-direction="editorial"] .nav {
   background: transparent;
-  border: none;
+  border: 0;
+  padding: 0;
+  gap: 0;
+}
+.nav-tab {
+  background: transparent;
+  border: 0;
   color: var(--text-muted);
-  padding: 6px 18px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  border-radius: 999px;
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: color 0.2s ease;
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.005em;
+  transition: color 0.15s, background 0.15s;
 }
-.view-tab:hover:not(:disabled) {
+[data-direction="editorial"] .nav-tab {
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  padding: 10px 22px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+/* Nav tab hover: TEXT color only (muted -> full or accent in
+ * Editorial). The global `button:hover:not(:disabled)` rule would
+ * otherwise win on specificity and flip the tab to accent
+ * background; we use `:hover:not(:disabled)` here too (0,3,0 vs
+ * 0,2,1) and explicitly hold background + border to base values. */
+[data-direction="editorial"] .nav-tab:hover:not(:disabled) {
   background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+}
+.nav-tab:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
   color: var(--text);
-  border: none;
 }
-.view-tab.active {
+.nav-tab.active {
+  background: var(--accent);
   color: var(--accent-text);
 }
-.view-tab.active:hover:not(:disabled) {
-  color: var(--accent-text);
+[data-direction="editorial"] .nav-tab.active {
+  background: transparent;
+  border-bottom-color: var(--accent);
+  color: var(--accent);
 }
 
-/* Two-column layout: deck info on the left, play area on the right.
-   Sidebar sticks to the viewport so deck/commanders/stats stay visible
-   while you scroll through battlefield/hand/graveyard. */
-.layout {
-  display: grid;
-  grid-template-columns: minmax(320px, 360px) 1fr;
-  gap: 16px;
-  align-items: start;
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
 }
-.sidebar,
-.play-area,
+
+.deck-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 320px;
+  color: var(--text);
+  font-family: inherit;
+}
+.deck-pill:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.deck-pill-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.deck-pill-meta { color: var(--text-muted); font-size: 11px; }
+.deck-pill-sep { font-size: 11px; }
+.deck-pill-chev {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+/* Account button — anonymous (Connexion only) vs authed (avatar + name) */
+.account {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px 4px 4px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  color: var(--text);
+  font-family: inherit;
+}
+.account:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.account-anon {
+  padding: 8px 16px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  font-size: 13px;
+}
+/* Anon CTA: the only one of the three header buttons where a
+ * background flip on hover is intended (primary call-to-action). */
+.account-anon:hover:not(:disabled) {
+  background: var(--accent-2);
+  color: var(--accent-text);
+  border-color: var(--accent-2);
+}
+.account-avatar {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-text);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+[data-direction="editorial"] .account-avatar { font-family: var(--font-display); }
+.account-name {
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-chev {
+  color: var(--text-muted);
+  display: inline-grid;
+  place-items: center;
+}
+
+/* Color identity pips — used by deck-pill + manage view */
+.color-pips {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.color-pips:empty { display: none; }
+.pip-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.pip-dot.dot-w { background: var(--mtg-w); }
+.pip-dot.dot-u { background: var(--mtg-u); }
+.pip-dot.dot-b { background: var(--mtg-b); }
+.pip-dot.dot-r { background: var(--mtg-r); }
+.pip-dot.dot-g { background: var(--mtg-g); }
+
+/* Dropdowns (deck picker + account menu) */
+.dropdown { position: relative; }
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  z-index: 20;
+}
+.dropdown-menu[hidden] { display: none; }
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+.dropdown-item:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: transparent;
+}
+.dropdown-item[aria-current="true"] { background: var(--surface-2); }
+.dropdown-item.danger { color: var(--error); }
+.dropdown-item.danger:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--error) 14%, transparent);
+  color: var(--error);
+  border-color: transparent;
+}
+.dropdown-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.dropdown-head { padding: 10px 10px 6px; }
+.dropdown-head .name { font-weight: 600; font-size: 13px; color: var(--text); }
+.dropdown-head .email { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); margin-top: 2px; }
+.deck-dropdown-menu { min-width: 280px; }
+.deck-dropdown-menu .dropdown-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.deck-dropdown-menu .dropdown-list .dropdown-item .name-col {
+  flex: 1; min-width: 0;
+}
+.deck-dropdown-menu .dropdown-list .dropdown-item .name-col .deck-name-row {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deck-dropdown-menu .dropdown-list .dropdown-item .name-col .deck-meta-row {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Single-column outer layout. The old globally-shared sidebar (with
+   commander zone + hand stats + game state) was play-specific, so it
+   showed stale game data on Manage/Analyze. Each view now owns its
+   own internal layout — Play has .play-layout (sidebar + main),
+   Manage has .manage-layout, Analyze and Gallery are full-width. */
+.layout {
+  display: block;
+  /* Generous bottom padding so the last panel of any view never
+   * feels glued to the viewport edge. */
+  padding-bottom: 48px;
+}
 .manage-area,
 .analyze-area,
 .gallery-area {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-width: 0; /* let flex children shrink to fit */
+  min-width: 0;
 }
-/* All four views share the same right-column cell by default; only
-   one is visible at a time. The author `display: flex` rule above
-   has the same specificity as the UA's `[hidden]{display:none}` and
-   wins by origin, so we override `hidden` explicitly here. */
-.play-area, .manage-area, .analyze-area, .gallery-area {
-  grid-column: 2;
-  grid-row: 1;
-}
-.play-area[hidden],
+/* `display: flex` above beats the UA stylesheet's `[hidden]{display:none}`
+   by origin precedence, so we override `hidden` explicitly. #view-play
+   has no class and falls back to the UA default cleanly. */
 .manage-area[hidden],
 .analyze-area[hidden],
 .gallery-area[hidden] {
   display: none;
-}
-/* Gallery is the lone full-width view: when it's active, the sidebar
-   disappears and the layout collapses to a single column so the
-   gallery occupies the entire viewport width. The `gallery-active`
-   class on <body> is toggled by switchView. */
-body.gallery-active .layout { grid-template-columns: 1fr; }
-body.gallery-active .sidebar { display: none; }
-body.gallery-active .gallery-area { grid-column: 1 / -1; }
-.sidebar { grid-column: 1; grid-row: 1; }
-.sidebar {
-  position: sticky;
-  top: 16px;
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
-}
-/* Hide the sidebar's scrollbar visually while keeping it functional. */
-.sidebar::-webkit-scrollbar { width: 8px; }
-.sidebar::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
 }
 .layout section { margin-bottom: 0; }
 
@@ -170,37 +343,6 @@ section {
   letter-spacing: 0;
 }
 
-.deck-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.deck-bar label { color: var(--text-muted); font-size: 0.9rem; }
-.deck-bar select {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-family: inherit;
-  font-size: 0.95rem;
-  flex: 1;
-  min-width: 0;
-}
-/* The status line sits below the deck bar — it's now reserved for
-   transient ops feedback (loading, errors, save failures). The
-   persistent deck-composition info lives in the Analyze view's
-   "Conformité au format" section. */
-.deck-status {
-  margin: 8px 0 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-.deck-status:empty { display: none; }
-.deck-status.error { color: var(--error); }
-.deck-status.success { color: var(--success); }
-
 .cards {
   display: flex;
   flex-wrap: wrap;
@@ -208,74 +350,6 @@ section {
   justify-content: center;
   min-height: 200px;
 }
-.commander-row .cards { justify-content: flex-start; }
-
-/* Hand and graveyard share a row below the battlefield. The graveyard
-   takes a single-card column; cards stack vertically inside it (a real
-   pile/z-stacking pass will come later). */
-.play-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 14px;
-  align-items: start;
-}
-.play-row > section { margin-bottom: 0; }
-
-/* Bottom row: "ajouter un terrain" and "actions" share the width.
-   1fr 1fr keeps them balanced; auto-flow lets them stack on narrow
-   viewports. */
-.bottom-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  align-items: start;
-}
-.bottom-row > section { margin-bottom: 0; }
-@media (max-width: 720px) {
-  .bottom-row { grid-template-columns: 1fr; }
-}
-.graveyard-section { width: 190px; }
-/* Pile-of-cards layout: one card visible on top, depth suggested by
-   pseudo-elements (cheap — no extra DOM, no extra image loads). */
-.graveyard-section .cards {
-  position: relative;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  align-items: center;
-  min-height: 210px;
-  /* Allow the staggered pseudo-card edges to peek past the box. */
-  overflow: visible;
-}
-.graveyard-section .cards.has-stack::before,
-.graveyard-section .cards.has-deep-stack::after {
-  content: "";
-  position: absolute;
-  width: 146px;
-  aspect-ratio: 488 / 680;
-  top: 0;
-  left: 50%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  pointer-events: none;
-  z-index: 0;
-}
-.graveyard-section .cards.has-stack::before {
-  transform: translate(-50%, 0) rotate(-2deg) translate(-3px, 4px);
-}
-.graveyard-section .cards.has-deep-stack::after {
-  transform: translate(-50%, 0) rotate(3deg) translate(4px, 7px);
-}
-.graveyard-section .cards .card {
-  z-index: 1; /* sit above the depth pseudo-elements */
-}
-@media (max-width: 600px) {
-  .graveyard-section .cards.has-stack::before,
-  .graveyard-section .cards.has-deep-stack::after {
-    width: 110px;
-  }
-}
-
 /* Skeleton placeholders shown while a deck resolves on a cold cache.
    Shimmer animation tells the user something's loading without the
    layout thrashing once real content lands. */
@@ -302,8 +376,8 @@ section {
 .basic-lands {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
+  gap: 6px;
+  justify-content: flex-start;
 }
 .land-btn {
   padding: 6px 14px;
@@ -511,36 +585,7 @@ button.icon-only svg { display: block; }
   font-size: 0.9rem;
   color: var(--text-muted);
 }
-.manage-format {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: 0.88rem;
-  color: var(--text-muted);
-}
-.manage-format select {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 0.88rem;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-/* Deck-level action buttons in the Manage view (export, future:
-   duplicate, reset…). One row, right-aligned. */
-.manage-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-
-/* EN | FR pill switch in the manage view's section title. Mirrors
-   the look of the global view-tabs at a smaller scale. */
+/* EN | FR pill switch — sits inside the manage deck-summary tags row. */
 .lang-switch {
   display: inline-flex;
   margin-left: auto;
@@ -747,6 +792,30 @@ button.icon-only svg { display: block; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.card-row-name .card-row-name-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* Small Game Changer chip next to the name — same amber identity
+ * as the .gc-mark pin on Play cards, sized for a one-row context. */
+.gc-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #fbbf24;
+  color: #1a1814;
+  flex-shrink: 0;
 }
 
 /* Per-row "translating to FR…" feedback. The name dims, a small
@@ -1784,32 +1853,23 @@ button.icon-only svg { display: block; }
 }
 .modal-actions:empty { display: none; }
 
-.game-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.95rem;
-  color: var(--text-muted);
-}
-.game-bar strong { color: var(--text); }
-.game-bar .sep { opacity: 0.5; }
-
-/* Engaged (tapped) cards: dimmed + corner badge. A 90° rotation would
-   break flex-row layout, so we use an in-place visual cue. */
-.card.tapped { filter: brightness(0.55) saturate(0.8); }
+/* Tapped (engaged) cards: dimmed + "TAP" corner badge — matches
+   the MTG community convention used in the design. A 90° rotation
+   would break the flex-row layout, so we keep an in-place cue. */
+.card.tapped { filter: brightness(0.55) saturate(0.7); }
 .card.tapped::after {
-  content: "ENGAGÉ";
+  content: "TAP";
   position: absolute;
   top: 6px;
   right: 6px;
   background: rgba(0, 0, 0, 0.85);
   color: var(--accent);
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
   z-index: 1;
   pointer-events: none;
 }
@@ -1822,29 +1882,13 @@ button.icon-only svg { display: block; }
   font-size: 0.9rem;
 }
 
-/* Stack the two columns once the sidebar can no longer host two
-   commanders side-by-side comfortably. On mobile the play-area is
-   promoted above the sidebar — the hand is the primary content. */
-@media (max-width: 960px) {
-  .layout { grid-template-columns: 1fr; }
-  .play-area { order: 1; }
-  .sidebar {
-    order: 2;
-    position: static;
-    max-height: none;
-    overflow: visible;
-  }
-}
-
+/* Narrow-viewport tweaks. Each view (play, manage) handles its own
+   2-col → 1-col collapse via its dedicated layout class. Here we
+   shrink the global affordances. */
 @media (max-width: 600px) {
   body { padding: 8px; }
   .card { width: 110px; }
   section { padding: 10px; }
-  header h1 { font-size: 1.15rem; }
-  .layout { gap: 10px; }
-  .sidebar, .play-area { gap: 10px; }
-  .graveyard-section { width: 145px; }
-  .graveyard-section .cards { min-height: 165px; }
 }
 
 /* ============================================================
@@ -2014,21 +2058,6 @@ button.icon-only svg { display: block; }
 }
 
 /* ============================================================
-   Header right-side actions — wraps import + account so the nav
-   stays grid-centered. Multiple .header-action buttons sit side
-   by side in this wrapper.
-   ============================================================ */
-.header-right {
-  grid-column: 3;
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.header-actions .header-right .header-action { grid-column: auto; justify-self: auto; }
-.header-action-account[aria-expanded="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-
-/* ============================================================
    .btn class system — ported from claude.design's app.css. Used
    by the login submit button and (eventually) the rest of the
    rebuilt UI. Coexists with the older `button.primary` selector
@@ -2050,7 +2079,17 @@ button.icon-only svg { display: block; }
   transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.06s;
   white-space: nowrap;
 }
-.btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
+/* `.btn:hover` etc. need `:not(:disabled)` to beat the global
+ * `button:hover:not(:disabled)` (0,2,1) on specificity — otherwise
+ * every secondary .btn flipped to accent on hover (in Editorial
+ * mode that meant a bordeaux pink fill instead of the soft hover
+ * the design wants). Color/background are listed explicitly so the
+ * global rule's defaults don't leak through. */
+.btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+}
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn.primary {
@@ -2059,16 +2098,21 @@ button.icon-only svg { display: block; }
   border-color: var(--accent);
   font-weight: 600;
 }
-.btn.primary:hover {
+.btn.primary:hover:not(:disabled) {
   background: var(--accent-2);
   border-color: var(--accent-2);
+  color: var(--accent-text);
 }
 .btn.ghost {
   background: transparent;
   border-color: transparent;
   color: var(--text-2);
 }
-.btn.ghost:hover { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn.ghost:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
 .btn-block { width: 100%; justify-content: center; }
 .btn-lg { padding: 13px 22px; font-size: 14px; }
 
@@ -2381,7 +2425,11 @@ select.is-invalid:focus {
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.google-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.google-btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+}
 
 .login-error {
   background: color-mix(in oklch, var(--error) 12%, transparent);
@@ -2405,4 +2453,1105 @@ select.is-invalid:focus {
   text-align: center;
   line-height: 1.5;
   margin: 0;
+}
+/* ============================================================
+   Settings modal styles
+   ============================================================ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  animation: backdrop-in 0.2s ease;
+}
+/* `display: grid` beats the UA stylesheet's `[hidden]{display:none}`
+ * by origin precedence (author > UA), so the modal stayed visible
+ * when toggling `hidden`. Mirror the same fix used elsewhere in the
+ * codebase. See `feedback_dom_changes_need_integration_tests` for
+ * the broader pattern. */
+.modal-backdrop[hidden] { display: none; }
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+[data-direction="editorial"] .modal-backdrop {
+  background: rgba(26, 24, 20, 0.4);
+}
+
+.settings-modal {
+  width: 100%;
+  max-width: 920px;
+  max-height: 86vh;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.settings-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+.settings-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+[data-direction="editorial"] .settings-head h2 {
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+.settings-head p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.settings-body {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+@media (max-width: 720px) {
+  .settings-body { grid-template-columns: 1fr; }
+}
+
+.settings-nav {
+  border-right: 1px solid var(--border);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg);
+}
+@media (max-width: 720px) {
+  .settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}
+.settings-nav-item {
+  background: transparent;
+  border: 0;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.settings-nav-item:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: transparent;
+}
+.settings-nav-item.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+[data-direction="editorial"] .settings-nav-item.active {
+  font-weight: 600;
+}
+
+.settings-content {
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+@media (max-width: 720px) {
+  .settings-content { padding: 20px; }
+}
+
+.settings-section-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-section-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+[data-direction="editorial"] .settings-section-head h3 {
+  font-size: 19px;
+  font-weight: 500;
+}
+.settings-section-head p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.settings-section.danger-zone {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+/* ----- Theme picker cards ----- */
+.theme-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 560px) {
+  .theme-cards { grid-template-columns: 1fr; }
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.theme-card:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  color: inherit;
+}
+.theme-card.active {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.theme-card-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  display: grid;
+  place-items: center;
+}
+
+.theme-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.theme-card-meta strong {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+}
+[data-direction="editorial"] .theme-card-meta strong {
+  font-size: 17px;
+  font-weight: 500;
+}
+.theme-card-meta span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Mini preview of each theme — built purely from rectangles */
+.theme-preview {
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius);
+  position: relative;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+.tp-bar {
+  display: flex;
+  gap: 5px;
+}
+.tp-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  display: block;
+}
+.tp-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+  flex: 1;
+}
+.tp-title {
+  width: 60%;
+  height: 10px;
+  border-radius: 2px;
+  display: block;
+}
+.tp-line {
+  height: 5px;
+  border-radius: 2px;
+  display: block;
+}
+.tp-line-1 { width: 90%; }
+.tp-line-2 { width: 80%; }
+.tp-line-3 { width: 60%; }
+.tp-cta {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 50px;
+  height: 16px;
+  border-radius: 999px;
+  display: block;
+}
+
+/* Studio preview */
+.theme-preview-studio {
+  background: #0a0c12;
+  border-color: #181c27;
+}
+.theme-preview-studio .tp-dot { background: #353c4d; }
+.theme-preview-studio .tp-dot:first-child { background: #818cf8; }
+.theme-preview-studio .tp-title { background: #ecedf0; }
+.theme-preview-studio .tp-line { background: #353c4d; }
+.theme-preview-studio .tp-cta { background: #818cf8; }
+
+/* Editorial preview */
+.theme-preview-editorial {
+  background: #f7f5f0;
+  border-color: #d8d2c2;
+}
+.theme-preview-editorial .tp-dot { background: #b8b0a0; }
+.theme-preview-editorial .tp-dot:first-child { background: #9f1239; }
+.theme-preview-editorial .tp-title {
+  background: #1a1814;
+  /* Hint of serif typo: slightly taller */
+  height: 12px;
+  border-radius: 1px;
+}
+.theme-preview-editorial .tp-line { background: #b8b0a0; }
+.theme-preview-editorial .tp-cta { background: #9f1239; border-radius: 2px; }
+
+/* ----- Segmented control ----- */
+.segmented {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.segmented button {
+  background: transparent;
+  border: 0;
+  color: var(--text-2);
+  padding: 7px 14px;
+  border-radius: calc(var(--radius) - 1px);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.segmented button:hover:not(:disabled) {
+  color: var(--text);
+  background: transparent;
+  border-color: transparent;
+}
+.segmented button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+[data-direction="editorial"] .segmented button.active { font-weight: 600; }
+
+/* ----- Select field (native styled) ----- */
+.select-field {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 32px 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8578' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  min-width: 220px;
+}
+.select-field:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ----- Toggle field ----- */
+.toggle-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.toggle {
+  width: 36px;
+  height: 20px;
+  background: var(--border-strong);
+  border: 0;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.18s;
+  padding: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toggle.on .toggle-thumb { transform: translateX(16px); }
+
+/* ----- Setting row ----- */
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.setting-row strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.setting-row p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ----- Account card ----- */
+.account-card {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.account-avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+  border-radius: 50%;
+}
+[data-direction="editorial"] .account-avatar-lg { border-radius: 50%; }
+.account-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.account-info-row {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+.account-info-row .label { color: var(--text-muted); min-width: 70px; font-weight: normal; text-transform: none; letter-spacing: 0; font-size: 12px; }
+.account-info-row strong { font-weight: 500; }
+
+/* ----- Keyboard shortcut list ----- */
+.kbd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kbd-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.kbd-keys {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 0 var(--border-strong);
+  color: var(--text);
+  min-width: 22px;
+  text-align: center;
+}
+[data-direction="editorial"] kbd {
+  background: var(--surface);
+  font-weight: 500;
+  box-shadow: 0 1px 0 var(--border-strong), inset 0 -1px 0 rgba(0,0,0,0.05);
+}
+
+/* ============================================================
+   Account-dropdown shortcut hint (⌘,) — small mono label that
+   sits next to the "Paramètres" item to surface the keyboard
+   shortcut without it being clickable.
+   ============================================================ */
+.dropdown-item .kbd-hint {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Segmented control: disabled style for placeholder controls
+   (density, etc.) that exist visually but aren't wired yet. */
+.segmented[aria-disabled="true"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ============================================================
+   Manage view refonte — 2-column layout (main + side), deck
+   summary header with commander art, panel-based sections.
+   Ported from claude.design's view-manage.jsx + app-views.css.
+   ============================================================ */
+
+/* --- .panel base (shared across views once we lift more JSX) --- */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+[data-direction="editorial"] .panel { padding: 22px; }
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.panel-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--text-2);
+}
+[data-direction="editorial"] .panel-head h3 {
+  font-size: 18px;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  font-weight: 600;
+}
+.panel-head .panel-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.panel-head .panel-meta strong { color: var(--text); font-weight: 600; }
+
+/* --- Manage 2-col layout --- */
+.manage-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .manage-layout { grid-template-columns: 1fr; }
+  .manage-side { position: static !important; }
+}
+.manage-main { display: flex; flex-direction: column; gap: 16px; }
+.manage-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 16px;
+}
+
+/* --- Deck summary header --- */
+.deck-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 22px;
+}
+[data-direction="editorial"] .deck-summary { padding: 28px; }
+.deck-art {
+  width: 180px;
+  aspect-ratio: 488 / 680;
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  background: var(--surface-2);
+}
+.deck-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.deck-art:empty,
+.deck-art img:not([src]),
+.deck-art img[src=""] { display: none; }
+.deck-summary-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.deck-summary-body h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-direction="editorial"] .deck-summary-body h1 {
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+.deck-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.deck-meta-row strong { color: var(--text); font-weight: 600; }
+.deck-meta-row .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.deck-meta-sep {
+  width: 4px; height: 4px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  display: inline-block;
+}
+.deck-summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.deck-summary-format {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.deck-summary-format .label { text-transform: var(--label-transform); letter-spacing: var(--label-tracking); }
+.deck-summary-format .select-field {
+  padding: 6px 28px 6px 10px;
+  font-size: 12px;
+  min-width: 0;
+}
+.deck-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+@media (max-width: 760px) {
+  .deck-summary { flex-direction: column; }
+  .deck-art { width: 120px; }
+}
+
+/* --- Add-card panel layout adapts to the new 2-col grid --- */
+.add-card-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 760px) {
+  .add-card-block { grid-template-columns: 1fr; }
+}
+
+/* --- Side panel: composition rows + bracket summary + activity stub --- */
+.composition-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.composition-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.composition-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+}
+.composition-row-head .label { color: var(--text-2); }
+.composition-row-head .value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+.composition-row-bar {
+  height: 5px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.composition-row-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+.manage-side-bracket {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bracket-large {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+}
+.manage-side-bracket-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.manage-side-bracket-head .label { font-weight: 600; }
+.manage-side-bracket-head .sub {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.manage-side-bracket-verdict {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.manage-side-placeholder {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ============================================================
+   Play view refonte — 2-column layout, top game-state bar with
+   action buttons, panel-based sections, sidebar with commanders
+   / hand stats / game info. Ported from claude.design's
+   view-play.jsx + app-views.css.
+   ============================================================ */
+.play-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .play-layout { grid-template-columns: 1fr; }
+  .play-sidebar { position: static !important; }
+}
+.play-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.play-sidebar::-webkit-scrollbar { width: 6px; }
+.play-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.play-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Top game-state bar with Tour / Bibli. / Main tiles + action buttons */
+.game-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  flex-wrap: wrap;
+}
+/* Tiles read at a glance: label on the left, big mono accent value
+ * on the right, both on the same baseline. Match the design exactly
+ * (label 12px text-muted, value 18px var(--accent), tabular-nums
+ * so 1→10 doesn't shift width). */
+.game-state-tile {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.game-state-tile .label {
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  font-weight: 500;
+}
+.game-state-tile strong {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.game-state-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+.game-state-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Stats grid in the sidebar */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.stat-box {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat-box-wide { grid-column: 1 / -1; }
+.stat-box .label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  font-weight: 500;
+}
+.stat-box .v {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.stat-box .sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.sources-row {
+  margin-top: 4px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* "Partie en cours" mini-rows in the sidebar (compact key/value) */
+.game-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.game-side-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: var(--text-muted);
+}
+.game-side-row strong { color: var(--text); font-weight: 600; }
+/* Tour in the sidebar is the call-out value — colored accent to
+ * keep the eye anchored on "where am I in the game", mirroring the
+ * big game-state tile at the top. */
+.game-side-turn { color: var(--accent) !important; }
+
+/* Hand + Graveyard side by side. `min-width: 0` on the grid items
+   is critical: without it, the flex children inside the hand strip
+   refuse to shrink below their content width, and a 7-card opening
+   hand blows the 1fr column wide enough to push the graveyard off
+   the right edge of play-main. */
+.hand-row {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: 14px;
+  align-items: start;
+}
+.hand-row > section { min-width: 0; }
+@media (max-width: 720px) {
+  .hand-row { grid-template-columns: 1fr; }
+}
+
+/* Land buttons: small touch of motion on hover (translateY) */
+.land-btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   Play view section pattern.
+   The design puts the section title ABOVE the bordered container
+   (vs the .panel pattern where the title is inside). Reset the
+   element-level `section { ... }` rule for these .play-section
+   wrappers — they're transparent containers; the visible "box" is
+   the inner .cards.[zone] div.
+   ============================================================ */
+.play-section {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 0;
+  border-radius: 0;
+}
+.play-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+.play-section-head .title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--text-2);
+}
+[data-direction="editorial"] .play-section-head .title {
+  font-size: 16px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.play-section-head .meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.play-section-head .meta strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Battlefield + Lands are the canonical "box of cards" zones —
+   surface bg + border + radius, flex-wrap in the middle. The
+   existing .cards rule provides the wrap/gap; we add the box. */
+.cards.play-zone {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  min-height: 220px;
+}
+
+/* Hand strip: free-floating row(s) of cards, no bordered box.
+   Cards wrap to a new line when they don't fit on a single row —
+   the design's no-wrap-with-scroll variant was overflowing the
+   1fr column on a 7-card opening hand, pushing the graveyard
+   off the right edge of play-main. Wrap solves both: the strip
+   stays within its column, and the 7-card row visually breaks
+   into two without a scrollbar. */
+.cards.hand-strip {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 2px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+  min-height: 0;
+  min-width: 0;
+}
+.cards.hand-strip > .card { flex-shrink: 0; }
+.cards.hand-strip::-webkit-scrollbar { height: 8px; }
+.cards.hand-strip::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+/* Graveyard zone: narrow column showing a real pile — top card on
+   top, up to two backing cards rotated and dimmed behind it. Like
+   the hand strip next to it, the design intentionally drops the
+   bordered surface here so the pile sits directly on the page and
+   the two zones share the same visual baseline. */
+.cards.graveyard-zone {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.graveyard-stack {
+  position: relative;
+  width: 146px;
+  aspect-ratio: 488 / 680;
+}
+.graveyard-stack .card {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  /* aspect-ratio inherited from .card */
+}
+.graveyard-stack .gs-1 {
+  transform: rotate(-3deg) translate(-4px, 4px);
+  opacity: 0.55;
+  z-index: 1;
+  pointer-events: none;
+}
+.graveyard-stack .gs-2 {
+  transform: rotate(2deg) translate(5px, 6px);
+  opacity: 0.7;
+  z-index: 2;
+  pointer-events: none;
+}
+.graveyard-stack .gs-top { z-index: 3; }
+.graveyard-stack .gs-top:hover {
+  /* The standard .card:hover lifts the card by -4px / scale 1.02 —
+     keep that interaction since the top is interactive. */
+}
+
+/* Phantom slot shown when the graveyard is empty. Card-shaped so
+ * the drop affordance reads as "drop a card here" — without this
+ * the .cards.graveyard-zone shrinks to the height of a one-line
+ * placeholder and the drag drop-target outline is a tiny rectangle
+ * floating in the middle of the column. */
+.graveyard-empty-slot {
+  width: 146px;
+  aspect-ratio: 488 / 680;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: color-mix(in oklch, var(--surface-2) 35%, transparent);
+}
+/* When the user drags a card over the (empty) graveyard, move the
+ * drop-target outline ONTO the phantom slot so the dashed accent
+ * frames a card-shaped target, not the full column-wide cards
+ * container. */
+.cards.graveyard-zone:has(.graveyard-empty-slot).drop-target {
+  outline: none;
+  background: transparent;
+}
+.cards.graveyard-zone.drop-target .graveyard-empty-slot {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+
+/* Game Changer marker — small amber pill in the top-left corner.
+   Driven by `card.game_changer` from Scryfall. Color is the same
+   amber the Manage view already uses for the GC accordion, so the
+   visual identity stays consistent across views. */
+.card .gc-mark {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #fbbf24;
+  color: #1a1814;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+  z-index: 2;
+  pointer-events: none;
 }

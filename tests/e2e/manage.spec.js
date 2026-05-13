@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockScryfall, openDeckMenu, switchDeckById } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
@@ -67,6 +67,7 @@ test("removing the last deck shows the empty selector", async ({ page }) => {
   // Switch back to play view to reach the delete button.
   await page.click("#tab-play");
   page.on("dialog", (d) => d.accept()); // confirm "Supprimer le deck"
+  await openDeckMenu(page);
   await page.click("#btn-delete-deck");
   await expect(page.locator("#deck-select option")).toHaveCount(0);
 });
@@ -197,7 +198,7 @@ test("switching deck while FR is active translates the new deck (regression)", a
   // Switch to deck-b — names start out untranslated until the
   // background fetch lands. The regression is that they used to
   // STAY in English forever; now they must flip to FR.
-  await page.locator("#deck-select").selectOption("deck-b");
+  await switchDeckById(page, "deck-b");
   await expect(page.locator("#manage-cards .card-row-name").first())
     .toHaveText(/^\[FR\] /, { timeout: 5000 });
 });
@@ -234,10 +235,12 @@ test("changing a printing keeps every manage thumbnail visible (regression)", as
   // `state.resolved = null`, which left renderManageView with no
   // resolvedByName entries → every thumbnail went blank until reload.
 
-  // Wait for the deck resolution to complete — renderCommanders only
-  // populates the sidebar's commander-zone once state.resolved is set,
-  // and the manage view's by-name fallback feeds off the same data.
-  await page.locator("#commander-zone .card").first().waitFor();
+  // Wait for the deck resolution to complete. We can't watch
+  // #commander-zone anymore (it moved into the play-sidebar, which
+  // is hidden while we're on the manage view), so we use the manage
+  // view's own commander panel as the readiness signal — it gets
+  // populated from the same state.resolved as #commander-zone.
+  await page.locator("#manage-commanders .card-row").first().waitFor();
 
   // Now wait for the manage view to settle: at least 10 thumbnails
   // (Sultai is much bigger than that — 1 means rendering is mid-flight).

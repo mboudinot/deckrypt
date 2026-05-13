@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockScryfall, openDeckMenu } from "./_helpers.js";
 
 /* Form validation flows outside the login overlay (which has its
  * own spec). Verifies that the shared form-validate helper plays
@@ -15,6 +15,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("import: submit with both fields empty flags both inputs", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.click("#import-confirm");
   await expect(page.locator("#import-name")).toHaveClass(/is-invalid/);
@@ -24,6 +25,7 @@ test("import: submit with both fields empty flags both inputs", async ({ page })
 });
 
 test("import: only name missing -> flag only the name field", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.locator("#import-text").fill("1 Sol Ring");
   await page.click("#import-confirm");
@@ -32,6 +34,7 @@ test("import: only name missing -> flag only the name field", async ({ page }) =
 });
 
 test("import: only text missing -> flag only the textarea", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.locator("#import-name").fill("My deck");
   await page.click("#import-confirm");
@@ -40,6 +43,7 @@ test("import: only text missing -> flag only the textarea", async ({ page }) => 
 });
 
 test("import: text non-empty but yields zero cards -> flag textarea", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.locator("#import-name").fill("Junk");
   await page.locator("#import-text").fill("just some random unparseable text");
@@ -48,6 +52,7 @@ test("import: text non-empty but yields zero cards -> flag textarea", async ({ p
 });
 
 test("import: typing in a flagged field clears its red border live", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.click("#import-confirm");
   await expect(page.locator("#import-name")).toHaveClass(/is-invalid/);
@@ -58,10 +63,12 @@ test("import: typing in a flagged field clears its red border live", async ({ pa
 });
 
 test("import: reopening the panel after a failed attempt resets flags", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.click("#import-confirm");
   await expect(page.locator("#import-name")).toHaveClass(/is-invalid/);
   await page.keyboard.press("Escape");
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await expect(page.locator("#import-name")).not.toHaveClass(/is-invalid/);
   await expect(page.locator("#import-text")).not.toHaveClass(/is-invalid/);

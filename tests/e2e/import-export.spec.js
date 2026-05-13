@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockScryfall, openDeckMenu } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
@@ -9,6 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 test("Import button opens the modal on the Importer tab", async ({ page }) => {
   await expect(page.locator("#ie-modal")).toBeHidden();
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await expect(page.locator("#ie-modal")).toBeVisible();
   await expect(page.locator("#ie-tab-import")).toHaveClass(/active/);
@@ -16,9 +17,12 @@ test("Import button opens the modal on the Importer tab", async ({ page }) => {
   await expect(page.locator("#ie-panel-export")).toBeHidden();
 });
 
-test("Import button is always visible in the header, Export is Manage-only", async ({ page }) => {
-  // From the Play view (default), Import button is reachable directly.
+test("Import lives in the header deck-menu (reachable from any view), Export is Manage-only", async ({ page }) => {
+  /* Import moved into the deck-pill dropdown — open the menu to see
+   * it, but it's reachable from every view. */
+  await openDeckMenu(page);
   await expect(page.locator("#btn-import-toggle")).toBeVisible();
+  await page.keyboard.press("Escape");
   // Export button lives inside the Manage view → hidden until tab swap.
   await expect(page.locator("#btn-export")).toBeHidden();
   await page.click("#tab-manage");
@@ -37,6 +41,7 @@ test("Export button (in Manage view) opens the modal on the Exporter tab", async
 });
 
 test("Tabs swap panels inside the modal", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.click("#ie-tab-export");
   await expect(page.locator("#ie-panel-export")).toBeVisible();
@@ -58,6 +63,7 @@ test("Escape and the X button close the modal", async ({ page }) => {
 });
 
 test("Backdrop click does NOT close the modal (protects pasted content)", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.locator("#import-text").fill("1 Sol Ring");
   // Click well outside the content panel — the backdrop area.
@@ -110,6 +116,7 @@ test("Format description updates when the user changes format", async ({ page })
 });
 
 test("Import flow still works end-to-end via the modal", async ({ page }) => {
+  await openDeckMenu(page);
   await page.click("#btn-import-toggle");
   await page.locator("#import-name").fill("Tiny test deck");
   await page.locator("#import-text").fill("1 Sol Ring\n1 Forest");
