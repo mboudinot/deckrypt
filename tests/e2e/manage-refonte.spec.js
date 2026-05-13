@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
 /* Manage view refonte: 2-column layout, deck-summary header,
  * side panel with composition + bracket + activity stub. The
@@ -9,6 +9,8 @@ import { mockScryfall } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
   await page.click("#tab-manage");

@@ -1,70 +1,57 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockScryfall, mockAuth, seedSultaiDeck } from "./_helpers.js";
 
 /* UI-level tests for the login overlay. We never hit real Firebase
  * here — those calls would either flake or require live credentials.
  * The goal is to lock the overlay's open/close lifecycle, the
  * signin↔signup mode toggle, the password show/hide flip, and the
- * keyboard accessibility (Esc closes). Real auth round-trips are
- * smoke-tested manually via devtools. */
+ * keyboard accessibility. Real auth round-trips are smoke-tested
+ * manually via devtools.
+ *
+ * Login-obligatoire model (May 2026): the overlay is open by
+ * default and dismiss affordances (X, Escape) are inert until the
+ * user authenticates. Most of these specs run UNAUTHENTICATED so
+ * they can exercise the overlay directly. The "auth-then-overlay-
+ * closes" path uses mockAuth + reload to verify the unlock side. */
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
-  /* Also block the api.scryfall.com hero-card image requests on the
-   * login visual side — those redirect to cards.scryfall.io but in
-   * tests we don't want any real network traffic. */
+  /* Block hero-card image fetches on the login visual side. */
   await page.route("https://api.scryfall.com/cards/named*", (route) =>
     route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from([]) })
   );
 });
 
-test("login overlay is hidden by default and the account button reads 'Connexion'", async ({ page }) => {
+test("overlay is open by default and the app shell is hidden behind it", async ({ page }) => {
   await page.goto("/index.html");
-  await expect(page.locator("#login-overlay")).toBeHidden();
-  await expect(page.locator("#btn-account")).toHaveText("Connexion");
-});
-
-test("clicking the account button opens the overlay and focuses the email field", async ({ page }) => {
-  await page.goto("/index.html");
-  await page.click("#btn-account");
   await expect(page.locator("#login-overlay")).toBeVisible();
-  await expect(page.locator("#login-email")).toBeFocused();
-  await expect(page.locator("#btn-account")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("html")).toHaveClass(/auth-locked/);
+  /* The .container holds the entire app — it's hidden via the
+   * html.auth-locked rule in components.css (boot-theme.js applies
+   * the class synchronously when no session hint is set). */
+  await expect(page.locator(".container")).toBeHidden();
 });
 
-test("close button's X icon is actually visible (not crushed to a dot)", async ({ page }) => {
-  /* Regression: the global `button { padding: 10px 18px }` rule was
-   * applying to .login-close, leaving only ~2px of content width
-   * for the SVG once box-sizing accounted for padding + border.
-   * The X looked like a single dot. Lock the SVG's rendered size
-   * here so any future global button rule that wipes our padding
-   * reset gets caught. */
+test("close button is hidden while auth-locked (no way out without authenticating)", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
-  const svgBox = await page.locator("#login-close svg").boundingBox();
-  expect(svgBox.width).toBeGreaterThanOrEqual(20);
-  expect(svgBox.height).toBeGreaterThanOrEqual(20);
+  await expect(page.locator("#login-close")).toBeHidden();
 });
 
-test("close button hides the overlay", async ({ page }) => {
+test("Escape key does NOT close the overlay while auth-locked", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
-  await page.click("#login-close");
-  await expect(page.locator("#login-overlay")).toBeHidden();
-  await expect(page.locator("#btn-account")).toHaveAttribute("aria-expanded", "false");
-});
-
-test("Escape key closes the overlay", async ({ page }) => {
-  await page.goto("/index.html");
-  await page.click("#btn-account");
   await expect(page.locator("#login-overlay")).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.locator("#login-overlay")).toBeHidden();
+  /* Still visible — Escape is intercepted by the auth-locked guard. */
+  await expect(page.locator("#login-overlay")).toBeVisible();
+});
+
+test("email field is focused once the overlay finishes laying out", async ({ page }) => {
+  await page.goto("/index.html");
+  await expect(page.locator("#login-email")).toBeFocused();
 });
 
 test("password show/hide toggle flips the input type", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
   const pwd = page.locator("#login-pwd");
   const toggle = page.locator("#login-pwd-toggle");
   await expect(pwd).toHaveAttribute("type", "password");
@@ -78,7 +65,6 @@ test("password show/hide toggle flips the input type", async ({ page }) => {
 
 test("mode toggle swaps the title, submit label, and password autocomplete", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
 
   // Default = signin
   await expect(page.locator("#login-title")).toHaveText("Connexion");
@@ -102,18 +88,8 @@ test("mode toggle swaps the title, submit label, and password autocomplete", asy
   await expect(page.locator("#login-signin-only")).toBeVisible();
 });
 
-test("re-opening the overlay always resets to signin mode (no carryover from last close)", async ({ page }) => {
-  await page.goto("/index.html");
-  await page.click("#btn-account");
-  await page.click("#login-mode-toggle"); // signup
-  await page.keyboard.press("Escape");
-  await page.click("#btn-account");
-  await expect(page.locator("#login-title")).toHaveText("Connexion");
-});
-
 test("submitting with empty email surfaces an inline error, doesn't crash", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
   /* Form is novalidate so the browser doesn't pre-empt the submit;
    * our controller has to catch the empty-field case itself. */
   await page.click("#login-submit");
@@ -122,7 +98,6 @@ test("submitting with empty email surfaces an inline error, doesn't crash", asyn
 
 test("empty form submit: error names BOTH missing fields and both get the invalid border", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
   await page.click("#login-submit");
   await expect(page.locator("#login-error")).toHaveText("Renseigne ton email et ton mot de passe.");
   await expect(page.locator("#login-email")).toHaveClass(/is-invalid/);
@@ -131,7 +106,6 @@ test("empty form submit: error names BOTH missing fields and both get the invali
 
 test("missing email only: message is tailored and only email gets the invalid border", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
   await page.fill("#login-pwd", "secret123");
   await page.click("#login-submit");
   await expect(page.locator("#login-error")).toHaveText("Renseigne ton email.");
@@ -141,7 +115,6 @@ test("missing email only: message is tailored and only email gets the invalid bo
 
 test("missing password only: message + invalid border only on password", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
   await page.fill("#login-email", "a@b.com");
   await page.click("#login-submit");
   await expect(page.locator("#login-error")).toHaveText("Renseigne ton mot de passe.");
@@ -151,7 +124,6 @@ test("missing password only: message + invalid border only on password", async (
 
 test("submitting a malformed email flags only the email field with the format message", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
   await page.fill("#login-email", "not-an-email");
   await page.fill("#login-pwd", "anything12");
   await page.click("#login-submit");
@@ -166,7 +138,6 @@ test("invalid email + empty password: BOTH flagged, message lists both issues", 
    * fired and the malformed email was silently ignored. Now every
    * field is validated independently and all problems are surfaced. */
   await page.goto("/index.html");
-  await page.click("#btn-account");
   await page.fill("#login-email", "dsf");
   await page.click("#login-submit");
   await expect(page.locator("#login-email")).toHaveClass(/is-invalid/);
@@ -178,7 +149,6 @@ test("invalid email + empty password: BOTH flagged, message lists both issues", 
 
 test("signup mode: weak password (no digit) flags the password with the strength message", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
   await page.click("#login-mode-toggle"); // signup
   await page.fill("#login-email", "valid@example.com");
   await page.fill("#login-pwd", "alphabetsoup"); // 12 chars, no digit
@@ -189,33 +159,86 @@ test("signup mode: weak password (no digit) flags the password with the strength
   await expect(page.locator("#login-error")).toContainText("au moins 1 chiffre");
 });
 
-test("signup mode: a strong password (≥8 with digit) passes the client-side check", async ({ page }) => {
-  /* We don't follow through to Firebase here (would be flaky) — just
-   * assert that the password field does NOT get flagged invalid on a
-   * compliant input. The Google/Firebase round-trip is smoke-tested
-   * manually via devtools per the auth/persistence model memory. */
-  await page.goto("/index.html");
-  await page.click("#btn-account");
-  await page.click("#login-mode-toggle"); // signup
-  await page.fill("#login-email", "valid@example.com");
-  await page.fill("#login-pwd", "alphabet1");
-  /* Cut off the real Firebase request so we don't depend on network. */
-  await page.route("**/identitytoolkit.googleapis.com/**", (r) => r.abort());
-  await page.click("#login-submit");
-  /* The password field should NOT be flagged. The submission itself
-   * may error out (network aborted) but that's a different category
-   * of error -- the inline error box may show a network message,
-   * but the password border stays clean. */
-  await expect(page.locator("#login-pwd")).not.toHaveClass(/is-invalid/);
-});
-
 test("typing in an invalid field clears its red border live", async ({ page }) => {
   await page.goto("/index.html");
-  await page.click("#btn-account");
   await page.click("#login-submit");
   await expect(page.locator("#login-email")).toHaveClass(/is-invalid/);
   await page.locator("#login-email").type("a");
   await expect(page.locator("#login-email")).not.toHaveClass(/is-invalid/);
   /* The other field's flag stays until that field is engaged. */
   await expect(page.locator("#login-pwd")).toHaveClass(/is-invalid/);
+});
+
+test("sign-out wipes the local deck cache and re-locks the app shell", async ({ page }) => {
+  /* Login-obligatoire security contract: a user A logging out on a
+   * shared browser must NOT leave their decks in localStorage where
+   * a subsequent user B could see them. signOut() in sync.js wipes
+   * the user-decks key + the per-uid queue, then fans out the null
+   * auth transition (in test mode) so the UI re-locks. */
+  await mockAuth(page);
+  await seedSultaiDeck(page);
+  await page.goto("/index.html");
+  await expect(page.locator(".container")).toBeVisible();
+  /* Verify the cache is populated before signing out. */
+  const before = await page.evaluate(() => localStorage.getItem("mtg-hand-sim:user-decks-v1"));
+  expect(before).toContain("Ukkima");
+  /* Open the account menu, click Déconnexion. */
+  await page.click("#btn-account");
+  await page.click("#btn-account-signout");
+  /* Shell re-locks, overlay reappears, deck cache cleared. */
+  await expect(page.locator("html")).toHaveClass(/auth-locked/);
+  await expect(page.locator("#login-overlay")).toBeVisible();
+  const after = await page.evaluate(() => localStorage.getItem("mtg-hand-sim:user-decks-v1"));
+  expect(after).toBe(null);
+});
+
+test("zero-flash F5 for signed-in users: shell visible from the FIRST paint, no transient auth-locked class", async ({ page }) => {
+  /* The regression: an already-signed-in user pressing F5 used to
+   * briefly see the login overlay until Firebase resolved persistence
+   * (~50-200ms). Fix: boot-theme.js reads the `has-session-v1` hint
+   * synchronously before <body> parses and skips `auth-locked` when
+   * the hint is set. sync.js sets the hint on every authed callback.
+   *
+   * We assert two things: (1) on first paint, the html element does
+   * NOT have auth-locked (mockAuth pre-sets the hint, same as a real
+   * signed-in user's localStorage on F5); (2) the .container is
+   * visible immediately, no waiting. */
+  await mockAuth(page);
+  await seedSultaiDeck(page);
+  await page.goto("/index.html");
+  /* Inspect FIRST — no waitFor / no animations. The check is
+   * synchronous from Playwright's perspective. */
+  const initialClass = await page.locator("html").getAttribute("class");
+  expect(initialClass || "").not.toMatch(/auth-locked/);
+  await expect(page.locator(".container")).toBeVisible();
+  await expect(page.locator("#login-overlay")).toBeHidden();
+});
+
+test("first-ever visit (no session hint): auth-locked applied synchronously, overlay visible from boot", async ({ page }) => {
+  /* The other half of the contract — without a hint, boot-theme.js
+   * MUST add auth-locked synchronously, otherwise an anon user would
+   * briefly see the app shell. */
+  await page.goto("/index.html");
+  const initialClass = await page.locator("html").getAttribute("class");
+  expect(initialClass || "").toMatch(/auth-locked/);
+  await expect(page.locator(".container")).toBeHidden();
+  await expect(page.locator("#login-overlay")).toBeVisible();
+});
+
+test("authenticated boot: shell is visible, overlay hidden, account button shows the user", async ({ page }) => {
+  /* This is the post-auth half of the lifecycle. mockAuth primes the
+   * sync.js test seam so the boot acts as if Firebase resolved an
+   * already-signed-in user. */
+  await mockAuth(page, {
+    uid: "test-uid",
+    email: "alice@example.com",
+    displayName: "Alice",
+    photoURL: null,
+  });
+  await seedSultaiDeck(page);
+  await page.goto("/index.html");
+  await expect(page.locator("#login-overlay")).toBeHidden();
+  await expect(page.locator("html")).not.toHaveClass(/auth-locked/);
+  await expect(page.locator(".container")).toBeVisible();
+  await expect(page.locator("#btn-account")).toContainText("Alice");
 });

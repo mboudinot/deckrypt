@@ -11,6 +11,17 @@
 .modal:focus { outline: none; }
 body { padding: 16px; }
 .container { max-width: 1500px; margin: 0 auto; }
+/* Login-obligatoire boot gate: boot-theme.js sets `html.auth-locked`
+ * synchronously before the body parses (gated on the `has-session-v1`
+ * localStorage hint), and app-login.js toggles it on auth changes.
+ * Lives on <html> rather than <body> so the inline boot script can
+ * apply it before <body> exists — no flash for already-signed-in
+ * users on F5. */
+html.auth-locked .container { display: none; }
+/* Force the login overlay visible while auth-locked, even though the
+ * markup keeps `hidden` on it for the unlocked default. Specificity
+ * (1,2,1) beats the UA `[hidden]` rule (0,1,0). */
+html.auth-locked #login-overlay[hidden] { display: block; }
 
 /* ============================================================
    App header — brand on the left, view nav centered, deck pill +

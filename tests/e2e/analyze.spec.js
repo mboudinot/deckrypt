@@ -1,8 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall, switchDeckById } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck, switchDeckById } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   // Wait for the deck to fully resolve — analyze reads state.resolved.
   await page.locator("#commander-zone .card").first().waitFor();

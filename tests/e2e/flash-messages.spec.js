@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
 /* The flash() helper is the app-wide toast system: stacking, auto-
  * dismiss, ARIA-live polite, accent-colored by kind. These tests
@@ -9,6 +9,8 @@ import { mockScryfall } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.click("#tab-manage");
 });

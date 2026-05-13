@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
 /* When the user selects an edition in the add-card draft, the
  * preview <img> swaps to that printing's art. Lets them visually
@@ -7,6 +7,8 @@ import { mockScryfall } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.click("#tab-manage");
 });

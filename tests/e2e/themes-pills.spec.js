@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mockAuth, seedSultaiDeck } from "./_helpers.js";
 
 /* Themes panel — each detected theme is a toggleable pill. Clicking
  * a pill makes it active and reveals its matching cards in a single
@@ -69,6 +70,8 @@ test.beforeEach(async ({ page }) => {
     }
     await route.fulfill({ status: 404 });
   });
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
   await page.click("#tab-analyze");

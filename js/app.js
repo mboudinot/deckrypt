@@ -485,16 +485,44 @@ function removeFlash(node) {
 }
 
 /* Reset the play view to an empty state — used when the user deletes
- * their last deck, or on first run before any deck has been seeded. */
+ * their last deck, or right after sign-in for a brand-new account
+ * with no cloud decks yet. The commander zone gets a CTA that
+ * triggers the import modal; the other zones keep a quiet
+ * placeholder so the page doesn't feel screaming-empty. */
 function clearActiveView() {
   state.resolved = null;
   state.game = null;
-  for (const el of [els.commanderZone, els.hand, els.battlefield, els.lands, els.graveyard]) {
+  els.commanderZone.replaceChildren(emptyDeckCta());
+  for (const el of [els.hand, els.battlefield, els.lands, els.graveyard]) {
     el.replaceChildren(placeholderText("Aucun deck chargé."));
   }
   setStatus("Aucun deck. Importez-en un pour commencer.");
   renderGameBar();
   updateButtons();
+}
+
+/* Built once per call so the click handler captures the latest
+ * openImportPanel. Used both by clearActiveView and the dropdown
+ * helpers — the message stays the same, the visual treatment is
+ * driven entirely by .empty-deck-cta in views.css. */
+function emptyDeckCta() {
+  const wrap = document.createElement("div");
+  wrap.className = "empty-deck-cta";
+  const title = document.createElement("div");
+  title.className = "empty-deck-cta-title";
+  title.textContent = "Aucun deck pour le moment";
+  const sub = document.createElement("div");
+  sub.className = "empty-deck-cta-sub";
+  sub.textContent = "Importe ta première deck-liste pour commencer.";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-primary empty-deck-cta-btn";
+  btn.textContent = "Importer ton premier deck";
+  btn.addEventListener("click", () => openImportPanel());
+  wrap.appendChild(title);
+  wrap.appendChild(sub);
+  wrap.appendChild(btn);
+  return wrap;
 }
 
 async function switchDeck(deckId) {
@@ -1023,20 +1051,42 @@ function init() {
     }
   } catch (e) { /* localStorage blocked */ }
 
-  // Default-deck seeding runs once per user (migration flag is
-  // independent from the user-decks key, so an existing user whose
-  // local list predates the seeding feature still gets the defaults
-  // appended on next load). After the flag is set, deletions stick —
-  // we don't fight the user's intent.
-  if (!hasSeededDefaults()) {
-    const merged = mergeDefaultsForSeeding(loadUserDecks(), DEFAULT_DECKS);
-    saveUserDecks(merged);
-    markDefaultsSeeded();
-  }
+  // Login-obligatoire model: no default-deck seeding. The boot uses
+  // a localStorage session hint (set by sync.js when Firebase confirms
+  // a user, cleared on signOut). When the hint is present:
+  //   - boot-theme.js skipped the auth-locked class — shell visible.
+  //   - we optimistically render the user's last deck from the
+  //     localStorage cache, so an F5 by a signed-in user sees zero
+  //     flash. The auth handler below validates with Firebase and
+  //     corrects if persistence has actually expired.
+  // When the hint is absent: the shell is locked, no render needed.
+  //
+  // One-shot legacy wipe: existing installs may still carry the old
+  // anon-mode user-decks-v1 + seeded-defaults flag. Drop them once so
+  // a user who signs in fresh doesn't see ghost decks before cloud
+  // takes over. Idempotent via the OBLIGATORY_LOGIN_FLAG below.
+  const OBLIGATORY_LOGIN_FLAG = "mtg-hand-sim:obligatory-login-v1";
+  try {
+    if (!localStorage.getItem(OBLIGATORY_LOGIN_FLAG)) {
+      localStorage.removeItem("mtg-hand-sim:user-decks-v1");
+      localStorage.removeItem("mtg-hand-sim:defaults-seeded-v1");
+      localStorage.setItem(OBLIGATORY_LOGIN_FLAG, "1");
+    }
+  } catch (e) { /* localStorage blocked — skip the wipe, no harm */ }
 
+  // Optimistic boot render. Reads the hint set by sync.js — if we
+  // had a recent session, populate immediately so the deck list and
+  // last-loaded deck appear with the first paint, not after Firebase
+  // resolves persistence ~50-200ms later.
+  let hasSessionHint = false;
+  try { hasSessionHint = localStorage.getItem("mtg-hand-sim:has-session-v1") === "1"; }
+  catch (e) { /* localStorage blocked — fall back to non-optimistic boot */ }
   populateDeckSelect();
-  if (state.currentDeckId) switchDeck(state.currentDeckId);
-  else clearActiveView();
+  if (hasSessionHint && state.currentDeckId) {
+    switchDeck(state.currentDeckId);
+  } else {
+    clearActiveView();
+  }
 
   /* Honour the user's "default view at open" preference set in
    * Settings → Préférences. Falls through to the markup's default
@@ -1054,40 +1104,56 @@ function init() {
   // page load for no UX benefit.
   setTimeout(() => evictExpired(), 1000);
 
-  // Wire cloud reconciliation. sync.js is an ES module and executes
-  // AFTER this classic-defer script, so window.sync isn't ready yet
-  // when init() runs synchronously — we wait for DOMContentLoaded,
-  // which fires only once every deferred + module script has
-  // executed. From there, onAuthChange replays the current auth
-  // snapshot immediately and pings us on every subsequent change.
+  // Auth handler — runs ONCE when Firebase resolves persistence, then
+  // again on every sign-in/out. The optimistic boot above may have
+  // already rendered; this callback validates with Firebase and
+  // either confirms (re-render is a no-op cache hit) or wipes (user
+  // is actually signed out — clear UI, lock the shell via the class
+  // toggle in app-login.js).
+  //
+  // Note: sync.js's onAuthChange does NOT replay until Firebase has
+  // confirmed the initial state (authResolved flag) — that's what
+  // prevents the "flash of login overlay" race for already-signed-in
+  // users on F5.
+  //
+  // sync.js is an ES module and executes AFTER this classic-defer
+  // script, so window.sync isn't ready when init() runs synchronously
+  // — wait for DOMContentLoaded, which fires only once every deferred
+  // + module script has executed.
   document.addEventListener("DOMContentLoaded", () => {
     if (!window.sync || typeof window.sync.onAuthChange !== "function") return;
     window.sync.onAuthChange(async (user) => {
-      if (!user) return;
-      let result;
-      try {
-        result = await window.sync.loadAllDecks();
-      } catch (e) {
-        console.warn("Cloud deck load failed (will retry on next sync trigger):", e);
+      if (!user) {
+        /* Sign-out, token expiration, or remote logout. sync.js has
+         * already wiped the localStorage cache + the session hint;
+         * here we clear in-memory state and re-render. The shell is
+         * being re-locked by app-login.js in parallel, so nothing
+         * the user can see flickers — only the in-memory state of a
+         * future re-login is at risk if we leave it stale. */
+        state.currentDeckId = null;
+        state.resolved = null;
+        state.deckCache.clear();
+        populateDeckSelect();
+        clearActiveView();
         return;
       }
-      /* No cloud data means localStorage was left untouched — skip
-       * the deck-list rebuild AND the switchDeck. Re-resolving here
-       * would race with any commitDeckChange the user fires right
-       * after login (paste/add), leaving fresh cards stuck without
-       * Scryfall data because their refreshResolved bailed while
-       * state.resolved was null mid-switch. */
-      if (result.source !== "cloud") return;
+      /* User confirmed by Firebase. If init() optimistically rendered
+       * (hint was set), this is a reconciliation — populateDeckSelect
+       * picks up any cloud-side change, the deckCache.delete forces a
+       * fresh resolve in case cloud returned a different version of
+       * the active deck, and switchDeck re-renders. Cache hits make
+       * this visually invisible in the happy case. */
+      try { await window.sync.loadAllDecks(); }
+      catch (e) { console.warn("Cloud deck load failed (will retry on next sync trigger):", e); }
       populateDeckSelect();
-      const stillValid = state.currentDeckId && findDeck(state.currentDeckId);
-      if (stillValid) {
+      /* populateDeckSelect just ran and either kept a valid
+       * currentDeckId or reset it to the first deck (or null if no
+       * decks exist) — no need for a separate stillValid check. */
+      if (state.currentDeckId) {
         state.deckCache.delete(state.currentDeckId);
         switchDeck(state.currentDeckId);
       } else {
-        const first = loadUserDecks()[0];
-        state.currentDeckId = first?.id || null;
-        if (state.currentDeckId) switchDeck(state.currentDeckId);
-        else clearActiveView();
+        clearActiveView();
       }
     });
   });

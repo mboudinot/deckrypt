@@ -66,28 +66,51 @@
       clearError();
     }
 
-    function openOverlay() {
-      openerForFocusReturn = document.activeElement;
-      mode = "signin";
-      applyMode();
-      form.reset();
-      pwdInput.type = "password";
-      pwdToggle.textContent = "Voir";
-      pwdToggle.setAttribute("aria-pressed", "false");
-      overlay.hidden = false;
-      accountBtn.setAttribute("aria-expanded", "true");
-      /* Defer focus to give the overlay a frame to lay out — focusing
-       * on a display:none subtree fails silently. */
-      requestAnimationFrame(() => emailInput.focus());
+    /* Low-level toggle that bypasses the auth-lock guard. Used by the
+     * auth-state subscriber to open/close the overlay in lock-step
+     * with sign-in / sign-out. User-initiated close goes through
+     * closeOverlay() instead so the lock is respected. */
+    function setOverlayVisible(visible) {
+      if (visible) {
+        if (overlay.hidden) openerForFocusReturn = document.activeElement;
+        mode = "signin";
+        applyMode();
+        form.reset();
+        pwdInput.type = "password";
+        pwdToggle.textContent = "Voir";
+        pwdToggle.setAttribute("aria-pressed", "false");
+        overlay.hidden = false;
+        accountBtn.setAttribute("aria-expanded", "true");
+        /* Defer focus to give the overlay a frame to lay out — focusing
+         * on a display:none subtree fails silently. */
+        requestAnimationFrame(() => emailInput.focus());
+      } else {
+        overlay.hidden = true;
+        accountBtn.setAttribute("aria-expanded", "false");
+        clearError();
+        if (openerForFocusReturn && typeof openerForFocusReturn.focus === "function") {
+          openerForFocusReturn.focus();
+        }
+        openerForFocusReturn = null;
+      }
     }
 
+    function openOverlay() {
+      setOverlayVisible(true);
+    }
+
+    /* User-initiated close (X button, Escape, backdrop click). Bails
+     * when the app is auth-locked: the overlay is the ONLY thing
+     * standing between an anonymous user and a blank page, so we
+     * can't let it be dismissed without authenticating. The auth
+     * subscriber bypasses this guard via setOverlayVisible.
+     *
+     * The class lives on <html> (set synchronously by boot-theme.js
+     * before <body> parses, see the session-hint optimistic-boot
+     * comment there). */
     function closeOverlay() {
-      overlay.hidden = true;
-      accountBtn.setAttribute("aria-expanded", "false");
-      clearError();
-      if (openerForFocusReturn && typeof openerForFocusReturn.focus === "function") {
-        openerForFocusReturn.focus();
-      }
+      if (document.documentElement.classList.contains("auth-locked")) return;
+      setOverlayVisible(false);
     }
 
     function clearError() {
@@ -140,12 +163,14 @@
       pwdInput.disabled = busy;
     }
 
-    /* The account button has two modes:
-     *   - Anonymous: renders as a primary CTA "Connexion" pill.
-     *     Clicking it opens the login overlay.
-     *   - Logged in: renders as a circular avatar + display name.
-     *     Clicking it toggles the account dropdown menu (sign out,
-     *     and eventually Settings / Profil — wired in step 5+). */
+    /* The account button has two visual modes — anon (Connexion pill)
+     * and authed (avatar + name + chevron). In the login-obligatoire
+     * model the anon variant is rendered ONLY as a defensive fallback
+     * during the brief window between sync.js firing user=null and
+     * applyAuthState adding html.auth-locked to hide the shell; the
+     * user never sees it interactively. The click handler keeps both
+     * branches so a stray click during that transition still does
+     * something useful (open the overlay) instead of throwing. */
     const accountMenu = document.getElementById("account-dropdown-menu");
     const accountLabel = document.getElementById("account-label");
     const accountMenuName = document.getElementById("account-menu-name");
@@ -312,14 +337,34 @@
       }
     });
 
-    /* React to auth changes: refresh the header button, auto-close
-     * the overlay on login. Subscribing replays the current snapshot
-     * immediately so we get the initial paint right. */
+    /* React to auth changes: refresh the header button, gate the app
+     * shell behind the overlay. The html.auth-locked class is the
+     * single source of truth — boot-theme.js applies it synchronously
+     * pre-paint when the session hint is absent (avoids flash for
+     * anon boots), and we toggle it here on every auth transition.
+     * Components.css reads it to hide .container + the login-close X.
+     *
+     * Subscriber timing: sync.js's onAuthChange skips the immediate
+     * replay until Firebase resolves persistence (authResolved flag),
+     * so this callback fires ONCE with the real state — no premature
+     * cb(null) → relock → flash race.
+     *
+     *  - user present  → unlock + close overlay
+     *  - user absent   → lock + show overlay
+     * Idempotent on both transitions (already-hidden / already-shown
+     * are no-ops). */
+    function applyAuthState(user) {
+      refreshAccountButton(user);
+      if (user) {
+        document.documentElement.classList.remove("auth-locked");
+        if (!overlay.hidden) setOverlayVisible(false);
+      } else {
+        document.documentElement.classList.add("auth-locked");
+        if (overlay.hidden) setOverlayVisible(true);
+      }
+    }
     if (window.sync && typeof window.sync.onAuthChange === "function") {
-      window.sync.onAuthChange((user) => {
-        refreshAccountButton(user);
-        if (user && !overlay.hidden) closeOverlay();
-      });
+      window.sync.onAuthChange(applyAuthState);
     } else {
       /* sync.js is a module and may execute after this classic-defer
        * script even though we wrapped in DOMContentLoaded — different
@@ -328,10 +373,7 @@
       const t = setInterval(() => {
         if (window.sync && typeof window.sync.onAuthChange === "function") {
           clearInterval(t);
-          window.sync.onAuthChange((user) => {
-            refreshAccountButton(user);
-            if (user && !overlay.hidden) closeOverlay();
-          });
+          window.sync.onAuthChange(applyAuthState);
         }
       }, 50);
       setTimeout(() => clearInterval(t), 5000);

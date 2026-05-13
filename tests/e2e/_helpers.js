@@ -212,6 +212,113 @@ export async function presetStorage(page, state) {
   }, state);
 }
 
+/* Login-obligatoire model: the app shell is hidden until sync.js
+ * resolves an authenticated user. Tests don't run real Firebase
+ * Auth, so they MUST set this hook BEFORE page navigation — sync.js
+ * reads window.__deckryptTestUser at module init and primes its
+ * cachedUser with it, skipping the Firebase subscription entirely.
+ * Without this call, every test would render against a blank
+ * `html.auth-locked` page (the class is set by boot-theme.js when
+ * the session hint is absent). */
+export async function mockAuth(page, user = {
+  uid: "test-uid",
+  email: "test@example.com",
+  displayName: "Test User",
+  photoURL: null,
+}) {
+  await page.addInitScript((u) => {
+    window.__deckryptTestUser = u;
+    /* Bypass the one-shot legacy wipe in tests — we want presetStorage
+     * decks to survive into the rendered app. The migration flag is
+     * already set, so app.js's init() leaves localStorage alone. */
+    localStorage.setItem("mtg-hand-sim:obligatory-login-v1", "1");
+    /* Set the session hint so boot-theme.js skips the auth-locked
+     * class — tests run "as if Firebase already confirmed a user"
+     * which is what mockAuth simulates. Without this, every test
+     * would briefly paint the locked state before our auth handler
+     * unlocks it. */
+    localStorage.setItem("mtg-hand-sim:has-session-v1", "1");
+  }, user);
+}
+
+/* Test fixture: a representative Commander deck (the formerly-seeded
+ * Sultai list, kept here inline since the seeding code has been
+ * removed from the app). Used by every test that needs a populated
+ * deck after boot. Tests with different requirements should preset
+ * their own deck via presetStorage instead. */
+const SULTAI_DECK_FIXTURE = {
+  id: "sultai-ukkima-cazur",
+  name: "Sultai — Ukkima & Cazur",
+  format: "commander",
+  commanders: [
+    { name: "Ukkima, Stalking Shadow" },
+    { name: "Cazur, Ruthless Stalker" },
+  ],
+  cards: [
+    /* Big enough to exercise the manage view's grouping + card-row
+     * rendering — several specs assert ≥ 10 visible rows. Mirror of
+     * the deck list that was seeded by default before the login-
+     * obligatoire pivot; copy is kept here so the fixture survives
+     * even if app code stops referencing this exact card set. */
+    { name: "Island", qty: 6 }, { name: "Swamp", qty: 6 }, { name: "Forest", qty: 5 },
+    { name: "Polluted Delta", qty: 1 }, { name: "Breeding Pool", qty: 1 },
+    { name: "Overgrown Tomb", qty: 1 }, { name: "Underground River", qty: 1 },
+    { name: "Llanowar Wastes", qty: 1 }, { name: "Yavimaya Coast", qty: 1 },
+    { name: "Drowned Catacomb", qty: 1 }, { name: "Hinterland Harbor", qty: 1 },
+    { name: "Woodland Cemetery", qty: 1 }, { name: "Sunken Hollow", qty: 1 },
+    { name: "Darkslick Shores", qty: 1 }, { name: "Twilight Mire", qty: 1 },
+    { name: "Flooded Grove", qty: 1 }, { name: "Viridescent Bog", qty: 1 },
+    { name: "Overflowing Basin", qty: 1 }, { name: "Darkwater Catacombs", qty: 1 },
+    { name: "Command Tower", qty: 1 }, { name: "Exotic Orchard", qty: 1 },
+    { name: "Fetid Pools", qty: 1 }, { name: "Opulent Palace", qty: 1 },
+    { name: "Temple of Deceit", qty: 1 },
+    { name: "Birds of Paradise", qty: 1 }, { name: "Sylvan Caryatid", qty: 1 },
+    { name: "Great Forest Druid", qty: 1 }, { name: "Tower Winder", qty: 1 },
+    { name: "Sol Ring", qty: 1 }, { name: "Arcane Signet", qty: 1 },
+    { name: "Wayfarer's Bauble", qty: 1 }, { name: "Three Visits", qty: 1 },
+    { name: "Rampant Growth", qty: 1 }, { name: "Kodama's Reach", qty: 1 },
+    { name: "Cultivate", qty: 1 }, { name: "Phantom Warrior", qty: 1 },
+    { name: "Slippery Scoundrel", qty: 1 }, { name: "Cold-Eyed Selkie", qty: 1 },
+    { name: "Invisible Stalker", qty: 1 }, { name: "Triton Shorestalker", qty: 1 },
+    { name: "Dauthi Marauder", qty: 1 }, { name: "Thalakos Deceiver", qty: 1 },
+    { name: "Neurok Invisimancer", qty: 1 }, { name: "Mist-Cloaked Herald", qty: 1 },
+    { name: "Slither Blade", qty: 1 }, { name: "Whirler Rogue", qty: 1 },
+    { name: "Veteran Ice Climber", qty: 1 }, { name: "Latch Seeker", qty: 1 },
+    { name: "Jhessian Infiltrator", qty: 1 }, { name: "Shadowmage Infiltrator", qty: 1 },
+    { name: "Trespassing Souleater", qty: 1 }, { name: "Ohran Frostfang", qty: 1 },
+    { name: "Edric, Spymaster of Trest", qty: 1 }, { name: "Felix Five-Boots", qty: 1 },
+    { name: "Baleful Strix", qty: 1 }, { name: "Meltstrider Eulogist", qty: 1 },
+    { name: "Bonny Pall, Clearcutter", qty: 1 },
+    { name: "Aqueous Form", qty: 1 }, { name: "Curiosity", qty: 1 },
+    { name: "Curious Obsession", qty: 1 }, { name: "Bred for the Hunt", qty: 1 },
+    { name: "Bident of Thassa", qty: 1 }, { name: "Forced Adaptation", qty: 1 },
+    { name: "Rhystic Study", qty: 1 }, { name: "Brainstorm", qty: 1 },
+    { name: "Concentrate", qty: 1 }, { name: "Mystic Confluence", qty: 1 },
+    { name: "Unwind", qty: 1 }, { name: "Mana Leak", qty: 1 }, { name: "Negate", qty: 1 },
+    { name: "Putrefy", qty: 1 }, { name: "Doom Blade", qty: 1 },
+    { name: "Shoot the Sheriff", qty: 1 }, { name: "Curse of the Swine", qty: 1 },
+    { name: "Naturalize", qty: 1 }, { name: "Rapid Hybridization", qty: 1 },
+    { name: "Snakeskin Veil", qty: 1 }, { name: "Simic Charm", qty: 1 },
+    { name: "Intervene", qty: 1 }, { name: "Trash the Town", qty: 1 },
+    { name: "Midnight Recovery", qty: 1 }, { name: "Nature's Spiral", qty: 1 },
+    { name: "Arcane Heist", qty: 1 }, { name: "Entrancing Melody", qty: 1 },
+  ],
+};
+
+export async function seedSultaiDeck(page) {
+  /* Only seed on the FIRST page load — `page.addInitScript` fires on
+   * every navigation, and tests that mutate the deck (qty +1, etc.)
+   * then reload would otherwise see the fixture rewritten on top of
+   * their persisted change. Guarding on "key already present" is a
+   * safe proxy: tests that need a different deck delete the key
+   * explicitly before reloading. */
+  await page.addInitScript((deck) => {
+    if (!localStorage.getItem("mtg-hand-sim:user-decks-v1")) {
+      localStorage.setItem("mtg-hand-sim:user-decks-v1", JSON.stringify([deck]));
+    }
+  }, SULTAI_DECK_FIXTURE);
+}
+
 /* Open the header deck-pill dropdown so its menu items (Importer,
  * Supprimer ce deck, deck list) become visible to Playwright. Tests
  * that previously clicked a top-level "+ Importer" button now have

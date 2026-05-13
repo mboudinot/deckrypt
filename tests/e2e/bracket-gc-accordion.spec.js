@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
 /* Game Changer accordion in the Bracket panel. When the deck has at
  * least one card with `game_changer: true`, the bracket section shows
@@ -38,6 +38,8 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ object: "list", data, not_found: [] }),
     });
   });
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
   await page.click("#tab-analyze");

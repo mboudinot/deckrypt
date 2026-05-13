@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
 /* Helper: discard the first card from the hand via the per-card
  * modal's "Défausser" action. Faster and more deterministic in tests
@@ -13,6 +13,8 @@ async function discardFirstHandCard(page) {
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#hand .card").first().waitFor();
 });

@@ -1,60 +1,69 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall, presetStorage } from "./_helpers.js";
+import { mockAuth, mockScryfall, presetStorage, seedSultaiDeck } from "./_helpers.js";
 
-/* Regression coverage for the "Sultai disappeared" bug: the seeding
- * gate was tied to whether the user-decks key existed at all, so any
- * pre-existing user got skipped. Now the gate is a separate flag and
- * the seed is a non-destructive merge. */
+/* Login-obligatoire model (May 2026): there is NO automatic deck
+ * seeding anymore. A brand-new authenticated account starts with
+ * zero decks and sees the empty-state CTA. Decks live in Firestore
+ * (and the localStorage cache); the only way to get one is to
+ * import or create one through the UI.
+ *
+ * This file used to assert the seeded "Sultai" default — kept here
+ * as the empty-state contract so future seeding regressions get
+ * caught the other way around. */
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
 });
 
-test("first load: default decks (Sultai) are seeded into the selector", async ({ page }) => {
+test("fresh authenticated boot with no cloud decks: empty-state CTA visible", async ({ page }) => {
+  await mockAuth(page);
   await page.goto("/index.html");
-  const options = await page.locator("#deck-select option").allTextContents();
-  expect(options).toContain("Sultai — Ukkima & Cazur");
+  await expect(page.locator(".empty-deck-cta")).toBeVisible();
+  await expect(page.locator(".empty-deck-cta-btn")).toHaveText("Importer ton premier deck");
+  await expect(page.locator("#deck-select option")).toHaveCount(0);
 });
 
-test("existing user (pre-migration) gets defaults appended without losing their decks", async ({ page }) => {
+test("clicking the empty-state CTA opens the import modal", async ({ page }) => {
+  await mockAuth(page);
+  await page.goto("/index.html");
+  await page.click(".empty-deck-cta-btn");
+  await expect(page.locator("#ie-modal")).toBeVisible();
+});
+
+test("one-shot legacy wipe: stale anon decks are removed on first authenticated boot", async ({ page }) => {
+  /* Existing installs may carry the old anon-mode user-decks key.
+   * The login-obligatoire migration runs once at init() and drops
+   * those entries so a fresh signup doesn't inherit ghost decks. */
+  await mockAuth(page);
   await presetStorage(page, {
     "mtg-hand-sim:user-decks-v1": [
-      { id: "user-meren", name: "Meren", commanders: [], cards: [{ name: "Forest", qty: 1 }] },
+      { id: "ghost", name: "Ghost", commanders: [], cards: [{ name: "Forest", qty: 1 }] },
     ],
+    /* The obligatory-login flag is NOT set, so the wipe should fire.
+     * (mockAuth sets the flag too; override that here to exercise the
+     * pre-migration path.) */
+    "mtg-hand-sim:obligatory-login-v1": "",
   });
   await page.goto("/index.html");
-  const options = await page.locator("#deck-select option").allTextContents();
-  expect(options).toContain("Meren");
-  expect(options).toContain("Sultai — Ukkima & Cazur");
+  /* Wait long enough for sync.js auth callback + populate to settle. */
+  await expect(page.locator("#deck-select option")).toHaveCount(0);
+  /* Flag should now be set. */
+  const flag = await page.evaluate(() => localStorage.getItem("mtg-hand-sim:obligatory-login-v1"));
+  expect(flag).toBe("1");
 });
 
-test("warm-cache F5 skips the loading flash and renders synchronously", async ({ page }) => {
-  // First visit: cold cache, fetch via Scryfall (mocked), populate
-  // localStorage with the resolved cards.
+test("warm-cache F5 with a seeded deck: skips the loading flash and renders synchronously", async ({ page }) => {
+  /* Same regression as before, framed for the new model: the test
+   * preset is what the localStorage cache would hold for an
+   * already-authenticated user, so on F5 tryResolveSync hits the
+   * card cache and we never paint the "Chargement…" placeholder. */
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
 
-  // Second visit: cache is warm. switchDeck takes the synchronous
-  // path — the "Chargement…" placeholder text never appears in the
-  // commander zone.
-  let sawLoadingFlash = false;
-  page.on("console", () => {});  // noop, just to ensure listener wiring works
   await page.goto("/index.html");
-  // If the sync path is taken, the commander card is in the DOM by
-  // the time the load event fires. The "Chargement" placeholder
-  // never gets a chance to render. We assert by reading the DOM
-  // immediately and checking the placeholder is absent.
   const text = await page.locator("#commander-zone").innerText();
   expect(text).not.toMatch(/Chargement/);
-  // And the actual deck content is there.
   await expect(page.locator("#commander-zone .card").first()).toBeVisible();
-});
-
-test("once seeded, deleted defaults stay deleted on reload", async ({ page }) => {
-  await presetStorage(page, {
-    "mtg-hand-sim:user-decks-v1": [],
-    "mtg-hand-sim:defaults-seeded-v1": "1",
-  });
-  await page.goto("/index.html");
-  await expect(page.locator("#deck-select option")).toHaveCount(0);
 });

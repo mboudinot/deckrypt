@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
 /* Header layout regression for the redesigned shell. The new header
  * is a 3-column grid: brand (left), nav (center), right-side actions
@@ -8,6 +8,8 @@ import { mockScryfall } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
 });
@@ -106,9 +108,12 @@ test("deck-pill hover keeps the surface background (regression)", async ({ page 
   expect(after).toBe(before);
 });
 
-test("anonymous account button reads 'Connexion' and opens the login overlay", async ({ page }) => {
-  await expect(page.locator("#btn-account")).toContainText("Connexion");
-  await expect(page.locator("#btn-account")).toHaveClass(/account-anon/);
+test("authenticated account button shows the user's display name and toggles the account menu", async ({ page }) => {
+  /* Login-obligatoire: anon users never see the header (auth-locked
+   * hides .container). The header-visible state always implies an
+   * authed user, so this test focuses on the authed display + menu. */
+  await expect(page.locator("#btn-account")).toContainText("Test User");
+  await expect(page.locator("#btn-account")).toHaveClass(/account-authed/);
   await page.click("#btn-account");
-  await expect(page.locator("#login-overlay")).toBeVisible();
+  await expect(page.locator("#account-dropdown-menu")).toBeVisible();
 });

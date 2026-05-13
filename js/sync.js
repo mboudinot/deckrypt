@@ -64,18 +64,60 @@ function toUser(fbUser) {
  * (commitDeck, etc.) don't have to await onAuthStateChanged. */
 let cachedUser = null;
 const authSubscribers = new Set();
-onAuthStateChanged(auth, (fbUser) => {
-  const next = toUser(fbUser);
-  const wasLoggedIn = !!cachedUser;
-  cachedUser = next;
-  for (const cb of authSubscribers) {
-    try { cb(next); } catch (e) { console.error("auth subscriber threw:", e); }
-  }
-  /* Login transition: drain anything queued while we were offline /
-   * not authed yet. Login itself triggers a drain even with an empty
-   * queue, which is cheap and keeps the contract simple. */
-  if (!wasLoggedIn && next) void drainQueue();
-});
+/* True once Firebase has fired onAuthStateChanged at least once.
+ * Until then, cachedUser=null means "unknown", not "signed out" —
+ * `onAuthChange` skips the immediate replay so subscribers don't
+ * mistakenly lock the UI before persistence resolves. */
+let authResolved = false;
+
+/* The session hint drives the synchronous boot gate in boot-theme.js
+ * — present = "we expect a session" = render the app shell
+ * optimistically. Set on every login transition, cleared on every
+ * logout. Kept in localStorage so it survives the page reload that
+ * the user triggers (F5). */
+const SESSION_HINT_KEY = "mtg-hand-sim:has-session-v1";
+function setSessionHint(authed) {
+  try {
+    if (authed) localStorage.setItem(SESSION_HINT_KEY, "1");
+    else localStorage.removeItem(SESSION_HINT_KEY);
+  } catch (e) { /* localStorage blocked — falls back to flash, acceptable */ }
+}
+
+/* Test seam — Playwright sets window.__deckryptTestUser via
+ * addInitScript so the auth-gated boot works without hitting real
+ * Firebase. In test mode we skip the onAuthStateChanged subscription
+ * entirely and prime cachedUser directly; Firestore CRUD is also
+ * short-circuited below so tests stay localStorage-only. The flag
+ * is read once at module init — tests must set it BEFORE the page
+ * loads sync.js. */
+const TEST_MODE = typeof window !== "undefined" && !!window.__deckryptTestUser;
+if (TEST_MODE) {
+  cachedUser = { ...window.__deckryptTestUser };
+  authResolved = true;
+  setSessionHint(true);
+} else {
+  onAuthStateChanged(auth, (fbUser) => {
+    const next = toUser(fbUser);
+    const wasLoggedIn = !!cachedUser;
+    cachedUser = next;
+    authResolved = true;
+    setSessionHint(!!next);
+    /* Logout transition (token expired, signed-out from another tab,
+     * etc.): wipe the localStorage deck cache so the next user on
+     * this browser can't read the previous one's data. Same defense
+     * as signOut(), but covers paths we don't drive ourselves. */
+    if (wasLoggedIn && !next) {
+      try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
+    }
+    for (const cb of authSubscribers) {
+      try { cb(next); } catch (e) { console.error("auth subscriber threw:", e); }
+    }
+    /* Login transition: drain anything queued while we were offline /
+     * not authed yet. Login itself triggers a drain even with an empty
+     * queue, which is cheap and keeps the contract simple. */
+    if (!wasLoggedIn && next) void drainQueue();
+  });
+}
 
 function currentUser() {
   return cachedUser;
@@ -83,9 +125,14 @@ function currentUser() {
 
 function onAuthChange(cb) {
   authSubscribers.add(cb);
-  /* Replay the current snapshot so subscribers don't have to wait for
-   * the next change to learn the initial state. */
-  try { cb(cachedUser); } catch (e) { console.error("auth subscriber threw:", e); }
+  /* Replay the current snapshot ONLY if Firebase has already resolved
+   * persistence. Subscribing during boot (before resolution) waits for
+   * the real callback — that's what avoids the "flash of login overlay
+   * for an already-signed-in user" race: a premature cb(null) would
+   * lock the UI just before Firebase reports the actual user. */
+  if (authResolved) {
+    try { cb(cachedUser); } catch (e) { console.error("auth subscriber threw:", e); }
+  }
   return () => authSubscribers.delete(cb);
 }
 
@@ -105,6 +152,27 @@ async function signUpWithEmail(email, password) {
 }
 
 async function signOut() {
+  /* Wipe the local deck cache + queue BEFORE firing Firebase signOut.
+   * Login-obligatoire model: anonymous users must NEVER see another
+   * user's data in the same browser. Cache the uid first so we can
+   * clean the per-uid queue entry as well. */
+  const uidToCleanup = cachedUser?.uid || null;
+  try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
+  setSessionHint(false);
+  if (uidToCleanup && window.syncQueue?.queueKeyForUid) {
+    try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uidToCleanup)); } catch (e) {}
+  }
+  if (TEST_MODE) {
+    /* In tests we skipped the Firebase Auth subscription, so we have
+     * to fan out the null transition manually for subscribers (which
+     * is what onAuthStateChanged would do in production). Lets e2e
+     * tests assert the post-signOut UI state. */
+    cachedUser = null;
+    for (const cb of authSubscribers) {
+      try { cb(null); } catch (e) { console.error("auth subscriber threw:", e); }
+    }
+    return;
+  }
   await fbSignOut(auth);
 }
 
@@ -121,27 +189,31 @@ function decksCollection(uid) {
 }
 
 async function loadDecks(uid) {
+  if (TEST_MODE) return [];
   const snap = await getDocs(decksCollection(uid));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 async function saveDeck(uid, deck) {
+  if (TEST_MODE) return;
   const { id, ...body } = deck;
   if (!id) throw new Error("saveDeck: deck.id is required");
   await setDoc(doc(db, "users", uid, "decks", id), body);
 }
 
 async function deleteDeck(uid, deckId) {
+  if (TEST_MODE) return;
   await deleteDoc(doc(db, "users", uid, "decks", deckId));
 }
 
 /* ============================================================
  * High-level orchestration — what the rest of the app calls.
- * Mode rules (per the auth/persistence model memory):
- *   - Anonymous: localStorage only (sandbox mode).
- *   - Logged in: localStorage is the cache; Firestore is the source
- *     of truth. Every mutation writes both, with the cloud write
- *     queued for retry if it fails.
+ *
+ * Login-obligatoire model: there is always a signed-in user when
+ * these are called (the app shell is gated behind the auth lock).
+ * Firestore is the source of truth; localStorage is the cache that
+ * fuels the optimistic boot render. Every mutation writes both,
+ * with the cloud write queued for retry if it fails.
  * ============================================================ */
 
 /* Writes the deck to localStorage and, when logged in, enqueues a
@@ -180,59 +252,20 @@ function commitDeleteDeck(deckId) {
   return { ok: true };
 }
 
-/* Returns the canonical deck list. Anonymous = whatever's in local
- * storage (with the demo seeded defaults). Logged in = Firestore is
- * authoritative; we fetch it, mirror the result into localStorage
- * for the next instant boot, and return the cloud list. The boot
- * code in app.js can call this in the background and rerender when
- * it lands, so the user sees the cached UI immediately. */
-/* Returns { decks, source } so the caller can react accordingly:
- *   - source === "cloud": Firestore returned decks, localStorage was
- *     mirrored. Caller should typically rebuild the UI.
- *   - source === "local": Firestore was empty OR no user is logged
- *     in. Local was left untouched. Caller should NOT trigger any
- *     re-render — the visible state didn't change. This matters at
- *     boot for a fresh signup: the previous "always re-render"
- *     behavior fired a switchDeck() that raced with any in-flight
- *     refreshResolved (e.g., the user pasting cards right after
- *     login), leaving the new cards stuck unresolved. */
+/* Returns the canonical deck list as a plain array. Firestore is
+ * authoritative; we fetch from there, mirror the result into the
+ * localStorage cache (so the next boot-theme.js + optimistic render
+ * has fresh data), and return what's now in the cache. When the
+ * cloud is empty (fresh signup) or unreachable we just return what's
+ * already in localStorage. */
 async function loadAllDecks() {
-  if (!cachedUser) {
-    return { decks: window.loadUserDecks(), source: "local" };
-  }
+  if (!cachedUser) return window.loadUserDecks();
   const cloud = await loadDecks(cachedUser.uid);
   if (cloud.length > 0) {
     window.saveUserDecks(cloud);
-    return { decks: cloud, source: "cloud" };
+    return cloud;
   }
-  return { decks: window.loadUserDecks(), source: "local" };
-}
-
-/* Push every localStorage deck to Firestore. Used at the moment the
- * user signs in for the first time and decides to keep their demo
- * decks. Returns { pushed, queued } so the UI can surface how many
- * went through immediately vs. ended up retried later. */
-async function migrateLocalDecksToCloud() {
-  if (!cachedUser) return { pushed: 0, queued: 0 };
-  const decks = window.loadUserDecks();
-  let pushed = 0;
-  let queued = 0;
-  for (const d of decks) {
-    try {
-      await saveDeck(cachedUser.uid, d);
-      pushed++;
-    } catch (e) {
-      const q = window.syncQueue.readQueue(cachedUser.uid);
-      window.syncQueue.writeQueue(
-        cachedUser.uid,
-        window.syncQueue.dedupEnqueue(q, { op: "save", deckId: d.id, deck: d })
-      );
-      queued++;
-    }
-  }
-  /* Best-effort drain in case some succeeded after retries earlier. */
-  void drainQueue();
-  return { pushed, queued };
+  return window.loadUserDecks();
 }
 
 /* ============================================================
@@ -304,7 +337,6 @@ window.sync = {
   commitDeck,
   commitDeleteDeck,
   loadAllDecks,
-  migrateLocalDecksToCloud,
   /* Manual queue control (debugging / migration UI) */
   drainQueue,
 };

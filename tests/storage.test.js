@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  STORAGE_KEY, SEEDED_KEY,
+  STORAGE_KEY,
   isValidDeck, isValidDeckEntry, isValidDeckCard,
   loadUserDecks, saveUserDecks,
-  hasSeededDefaults, markDefaultsSeeded, mergeDefaultsForSeeding,
 } from "../js/storage.js";
 
 const validDeck = {
@@ -150,63 +149,5 @@ describe("loadUserDecks / saveUserDecks", () => {
     globalThis.localStorage.getItem = () => { throw new Error("blocked"); };
     expect(loadUserDecks()).toEqual([]);
     expect(warnSpy).toHaveBeenCalledOnce();
-  });
-
-  describe("hasSeededDefaults / markDefaultsSeeded", () => {
-    it("false until markDefaultsSeeded is called", () => {
-      expect(hasSeededDefaults()).toBe(false);
-      markDefaultsSeeded();
-      expect(hasSeededDefaults()).toBe(true);
-    });
-
-    it("uses a key independent from the user-decks key", () => {
-      // Saving decks must NOT mark defaults as seeded — a pre-migration
-      // user with a saved deck list still needs the seed migration.
-      saveUserDecks([validDeck]);
-      expect(hasSeededDefaults()).toBe(false);
-    });
-
-    it("survives reads when localStorage throws", () => {
-      globalThis.localStorage.getItem = () => { throw new Error("blocked"); };
-      expect(hasSeededDefaults()).toBe(false);
-    });
-
-    it("markDefaultsSeeded returns false (and doesn't crash) on quota error", () => {
-      globalThis.localStorage.setItem = () => { throw new Error("quota"); };
-      expect(markDefaultsSeeded()).toBe(false);
-    });
-  });
-});
-
-describe("mergeDefaultsForSeeding", () => {
-  const A = { id: "a", name: "A", commanders: [], cards: [] };
-  const B = { id: "b", name: "B", commanders: [], cards: [] };
-  const C = { id: "c", name: "C", commanders: [], cards: [] };
-
-  it("returns all defaults when existing is empty (fresh user)", () => {
-    expect(mergeDefaultsForSeeding([], [A, B])).toEqual([A, B]);
-  });
-
-  it("appends the missing defaults to a pre-existing user list (migration)", () => {
-    expect(mergeDefaultsForSeeding([C], [A, B])).toEqual([C, A, B]);
-  });
-
-  it("doesn't duplicate when a default is already present (by id)", () => {
-    expect(mergeDefaultsForSeeding([A, C], [A, B])).toEqual([A, C, B]);
-  });
-
-  it("returns the input array reference (not a copy) when nothing to add", () => {
-    const existing = [A, B, C];
-    expect(mergeDefaultsForSeeding(existing, [A])).toBe(existing);
-  });
-
-  it("is idempotent across repeated calls", () => {
-    const once = mergeDefaultsForSeeding([], [A, B]);
-    const twice = mergeDefaultsForSeeding(once, [A, B]);
-    expect(twice).toEqual([A, B]);
-  });
-
-  it("preserves user-deck order when appending (defaults go to the tail)", () => {
-    expect(mergeDefaultsForSeeding([B], [A]).map((d) => d.id)).toEqual(["b", "a"]);
   });
 });

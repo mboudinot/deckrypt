@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
 /* This is the regression test for the bug shipped in May 2026: an
  * author CSS rule won by origin precedence over `[hidden]` from the UA
@@ -11,12 +11,16 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("default state: play view visible, manage view hidden", async ({ page }) => {
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await expect(page.locator("#view-play")).toBeVisible();
   await expect(page.locator("#view-manage")).toBeHidden();
 });
 
 test("clicking Gérer hides the play view and shows the manage view", async ({ page }) => {
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.click("#tab-manage");
   await expect(page.locator("#view-play")).toBeHidden();
@@ -24,6 +28,8 @@ test("clicking Gérer hides the play view and shows the manage view", async ({ p
 });
 
 test("clicking Jouer brings the play view back", async ({ page }) => {
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.click("#tab-manage");
   await page.click("#tab-play");
@@ -32,6 +38,8 @@ test("clicking Jouer brings the play view back", async ({ page }) => {
 });
 
 test("manage view is pre-rendered before its first tab click (instant switch)", async ({ page }) => {
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
   // Even though the manage view is hidden, its content is already in
@@ -42,6 +50,8 @@ test("manage view is pre-rendered before its first tab click (instant switch)", 
 });
 
 test("analyze view is pre-rendered before its first tab click (instant switch)", async ({ page }) => {
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
   // Same idea for the analyze view — bracket and suggestions are
@@ -51,6 +61,8 @@ test("analyze view is pre-rendered before its first tab click (instant switch)",
 });
 
 test("active tab carries .active class and aria-selected=true", async ({ page }) => {
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.click("#tab-manage");
   await expect(page.locator("#tab-manage")).toHaveClass(/active/);

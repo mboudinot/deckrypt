@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockScryfall } from "./_helpers.js";
+import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
 /* The add-card UI no longer commits on suggestion-click. Picking a
  * suggestion opens a draft slot where the user chooses an edition
@@ -10,6 +10,8 @@ import { mockScryfall } from "./_helpers.js";
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
   await page.click("#tab-manage");
@@ -143,9 +145,9 @@ test("Enter in the qty field validates the draft", async ({ page }) => {
   await page.locator("#add-card-suggestions li", { hasText: "Sol Ring" }).first().click();
   await expect(page.locator("#add-card-draft-printing")).toBeEnabled();
   // Pick a printing so the new entry has a distinct identity from
-  // the seeded default-printing Sol Ring — otherwise addCard would
-  // fold qty into the existing entry and the row count stays the
-  // same. We're testing keyboard validation here, not merge logic.
+  // the fixture's default-printing Sol Ring — otherwise addCard
+  // would fold qty into the existing entry and the row count stays
+  // the same. We're testing keyboard validation here, not merge.
   await page.locator("#add-card-draft-printing").selectOption("lea:2");
   await page.locator("#add-card-draft-qty").fill("3");
   await page.locator("#add-card-draft-qty").press("Enter");

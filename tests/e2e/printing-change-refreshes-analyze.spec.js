@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mockAuth, seedSultaiDeck } from "./_helpers.js";
 
 /* Regression: changing a card's printing in the Manage view must
  * refresh the Analyze view's Game Changer accordion image without a
@@ -97,6 +98,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("changing a printing refreshes the Game Changer accordion image without reload", async ({ page }) => {
+  await mockAuth(page);
+  await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.locator("#commander-zone .card").first().waitFor();
 
