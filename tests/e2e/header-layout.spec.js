@@ -21,14 +21,17 @@ test("tabs and import button share the same vertical center", async ({ page }) =
   expect(Math.abs(tabsCenter - importCenter)).toBeLessThanOrEqual(1);
 });
 
-test("import button sits to the right of the view tabs", async ({ page }) => {
+test("right-side actions sit to the right of the view tabs, account hugs the edge", async ({ page }) => {
   await page.goto("/index.html");
   const tabsBox = await page.locator(".view-tabs").boundingBox();
   const importBox = await page.locator("#btn-import-toggle").boundingBox();
+  const accountBox = await page.locator("#btn-account").boundingBox();
   const header = await page.locator(".header-actions").boundingBox();
+  // Both right-side buttons live past the tabs.
   expect(importBox.x).toBeGreaterThan(tabsBox.x + tabsBox.width);
-  // Import button must hug the right edge of the header row.
-  const rightGap = (header.x + header.width) - (importBox.x + importBox.width);
+  expect(accountBox.x).toBeGreaterThan(importBox.x);
+  // The rightmost (account) hugs the header's right edge.
+  const rightGap = (header.x + header.width) - (accountBox.x + accountBox.width);
   expect(rightGap).toBeLessThanOrEqual(2);
 });
 

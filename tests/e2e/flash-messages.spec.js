@@ -73,5 +73,9 @@ test("paste-add of an empty textarea flashes an error", async ({ page }) => {
   await page.click("#add-card-paste-btn");
   const flash = page.locator("#flash-container .flash").last();
   await expect(flash).toHaveClass(/flash-error/);
-  await expect(flash).toContainText(/Aucune carte détectée/);
+  /* Two distinct messages now: "Colle une liste avant d'ajouter."
+   * for empty textarea, "Aucune carte détectée dans le collage."
+   * for non-empty but unparseable content. We assert the empty
+   * case here. */
+  await expect(flash).toContainText(/Colle une liste/);
 });

@@ -26,16 +26,22 @@ function renderGalleryView(ctx = null) {
    *      waiting on a full re-resolve);
    *   2. fallback to a by-name map built from state.resolved. */
   const cacheReader = ctx?.cacheReader || cardCacheReader();
+  /* Lower-case keys so a paste-add of "1 sol ring" still resolves
+   * to Scryfall's canonical "Sol Ring" — see the matching comment
+   * in app-manage.js for the full rationale. */
   const resolvedByName = new Map();
   for (const c of [...state.resolved.commanders, ...state.resolved.deck]) {
-    if (c.name && !resolvedByName.has(c.name)) resolvedByName.set(c.name, c);
+    if (c.name) {
+      const k = c.name.toLowerCase();
+      if (!resolvedByName.has(k)) resolvedByName.set(k, c);
+    }
   }
   const cardFor = (entry) => {
     if (entry.set && entry.collector_number) {
       const cached = cacheReader.getByPrinting(entry.set, entry.collector_number);
       if (cached) return cached;
     }
-    return resolvedByName.get(entry.name) || null;
+    return resolvedByName.get(entry.name.toLowerCase()) || null;
   };
 
   els.galleryContent.replaceChildren();

@@ -55,7 +55,14 @@ const state = {
   // so editing a card doesn't reopen a closed group. Not persisted
   // to localStorage — it's a working-set preference, not a setting.
   collapsedManageGroups: new Set(),
+  // Set of card names that were just added in the manage view; rows
+  // with a matching name get a brief highlight on render so the user
+  // can spot what they just inserted. Populated by add/paste handlers,
+  // cleared after the animation completes (see RECENTLY_ADDED_TTL_MS).
+  recentlyAddedNames: new Set(),
 };
+
+const RECENTLY_ADDED_TTL_MS = 2500;
 
 
 // ============================================================
@@ -517,11 +524,12 @@ function deleteCurrentDeck() {
   const def = findDeck(state.currentDeckId);
   if (!def) return;
   if (!confirm(`Supprimer le deck "${def.name}" ?`)) return;
-  const remaining = loadUserDecks().filter((d) => d.id !== def.id);
-  if (!saveUserDecks(remaining)) {
+  const result = window.sync.commitDeleteDeck(def.id);
+  if (!result.ok) {
     setStatus("Échec de la suppression (localStorage indisponible).", "error");
     return;
   }
+  const remaining = loadUserDecks();
   state.deckCache.delete(def.id);
   state.currentDeckId = remaining[0]?.id || null;
   populateDeckSelect();
@@ -537,7 +545,17 @@ function openImportPanel() {
   els.importText.value = "";
   els.importPreview.replaceChildren();
   els.importPreview.textContent = "Colle une liste pour voir le récap.";
-  els.importConfirm.disabled = true;
+  /* Button stays enabled — validation is the gatekeeper, not a
+   * disabled state. The user gets immediate inline feedback on
+   * click instead of wondering why the button is gray. */
+  els.importConfirm.disabled = false;
+  /* Clear any leftover invalid flags from a prior failed attempt
+   * and wire the auto-clear listeners (idempotent — first call
+   * registers, later calls are no-ops via dataset guard). */
+  window.formValidate.clearInvalid(els.importName);
+  window.formValidate.clearInvalid(els.importText);
+  window.formValidate.attachAutoClear(els.importName);
+  window.formValidate.attachAutoClear(els.importText);
   openIeModal("import");
   els.importName.focus();
 }
@@ -657,7 +675,6 @@ function refreshImportPreview() {
 
   if (!text.trim()) {
     els.importPreview.textContent = "Colle une liste pour voir le récap.";
-    els.importConfirm.disabled = true;
     return;
   }
   const parsed = parseDecklist(text);
@@ -677,18 +694,31 @@ function refreshImportPreview() {
     errEl.textContent = "⚠ " + e;
     els.importPreview.appendChild(errEl);
   }
-  els.importConfirm.disabled =
-    parsed.cards.length === 0 && parsed.commanders.length === 0;
 }
 
 async function confirmImport() {
+  const name = els.importName.value.trim();
   const text = els.importText.value;
-  const parsed = parseDecklist(text);
-  if (parsed.cards.length === 0 && parsed.commanders.length === 0) {
-    setStatus("Aucune carte détectée dans la liste.", "error");
+  const missingName = !name;
+  const missingText = !text.trim();
+  if (missingName || missingText) {
+    if (missingName) window.formValidate.flagInvalid(els.importName);
+    if (missingText) window.formValidate.flagInvalid(els.importText);
+    let msg;
+    if (missingName && missingText) msg = "Renseigne un nom de deck et colle ta liste.";
+    else if (missingName) msg = "Renseigne un nom pour ce deck.";
+    else msg = "Colle ta liste de cartes.";
+    setStatus(msg, "error");
+    (missingName ? els.importName : els.importText).focus();
     return;
   }
-  const name = (els.importName.value || "Deck importé").trim();
+  const parsed = parseDecklist(text);
+  if (parsed.cards.length === 0 && parsed.commanders.length === 0) {
+    window.formValidate.flagInvalid(els.importText);
+    setStatus("Aucune carte détectée dans la liste.", "error");
+    els.importText.focus();
+    return;
+  }
   const id = "user-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
   const def = {
     id, name,
@@ -707,9 +737,7 @@ async function confirmImport() {
     return;
   }
 
-  const users = loadUserDecks();
-  users.push(def);
-  if (!saveUserDecks(users)) {
+  if (!window.sync.commitDeck(def).ok) {
     setStatus("⚠ Sauvegarde impossible (localStorage plein ou indisponible). Le deck est chargé pour cette session uniquement.", "error");
   }
 
@@ -847,10 +875,7 @@ function makeSkeletonBlock() {
 }
 
 function commitDeckChange(def) {
-  const all = loadUserDecks();
-  const idx = all.findIndex((d) => d.id === def.id);
-  if (idx === -1) all.push(def); else all[idx] = def;
-  if (!saveUserDecks(all)) {
+  if (!window.sync.commitDeck(def).ok) {
     setStatus("Sauvegarde impossible (localStorage indisponible).", "error");
     return false;
   }
@@ -991,6 +1016,44 @@ function init() {
   // to call evictExpired() inline — that added ~5–15 ms to every
   // page load for no UX benefit.
   setTimeout(() => evictExpired(), 1000);
+
+  // Wire cloud reconciliation. sync.js is an ES module and executes
+  // AFTER this classic-defer script, so window.sync isn't ready yet
+  // when init() runs synchronously — we wait for DOMContentLoaded,
+  // which fires only once every deferred + module script has
+  // executed. From there, onAuthChange replays the current auth
+  // snapshot immediately and pings us on every subsequent change.
+  document.addEventListener("DOMContentLoaded", () => {
+    if (!window.sync || typeof window.sync.onAuthChange !== "function") return;
+    window.sync.onAuthChange(async (user) => {
+      if (!user) return;
+      let result;
+      try {
+        result = await window.sync.loadAllDecks();
+      } catch (e) {
+        console.warn("Cloud deck load failed (will retry on next sync trigger):", e);
+        return;
+      }
+      /* No cloud data means localStorage was left untouched — skip
+       * the deck-list rebuild AND the switchDeck. Re-resolving here
+       * would race with any commitDeckChange the user fires right
+       * after login (paste/add), leaving fresh cards stuck without
+       * Scryfall data because their refreshResolved bailed while
+       * state.resolved was null mid-switch. */
+      if (result.source !== "cloud") return;
+      populateDeckSelect();
+      const stillValid = state.currentDeckId && findDeck(state.currentDeckId);
+      if (stillValid) {
+        state.deckCache.delete(state.currentDeckId);
+        switchDeck(state.currentDeckId);
+      } else {
+        const first = loadUserDecks()[0];
+        state.currentDeckId = first?.id || null;
+        if (state.currentDeckId) switchDeck(state.currentDeckId);
+        else clearActiveView();
+      }
+    });
+  });
 }
 
 // Auto-init in browser context. The presence-check skips this when the

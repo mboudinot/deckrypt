@@ -1,0 +1,208 @@
+/* ============================================================
+   Deckrypt Refonte — Theme system
+   Two themes toggle via [data-direction] on <html>: "studio" (dark
+   default) and "editorial" (light). Each overrides the same set of
+   CSS variables, so markup stays identical and only tokens change.
+   The user picks their theme from Settings (account menu).
+   ============================================================ */
+
+:root {
+  /* WUBRG palette — refined in oklch for perceptual consistency.
+     These stay constant across directions (they ARE Magic colors). */
+  --mtg-w: oklch(0.93 0.07 95);
+  --mtg-u: oklch(0.68 0.16 240);
+  --mtg-b: oklch(0.72 0.13 295);
+  --mtg-r: oklch(0.72 0.18 25);
+  --mtg-g: oklch(0.78 0.16 160);
+
+  --mtg-w-bg: oklch(0.93 0.07 95 / 0.14);
+  --mtg-u-bg: oklch(0.68 0.16 240 / 0.14);
+  --mtg-b-bg: oklch(0.72 0.13 295 / 0.14);
+  --mtg-r-bg: oklch(0.72 0.18 25 / 0.14);
+  --mtg-g-bg: oklch(0.78 0.16 160 / 0.14);
+}
+
+/* ============================================================
+   Studio — dark modern. Indigo accent. Comfortable density.
+   ============================================================ */
+[data-direction="studio"] {
+  --bg: #0a0c12;
+  --surface: #11141c;
+  --surface-2: #181c27;
+  --surface-3: #232936;
+  --border: #252a36;
+  --border-strong: #353c4d;
+  --text: #ecedf0;
+  --text-2: #b4b8c4;
+  --text-muted: #767c8c;
+  --accent: #818cf8;
+  --accent-text: #060816;
+  --accent-2: #6366f1;
+  --success: #6ee7b7;
+  --warning: #fcd34d;
+  --error: #fca5a5;
+  --info: #93c5fd;
+
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.65);
+
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --density: 1;
+  --label-transform: none;
+  --label-tracking: 0;
+  --label-weight: 500;
+
+  --grid-bg: none;
+}
+
+/* ============================================================
+   Editorial — light mode. Bordeaux accent. Serif headlines.
+   ============================================================ */
+[data-direction="editorial"] {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface-2: #f0ede5;
+  --surface-3: #e7e3d8;
+  --border: #d8d2c2;
+  --border-strong: #b8b0a0;
+  --text: #1a1814;
+  --text-2: #4a4842;
+  --text-muted: #8a8578;
+  --accent: #9f1239;
+  --accent-text: #ffffff;
+  --accent-2: #be123c;
+  --success: #166534;
+  --warning: #b45309;
+  --error: #991b1b;
+  --info: #1e40af;
+
+  --radius: 2px;
+  --radius-lg: 4px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 0 rgba(26, 24, 20, 0.05);
+  --shadow: 0 2px 8px rgba(26, 24, 20, 0.08);
+  --shadow-lg: 0 12px 36px rgba(26, 24, 20, 0.18);
+
+  --font-display: "Fraunces", "Georgia", "Times New Roman", serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --density: 1.15;
+  --label-transform: uppercase;
+  --label-tracking: 0.15em;
+  --label-weight: 600;
+
+  --grid-bg: none;
+
+  /* WUBRG slightly darker for legibility on light bg */
+  --mtg-w: oklch(0.65 0.08 85);
+  --mtg-u: oklch(0.5 0.18 240);
+  --mtg-b: oklch(0.5 0.15 295);
+  --mtg-r: oklch(0.55 0.22 25);
+  --mtg-g: oklch(0.55 0.16 160);
+
+  --mtg-w-bg: oklch(0.65 0.08 85 / 0.12);
+  --mtg-u-bg: oklch(0.5 0.18 240 / 0.10);
+  --mtg-b-bg: oklch(0.5 0.15 295 / 0.10);
+  --mtg-r-bg: oklch(0.55 0.22 25 / 0.10);
+  --mtg-g-bg: oklch(0.55 0.16 160 / 0.10);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  background-image: var(--grid-bg);
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Focus ring — high contrast, theme-aware. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* Selection */
+::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Reusable mono number tag — used across views for any quantitative
+   value the user might want to scan/compare. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "ss01", "cv01";
+}
+
+/* WUBRG color utility classes */
+.c-w { color: var(--mtg-w); }
+.c-u { color: var(--mtg-u); }
+.c-b { color: var(--mtg-b); }
+.c-r { color: var(--mtg-r); }
+.c-g { color: var(--mtg-g); }
+.bg-w { background: var(--mtg-w-bg); color: var(--mtg-w); }
+.bg-u { background: var(--mtg-u-bg); color: var(--mtg-u); }
+.bg-b { background: var(--mtg-b-bg); color: var(--mtg-b); }
+.bg-r { background: var(--mtg-r-bg); color: var(--mtg-r); }
+.bg-g { background: var(--mtg-g-bg); color: var(--mtg-g); }
+.dot-w { background: var(--mtg-w); }
+.dot-u { background: var(--mtg-u); }
+.dot-b { background: var(--mtg-b); }
+.dot-r { background: var(--mtg-r); }
+.dot-g { background: var(--mtg-g); }
+
+/* Section labels */
+.label {
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  font-weight: var(--label-weight);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Visually hidden but accessible */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}

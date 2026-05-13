@@ -110,6 +110,13 @@ function setDeckFormat(format) {
 function makeManageCardRow(entry, resolvedCard, opts) {
   const row = document.createElement("div");
   row.className = "card-row";
+  if (state.recentlyAddedNames.has(entry.name)) {
+    /* Brief flash to draw the eye after a paste/draft add. The class
+     * carries a CSS animation that auto-fades to the normal style;
+     * we don't need to clean it up here (state.recentlyAddedNames
+     * gets cleared on the same timer). */
+    row.classList.add("card-row--just-added");
+  }
 
   const thumb = document.createElement("button");
   thumb.type = "button";
@@ -222,25 +229,38 @@ function renderManageView(ctx = null) {
   //   2. state.resolved (per-name fallback) — covers cards we never
   //      re-fetched specifically for the manage view but Scryfall
   //      returned during the deck-level resolution.
+  /* Case-insensitive name -> resolved card lookup. We key by lower-
+   * case so a paste-add of "1 sol ring" (any casing the user fancies)
+   * still matches Scryfall's canonical "Sol Ring" — otherwise the
+   * row falls into the Inconnu bucket with no thumbnail. */
   const resolvedByName = new Map();
   if (state.resolved) {
     for (const c of [...state.resolved.commanders, ...state.resolved.deck]) {
-      if (c.name && !resolvedByName.has(c.name)) resolvedByName.set(c.name, c);
+      if (c.name) {
+        const k = c.name.toLowerCase();
+        if (!resolvedByName.has(k)) resolvedByName.set(k, c);
+      }
     }
   }
+  const resolveForEntry = (entry) => resolvedByName.get(entry.name.toLowerCase()) || null;
   const thumbFor = (entry) => {
     if (entry.set && entry.collector_number) {
       const cached = cacheReader.getByPrinting(entry.set, entry.collector_number);
       if (cached) return cached;
     }
-    return resolvedByName.get(entry.name) || null;
+    return resolveForEntry(entry);
   };
   const displayName = (entry) => {
     if (translate) {
       const fr = translate(entry.name);
       if (fr) return fr;
     }
-    return entry.name;
+    /* Prefer the canonical Scryfall name when we have it — so a
+     * paste-add of "1 sol ring" displays as "Sol Ring" instead of
+     * the user's lowercase typing. Fallback to the entry's raw name
+     * while the async resolve is still in flight. */
+    const resolved = resolveForEntry(entry);
+    return (resolved && resolved.name) || entry.name;
   };
 
   els.manageCommanders.replaceChildren();
@@ -484,6 +504,10 @@ function setupAddCardUI() {
     // Delay so a click on a suggestion still registers before we hide.
     setTimeout(() => { els.addCardSuggestions.hidden = true; }, 150);
   });
+  /* Paste textarea: flag if user clicks "Ajouter depuis la liste"
+   * without anything in it, or with content that yields zero cards.
+   * Auto-clear listener attached once at setup. */
+  window.formValidate.attachAutoClear(els.addCardPasteText);
   els.addCardPasteBtn.addEventListener("click", onPasteAdd);
   els.addCardDraftCancel.addEventListener("click", cancelAddCardDraft);
   els.addCardDraftSubmit.addEventListener("click", submitAddCardDraft);
@@ -700,7 +724,10 @@ function cancelAddCardDraft() {
 function submitAddCardDraft() {
   if (!_draftName) return;
   const def = findDeck(state.currentDeckId);
-  if (!def) return;
+  if (!def) {
+    flash("Sélectionne un deck avant d'ajouter une carte.", "error");
+    return;
+  }
   const rawQty = parseInt(els.addCardDraftQty.value, 10);
   const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
   const entry = { name: _draftName, qty };
@@ -715,6 +742,7 @@ function submitAddCardDraft() {
   addCard(def, entry);
   if (commitDeckChange(def)) {
     const displayName = getDisplayName({ name: _draftName });
+    markRecentlyAdded([_draftName]);
     cancelAddCardDraft();
     rerenderDeckViews();
     flash(qty > 1
@@ -725,19 +753,42 @@ function submitAddCardDraft() {
 
 function onPasteAdd() {
   const def = findDeck(state.currentDeckId);
-  if (!def) return;
+  if (!def) {
+    flash("Sélectionne un deck avant d'ajouter des cartes.", "error");
+    return;
+  }
   const text = els.addCardPasteText.value;
+  if (!text.trim()) {
+    window.formValidate.flagInvalid(els.addCardPasteText);
+    flash("Colle une liste avant d'ajouter.", "error");
+    els.addCardPasteText.focus();
+    return;
+  }
   const parsed = parseDecklist(text);
   if (parsed.cards.length === 0 && parsed.commanders.length === 0) {
+    window.formValidate.flagInvalid(els.addCardPasteText);
     flash("Aucune carte détectée dans le collage.", "error");
+    els.addCardPasteText.focus();
     return;
   }
   for (const e of parsed.cards) addCard(def, e);
   for (const e of parsed.commanders) addCommander(def, e);
   if (commitDeckChange(def)) {
     els.addCardPasteText.value = "";
+    markRecentlyAdded([...parsed.cards, ...parsed.commanders].map((c) => c.name));
     rerenderDeckViews();
     const n = parsed.cards.length + parsed.commanders.length;
     flash(`${pluralFr(n, "ligne")} ajoutée${n > 1 ? "s" : ""} au deck`, "success");
   }
+}
+
+/* Schedule the highlight class on every row whose name matches one
+ * of `names`. Clearing the set is intentionally deferred until well
+ * after the CSS fade completes — anything sooner would re-render
+ * away the highlight before the user spots it. */
+function markRecentlyAdded(names) {
+  for (const n of names) state.recentlyAddedNames.add(n);
+  setTimeout(() => {
+    for (const n of names) state.recentlyAddedNames.delete(n);
+  }, RECENTLY_ADDED_TTL_MS);
 }

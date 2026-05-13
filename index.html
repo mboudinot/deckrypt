@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-direction="studio">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,17 +11,26 @@
        script-src + gstatic.com  - Firebase SDK loaded via ESM CDN
        connect-src + googleapis  - Firestore reads/writes + Auth REST
        frame-src                 - Google sign-in popup
-       img-src + googleusercontent - user avatar from Google login -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self'; img-src 'self' https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src https://api.scryfall.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none'; frame-ancestors 'none';">
+       img-src + googleusercontent - user avatar from Google login
+     Google Fonts additions:
+       style-src + fonts.googleapis.com - CSS for Inter, Fraunces, JetBrains Mono
+       font-src  + fonts.gstatic.com    - the woff2 files themselves -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src https://api.scryfall.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none'; frame-ancestors 'none';">
 <meta name="referrer" content="no-referrer">
 <title>Deckrypt</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="styles.css">
 <script defer src="js/util.js"></script>
 <script defer src="js/decks.js"></script>
 <script defer src="js/scryfall.js"></script>
 <script defer src="js/parser.js"></script>
 <script defer src="js/storage.js"></script>
+<script defer src="js/sync-queue.js"></script>
+<script defer src="js/form-validate.js"></script>
 <script defer src="js/card-cache.js"></script>
 <script defer src="js/translations.js"></script>
 <script defer src="js/deck-edit.js"></script>
@@ -36,6 +45,7 @@
 <script defer src="js/app-manage.js"></script>
 <script defer src="js/app-analyze.js"></script>
 <script defer src="js/app-gallery.js"></script>
+<script defer src="js/app-login.js"></script>
 <script defer src="js/app.js"></script>
 <script type="module" src="js/sync.js"></script>
 </head>
@@ -52,7 +62,10 @@
         <button id="tab-analyze" type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="view-analyze">Analyser</button>
         <button id="tab-gallery" type="button" class="view-tab" role="tab" aria-selected="false" aria-controls="view-gallery">Galerie</button>
       </nav>
-      <button id="btn-import-toggle" type="button" class="header-action">+ Importer un deck</button>
+      <div class="header-right">
+        <button id="btn-import-toggle" type="button" class="header-action">+ Importer un deck</button>
+        <button id="btn-account" type="button" class="header-action header-action-account" aria-haspopup="dialog" aria-expanded="false">Connexion</button>
+      </div>
     </div>
   </header>
 
@@ -393,5 +406,86 @@
 
 <!-- Flash messages — ephemeral action feedback. Populated by flash(). -->
 <div id="flash-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Login overlay — full-viewport split-screen, hidden until the user
+     clicks "Connexion". Markup ported from the claude.design bundle's
+     view-login.jsx. Auth is wired by js/app-login.js. Will become a
+     proper route once step 6 lands the header refactor. -->
+<div id="login-overlay" class="login-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="login-title">
+  <button type="button" class="login-close" id="login-close" aria-label="Fermer">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+  <div class="login-page">
+    <aside class="login-visual" aria-hidden="true">
+      <div class="login-cards">
+        <div class="mtg-card lc-1"><img alt="" loading="lazy" src="https://api.scryfall.com/cards/named?fuzzy=Mana+Crypt&amp;format=image"></div>
+        <div class="mtg-card lc-2"><img alt="" loading="lazy" src="https://api.scryfall.com/cards/named?fuzzy=Force+of+Will&amp;format=image"></div>
+        <div class="mtg-card lc-3"><img alt="" loading="lazy" src="https://api.scryfall.com/cards/named?fuzzy=Tymna+the+Weaver&amp;format=image"></div>
+        <div class="mtg-card lc-4"><img alt="" loading="lazy" src="https://api.scryfall.com/cards/named?fuzzy=Thrasios%2C+Triton+Hero&amp;format=image"></div>
+        <div class="mtg-card lc-5"><img alt="" loading="lazy" src="https://api.scryfall.com/cards/named?fuzzy=Jeweled+Lotus&amp;format=image"></div>
+      </div>
+      <header class="login-visual-brand">
+        <span class="brand-name">Deckrypt</span>
+      </header>
+      <div class="login-visual-tagline">
+        <h2>Construis. Analyse. Itère. Gagne.</h2>
+        <p>Importe ton deck, analyse sa courbe de mana, son bracket, ses thèmes et ses faiblesses. Joue des mains de test pour valider ta liste avant la prochaine pod cEDH.</p>
+      </div>
+      <div class="login-visual-stats">
+        <div class="login-visual-stat"><strong>2 384</strong><span>Decks importés</span></div>
+        <div class="login-visual-stat"><strong>27 k</strong><span>Cartes indexées</span></div>
+        <div class="login-visual-stat"><strong>5</strong><span>Brackets supportés</span></div>
+      </div>
+    </aside>
+    <main class="login-form-wrap">
+      <form class="login-form" id="login-form" novalidate>
+        <h1 id="login-title">Connexion</h1>
+        <p class="sub" id="login-sub">Accède à tes decks, ton historique de parties et tes analyses.</p>
+        <button type="button" class="google-btn" id="login-google">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+            <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+            <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+          </svg>
+          Continuer avec Google
+        </button>
+        <div class="divider">ou avec un email</div>
+        <div class="field">
+          <label for="login-email">Email</label>
+          <input id="login-email" type="email" placeholder="jean.dupont@example.com" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="login-pwd">Mot de passe</label>
+          <div class="pwd-wrap">
+            <input id="login-pwd" type="password" placeholder="•••••••••••" autocomplete="current-password" required>
+            <button type="button" class="pwd-toggle" id="login-pwd-toggle" aria-pressed="false">Voir</button>
+          </div>
+          <span class="hint" id="login-pwd-hint" hidden>Minimum 8 caractères avec au moins 1 chiffre.</span>
+        </div>
+        <div class="field-row" id="login-signin-only">
+          <label class="remember-me"><input type="checkbox" id="login-remember"> Se souvenir de moi</label>
+          <a href="#" id="login-forgot">Mot de passe oublié ?</a>
+        </div>
+        <div class="login-error" id="login-error" role="alert" hidden></div>
+        <button type="submit" class="btn primary btn-block btn-lg" id="login-submit">
+          <span id="login-submit-label">Se connecter</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
+        <div class="login-foot">
+          <span id="login-mode-prefix">Pas encore de compte ?</span>
+          <a href="#" id="login-mode-toggle">S'inscrire</a>
+        </div>
+        <p class="login-terms">En continuant tu acceptes les conditions d'utilisation et la politique de confidentialité.</p>
+      </form>
+    </main>
+  </div>
+</div>
 </body>
 </html>
