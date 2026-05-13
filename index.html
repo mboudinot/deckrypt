@@ -27,8 +27,13 @@
      localStorage read. -->
 <script src="js/boot-theme.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<!-- Load order matters: theme.css defines the tokens, components.css
+     pulls them via var() to build the reusable widgets (buttons,
+     dropdowns, cards, modals, header chrome, etc.), views.css layers
+     per-view layouts and content on top. -->
 <link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="views.css">
 <script defer src="js/util.js"></script>
 <script defer src="js/decks.js"></script>
 <script defer src="js/scryfall.js"></script>
