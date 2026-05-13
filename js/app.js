@@ -330,18 +330,6 @@ async function resolveDeck(deckDef) {
   return resolved;
 }
 
-/* Status-line message used after a successful resolution (sync or async). */
-/* Sidebar status line — reserved for transient ops feedback. The
- * persistent deck-composition info (X commandant + Y cartes) lives in
- * the Analyze view's "Conformité au format" section (see
- * renderCompositionPanel). We only surface a sidebar message here
- * when there's something to flag, like cards Scryfall didn't find. */
-function formatLoadIssues(r) {
-  if (!r.notFound.length) return "";
-  return `⚠ ${pluralFr(r.notFound.length, "introuvable")} : ${r.notFound.slice(0, 5).join(", ")}${r.notFound.length > 5 ? "…" : ""}`;
-}
-
-
 function showModal(card, actions) {
   state.focusBeforeModal = document.activeElement;
 
@@ -525,7 +513,6 @@ async function switchDeck(deckId) {
   const sync = tryResolveSync(def);
   if (sync) {
     state.resolved = sync;
-    setStatus(formatLoadIssues(sync), sync.notFound.length ? "error" : "");
     renderCommanders();
     startNewGame();
     rerenderDeckViews();
@@ -550,7 +537,6 @@ async function switchDeck(deckId) {
     const r = await resolveDeck(def);
     if (myToken !== state.switchToken) return; // stale: user already switched
     state.resolved = r;
-    setStatus(formatLoadIssues(r), r.notFound.length ? "error" : "");
     renderCommanders();
     startNewGame();
     rerenderDeckViews();
