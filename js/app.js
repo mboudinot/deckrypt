@@ -72,7 +72,12 @@ const els = {};
 
 function cacheElements() {
   els.deckSelect = document.getElementById("deck-select");
-  els.btnDeleteDeck = document.getElementById("btn-delete-deck");
+  /* Trash button lives in the deck-summary panel since the manage-view
+   * refonte (was in the header deck-pill dropdown). Cached under the
+   * same name so existing call sites (updateDeleteButton, click wiring)
+   * keep working without renaming. */
+  els.btnDeleteDeck = document.getElementById("btn-delete-deck-summary");
+  els.btnDuplicateDeck = document.getElementById("btn-duplicate-deck");
   els.btnImportToggle = document.getElementById("btn-import-toggle");
   els.btnDraw = document.getElementById("btn-draw");
   els.btnNextTurn = document.getElementById("btn-next-turn");
@@ -115,8 +120,7 @@ function cacheElements() {
   els.btnExport = document.getElementById("btn-export");
   els.ieModal = document.getElementById("ie-modal");
   els.ieModalClose = document.getElementById("ie-modal-close");
-  els.ieTabImport = document.getElementById("ie-tab-import");
-  els.ieTabExport = document.getElementById("ie-tab-export");
+  els.ieModalTitle = document.getElementById("ie-modal-title");
   els.iePanelImport = document.getElementById("ie-panel-import");
   els.iePanelExport = document.getElementById("ie-panel-export");
   els.exportFormat = document.getElementById("export-format");
@@ -179,7 +183,10 @@ function cacheElements() {
   els.langSwitchFr = document.getElementById("lang-switch-fr");
   els.translationBanner = document.getElementById("translation-banner");
   els.flashContainer = document.getElementById("flash-container");
-  els.formatSelect = document.getElementById("manage-format-select");
+  /* Format edit lives in the deck-summary meta-row (click on the
+   * format text → dropdown). Replaces the old <select> field. */
+  els.formatTrigger = document.getElementById("manage-deck-format-trigger");
+  els.formatMenu = document.getElementById("manage-deck-format-menu");
 
   // Build once: which DOM zones receive drops, and which game zone they
   // resolve to. The lands block resolves to the same `battlefield`
@@ -529,6 +536,11 @@ async function switchDeck(deckId) {
   const myToken = ++state.switchToken;
   state.currentDeckId = deckId;
   updateDeleteButton();
+  /* Keep the deck-pill dropdown's highlight (aria-current) in sync
+   * with the active deck — otherwise the row that was current when
+   * the menu was last built stays highlighted even after the user
+   * switches to a different deck. */
+  refreshDeckDropdownActive();
   const def = findDeck(deckId);
   if (!def) return;
 
@@ -580,10 +592,16 @@ async function switchDeck(deckId) {
   }
 }
 
-function deleteCurrentDeck() {
+async function deleteCurrentDeck() {
   const def = findDeck(state.currentDeckId);
   if (!def) return;
-  if (!confirm(`Supprimer le deck "${def.name}" ?`)) return;
+  const ok = await window.confirmDialog({
+    title: "Supprimer le deck",
+    message: `« ${def.name} » sera retiré de ton compte. Cette action est définitive.`,
+    confirmLabel: "Supprimer",
+    danger: true,
+  });
+  if (!ok) return;
   const result = window.sync.commitDeleteDeck(def.id);
   if (!result.ok) {
     setStatus("Échec de la suppression (localStorage indisponible).", "error");
@@ -595,6 +613,36 @@ function deleteCurrentDeck() {
   populateDeckSelect();
   if (state.currentDeckId) switchDeck(state.currentDeckId);
   else clearActiveView();
+}
+
+/* Clone the active deck under a new id with " (copie)" appended to
+ * the name. Commanders + cards are deep-copied so editing the clone
+ * doesn't mutate the original; the new id is a timestamp suffix
+ * (sufficient — id collisions would require sub-millisecond clicks
+ * on the same machine, and findDeck would just return the first
+ * match in that improbable case). */
+function duplicateCurrentDeck() {
+  const def = findDeck(state.currentDeckId);
+  if (!def) return;
+  const clone = {
+    id: `${def.id}-copy-${Date.now()}`,
+    name: `${def.name} (copie)`,
+    format: def.format,
+    commanders: def.commanders.map((c) => ({ ...c })),
+    cards: def.cards.map((c) => ({ ...c })),
+  };
+  if (def.description) clone.description = def.description;
+  const result = window.sync.commitDeck(clone);
+  if (!result.ok) {
+    setStatus("Échec de la duplication (localStorage indisponible).", "error");
+    return;
+  }
+  populateDeckSelect();
+  /* switchDeck calls refreshDeckDropdownActive which moves
+   * `aria-current` to the clone's row — no need to pre-set
+   * state.currentDeckId here. */
+  switchDeck(clone.id);
+  flash(`Deck "${clone.name}" créé`, "success");
 }
 
 // ============================================================
@@ -624,10 +672,20 @@ function closeImportPanel() { closeIeModal(); }
 /* Import / Export modal — separate from the card-preview modal
  * because it owns editable content (textarea). Closed only by the
  * X button or Escape — backdrop clicks are intentionally ignored
- * so an accidental click outside doesn't wipe a pasted decklist. */
-function openIeModal(initialTab = "import") {
+ * so an accidental click outside doesn't wipe a pasted decklist.
+ *
+ * Single-panel modal: each entry point (deck-pill "Importer une
+ * liste" / manage kebab "Exporter") picks which panel to show. The
+ * dual-tab UI was dropped because the inactive tab was always noise
+ * — the user is committed to one operation per modal open. The
+ * title doubles as the context indicator. */
+function openIeModal(mode = "import") {
   state.focusBeforeModal = document.activeElement;
-  switchIeTab(initialTab);
+  const isImport = mode === "import";
+  els.ieModalTitle.textContent = isImport ? "Importer une liste" : "Exporter le deck";
+  els.iePanelImport.hidden = !isImport;
+  els.iePanelExport.hidden = isImport;
+  if (!isImport) setupExportPanel();
   els.ieModal.hidden = false;
   els.ieModal.classList.add("open");
   els.ieModal.focus();
@@ -640,19 +698,6 @@ function closeIeModal() {
     state.focusBeforeModal.focus();
   }
   state.focusBeforeModal = null;
-}
-
-function switchIeTab(tab) {
-  const isImport = tab === "import";
-  els.ieTabImport.classList.toggle("active", isImport);
-  els.ieTabExport.classList.toggle("active", !isImport);
-  els.ieTabImport.setAttribute("aria-selected", String(isImport));
-  els.ieTabExport.setAttribute("aria-selected", String(!isImport));
-  els.iePanelImport.hidden = !isImport;
-  els.iePanelExport.hidden = isImport;
-  if (!isImport) {
-    setupExportPanel();
-  }
 }
 
 /* (Re)populate the format select on first open, then render the
@@ -982,16 +1027,27 @@ function bindEvents() {
   els.tabGallery.addEventListener("click", () => switchView("gallery"));
   els.langSwitchEn.addEventListener("click", () => setManageLanguage("en"));
   els.langSwitchFr.addEventListener("click", () => setManageLanguage("fr"));
-  els.formatSelect.addEventListener("change", (e) => setDeckFormat(e.target.value));
+  /* Format edit dropdown: trigger toggles the menu, each item sets the
+   * deck format. setupDropdown handles outside-click, Escape, and the
+   * aria-expanded sync on the trigger. */
+  const formatDropdown = setupDropdown({
+    trigger: els.formatTrigger,
+    menu: els.formatMenu,
+  });
+  els.formatMenu.addEventListener("click", (e) => {
+    const item = e.target.closest("[data-format]");
+    if (!item) return;
+    setDeckFormat(item.dataset.format);
+    if (formatDropdown) formatDropdown.close();
+  });
   els.btnDraw.addEventListener("click", drawOne);
   els.btnNextTurn.addEventListener("click", advanceTurn);
   els.btnNew.addEventListener("click", startNewGame);
   els.btnDeleteDeck.addEventListener("click", deleteCurrentDeck);
+  els.btnDuplicateDeck.addEventListener("click", duplicateCurrentDeck);
   els.btnImportToggle.addEventListener("click", openImportPanel);
   els.btnExport.addEventListener("click", () => openIeModal("export"));
   els.ieModalClose.addEventListener("click", closeIeModal);
-  els.ieTabImport.addEventListener("click", () => switchIeTab("import"));
-  els.ieTabExport.addEventListener("click", () => switchIeTab("export"));
   els.exportFormat.addEventListener("change", refreshExportOutput);
   els.exportCopy.addEventListener("click", onExportCopy);
   els.exportDownload.addEventListener("click", onExportDownload);
@@ -1000,17 +1056,60 @@ function bindEvents() {
   els.importText.addEventListener("input", refreshImportPreview);
   els.deckSelect.addEventListener("change", (e) => switchDeck(e.target.value));
 
-  /* Manage view deck-summary actions: "Lancer une partie" jumps to
-   * the play view and restarts the game on the current deck;
-   * "Pioche test" just redraws the opening hand without leaving
-   * the manage view. */
+  /* Manage view deck-summary "Lancer une partie" — switches to the
+   * play view and restarts the game on the current deck. The former
+   * "Pioche test" button was dropped: it called startNewGame()
+   * without switching view, so the user redrew a hand they couldn't
+   * see (the hand lives on the play view). */
   const btnPlayDeck = document.getElementById("btn-play-deck");
-  const btnTestDraw = document.getElementById("btn-test-draw");
   if (btnPlayDeck) btnPlayDeck.addEventListener("click", () => {
     switchView("play");
     startNewGame();
   });
-  if (btnTestDraw) btnTestDraw.addEventListener("click", () => startNewGame());
+
+  /* Kebab menu (⋮) — holds Renommer + Dupliquer + Exporter + Supprimer
+   * + future deck-level actions. setupDropdown wires open/close/
+   * outside-click/Escape. */
+  const kebabTrigger = document.getElementById("btn-deck-kebab");
+  const kebabMenu = document.getElementById("deck-kebab-menu");
+  const kebabDropdown = setupDropdown({ trigger: kebabTrigger, menu: kebabMenu });
+  /* Close the menu after picking any action — same pattern as the
+   * header deck-pill dropdown's import/delete handlers. */
+  if (kebabDropdown) {
+    kebabMenu.addEventListener("click", (e) => {
+      if (e.target.closest(".dropdown-item")) kebabDropdown.close();
+    });
+  }
+  /* Inline rename: kebab "Renommer" → swap h1 for an input.
+   * Enter / blur commits, Escape cancels. The blur handler is
+   * registered on the input itself; we use `e.preventDefault` on
+   * Enter so the input doesn't submit a form. */
+  const btnRenameDeck = document.getElementById("btn-rename-deck");
+  const renameInput = document.getElementById("manage-deck-name-input");
+  if (btnRenameDeck) btnRenameDeck.addEventListener("click", () => startRenameDeck());
+  if (renameInput) {
+    renameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); endRenameDeck(true); }
+      else if (e.key === "Escape") { e.preventDefault(); endRenameDeck(false); }
+    });
+    renameInput.addEventListener("blur", () => endRenameDeck(true));
+  }
+
+  /* Inline description: click on the description text → swap to a
+   * textarea + Save/Cancel buttons. Escape also cancels (same as
+   * Annuler). Save persists via commitDeckChange. */
+  const descDisplay = document.getElementById("manage-deck-description");
+  const descInput = document.getElementById("manage-deck-description-input");
+  const descSave = document.getElementById("btn-description-save");
+  const descCancel = document.getElementById("btn-description-cancel");
+  if (descDisplay) descDisplay.addEventListener("click", () => startEditDescription());
+  if (descSave) descSave.addEventListener("click", () => endEditDescription(true));
+  if (descCancel) descCancel.addEventListener("click", () => endEditDescription(false));
+  if (descInput) {
+    descInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); endEditDescription(false); }
+    });
+  }
 
   /* Header deck-pill dropdown setup lives in app-header.js. */
   setupHeaderDropdown();
@@ -1156,6 +1255,28 @@ function init() {
         clearActiveView();
       }
     });
+    /* Queue change observer — refreshes the manage deck-summary's
+     * sync indicator from "Sync en attente (N)" to "Synchronisé"
+     * (or back) every time the pending-write queue changes. Without
+     * this the indicator would stay stuck on its initial render. */
+    if (typeof window.sync.onQueueChange === "function") {
+      window.sync.onQueueChange(() => {
+        if (typeof renderDeckSummary !== "function") return;
+        renderDeckSummary(findDeck(state.currentDeckId) || null);
+      });
+    }
+    /* Online/offline transitions don't fire onQueueChange (the
+     * queue itself doesn't mutate) but the sync indicator depends
+     * on `navigator.onLine`. Re-render so the "Hors-ligne" pill
+     * appears / disappears in lock-step with the connection state.
+     * sync.js's own `online` listener triggers a drain in parallel
+     * — that handles the recovery path. */
+    const reRenderSummary = () => {
+      if (typeof renderDeckSummary !== "function") return;
+      renderDeckSummary(findDeck(state.currentDeckId) || null);
+    };
+    window.addEventListener("offline", reRenderSummary);
+    window.addEventListener("online", reRenderSummary);
   });
 }
 

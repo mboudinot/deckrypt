@@ -51,7 +51,10 @@ test("count rule reads '100 cartes' on a conformant deck", async ({ page }) => {
 
 test("switching to format libre falls back to the free-format placeholder", async ({ page }) => {
   await page.click("#tab-manage");
-  await page.locator('#manage-format-select').selectOption("limited");
+  /* Format edit moved from a <select> to a click-dropdown in the
+   * deck-summary's meta-row (mockup-aligned, May 2026). */
+  await page.click("#manage-deck-format-trigger");
+  await page.click('#manage-deck-format-menu [data-format="limited"]');
   await page.click("#tab-analyze");
   await expect(page.locator("#analyze-legality")).toContainText(/Format libre/);
   // No per-rule rows in libre mode.

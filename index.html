@@ -14,14 +14,17 @@
        img-src + googleusercontent - user avatar from Google login
      Google Fonts additions:
        style-src + fonts.googleapis.com - CSS for Inter, Fraunces, JetBrains Mono
-       font-src  + fonts.gstatic.com    - the woff2 files themselves -->
+       font-src  + fonts.gstatic.com    - the woff2 files themselves
+     img-src + data: — inline SVG chevrons in CSS background-image
+       (select fields, dropdown triggers). Without this the browser
+       blocks the data: URI and the chevron disappears silently. -->
 <!-- `frame-ancestors` is intentionally NOT in this meta CSP: the
      directive is spec'd to work only via an HTTP response header
      (per the CSP spec) and the browser warns when it sees it in a
      <meta>. Static GitHub Pages can't set custom headers, so true
      clickjacking protection would require a server in front. Left
      out to keep the console clean. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src https://api.scryfall.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src https://api.scryfall.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none';">
 <meta name="referrer" content="no-referrer">
 <title>Deckrypt</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -62,6 +65,7 @@
 <script defer src="js/app-gallery.js"></script>
 <script defer src="js/app-login.js"></script>
 <script defer src="js/app-settings.js"></script>
+<script defer src="js/confirm-dialog.js"></script>
 <script defer src="js/app-header.js"></script>
 <script defer src="js/app.js"></script>
 <script type="module" src="js/sync.js"></script>
@@ -128,15 +132,6 @@
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
             Importer une liste
-          </button>
-          <button type="button" id="btn-delete-deck" class="dropdown-item danger" role="menuitem" hidden>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-              <line x1="10" y1="11" x2="10" y2="17"/>
-              <line x1="14" y1="11" x2="14" y2="17"/>
-            </svg>
-            Supprimer ce deck
           </button>
         </div>
         <!-- Hidden mirror of the deck selection — kept so existing JS
@@ -324,20 +319,60 @@
       <div class="manage-layout">
         <main class="manage-main">
 
-          <!-- Deck summary header — commander art + name + meta + actions -->
+          <!-- Deck summary header — commander art + name + meta + tags + actions.
+               Layout mirrors claude.design view-manage.jsx <ManageView.deck-summary>:
+               h1 + meta-row + tags-row + actions-row.
+               The format label in meta-row is a button (click → dropdown to switch
+               Commander ↔ Format libre). Trash + Dupliquer in the actions row are
+               new — Trash moved from the header deck-pill dropdown. -->
           <header class="deck-summary panel">
-            <div class="deck-art">
-              <img id="manage-deck-art" alt="" loading="lazy">
-            </div>
+            <!-- Commander art panel. Populated by renderDeckSummary
+                 with one <img> for solo commanders OR N stacked <img>s
+                 for partner/partners-with decks. The container drives
+                 the portrait card shape; each child fills 1/N of the
+                 height via flex. -->
+            <div id="manage-deck-art" class="deck-art"></div>
             <div class="deck-summary-body">
               <h1 id="manage-deck-name">—</h1>
+              <!-- Inline rename input. Hidden by default; shown when
+                   the user picks "Renommer" in the kebab menu. Same
+                   geometry as the h1 so the swap is invisible — see
+                   the .deck-summary-name-input rule in views.css. -->
+              <input id="manage-deck-name-input" class="deck-summary-name-input" type="text" maxlength="80" autocomplete="off" hidden aria-label="Nom du deck">
+              <!-- Description: click-to-edit text under the title.
+                   Read mode = <button> with text or italic placeholder.
+                   Edit mode = textarea + Annuler / Sauvegarder. The
+                   button-as-paragraph is for a11y (proper focusable
+                   click target) — styled flat in views.css. -->
+              <button id="manage-deck-description" type="button" class="deck-description">
+                Ajoute une description (mulligan rule, win con, notes de testing…)
+              </button>
+              <div id="manage-deck-description-editor" class="deck-description-editor" hidden>
+                <textarea id="manage-deck-description-input" maxlength="2000" rows="4" aria-label="Description du deck"></textarea>
+                <div class="deck-description-actions">
+                  <button id="btn-description-cancel" type="button" class="btn btn-sm">Annuler</button>
+                  <button id="btn-description-save" type="button" class="btn btn-sm primary">Sauvegarder</button>
+                </div>
+              </div>
+
               <div class="deck-meta-row">
                 <span class="color-pips" id="manage-deck-pips" aria-hidden="true"></span>
-                <span class="deck-meta-sep" aria-hidden="true">·</span>
-                <span><strong id="manage-deck-format-label">Commander</strong></span>
-                <span class="deck-meta-sep" aria-hidden="true">·</span>
+                <span class="deck-meta-sep" aria-hidden="true"></span>
+                <!-- Format text is a button that opens a small dropdown to switch.
+                     Kept as <strong> visually via the .meta-edit-trigger class. -->
+                <span class="meta-edit">
+                  <button id="manage-deck-format-trigger" type="button" class="meta-edit-trigger" aria-haspopup="menu" aria-expanded="false">
+                    <strong id="manage-deck-format-label">Commander</strong>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  <div id="manage-deck-format-menu" class="dropdown-menu meta-edit-menu" role="menu" hidden>
+                    <button type="button" class="dropdown-item" role="menuitem" data-format="commander">Commander</button>
+                    <button type="button" class="dropdown-item" role="menuitem" data-format="limited">Format libre</button>
+                  </div>
+                </span>
+                <span class="deck-meta-sep" aria-hidden="true"></span>
                 <span><strong class="num" id="manage-deck-size">0</strong> cartes</span>
-                <span class="deck-meta-sep" aria-hidden="true">·</span>
+                <span class="deck-meta-sep" aria-hidden="true"></span>
                 <span id="manage-deck-archetype">—</span>
               </div>
               <!-- Hidden mirror for legacy JS that writes the old summary
@@ -346,42 +381,60 @@
                    .deck-meta-row above. -->
               <div id="manage-meta" hidden aria-hidden="true"></div>
               <div class="deck-summary-tags">
-                <label class="deck-summary-format">
-                  <span class="label">Format</span>
-                  <select id="manage-format-select" class="select-field">
-                    <option value="commander">Commander</option>
-                    <option value="limited">Format libre (40+ cartes)</option>
-                  </select>
-                </label>
-                <div class="lang-switch" role="radiogroup" aria-label="Langue d'affichage des cartes">
-                  <button id="lang-switch-en" type="button" class="active" aria-pressed="true">EN</button>
-                  <button id="lang-switch-fr" type="button" aria-pressed="false">FR</button>
-                </div>
+                <span id="manage-deck-bracket" class="bracket-badge" hidden>
+                  <span class="bracket-badge-num" id="manage-deck-bracket-num">—</span>
+                  <span id="manage-deck-bracket-label">—</span>
+                </span>
+                <span id="manage-deck-count-tag" class="tag" hidden>—</span>
+                <span id="manage-deck-rl-tag" class="tag" hidden>Reserved List : <span id="manage-deck-rl-count">0</span></span>
+                <span id="manage-deck-sync-tag" class="tag deck-sync-tag" hidden>
+                  <span class="deck-sync-dot" aria-hidden="true"></span>
+                  <span id="manage-deck-sync-label">Synchronisé</span>
+                </span>
               </div>
               <div class="deck-summary-actions">
                 <button id="btn-play-deck" type="button" class="btn primary btn-sm">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                   Lancer une partie
                 </button>
-                <button id="btn-test-draw" type="button" class="btn btn-sm">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <polyline points="16 3 21 3 21 8"/>
-                    <line x1="4" y1="20" x2="21" y2="3"/>
-                    <polyline points="21 16 21 21 16 21"/>
-                    <line x1="15" y1="15" x2="21" y2="21"/>
-                    <line x1="4" y1="4" x2="9" y2="9"/>
-                  </svg>
-                  Pioche test
-                </button>
-                <button id="btn-export" type="button" class="btn btn-sm">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                  Exporter
-                </button>
               </div>
+            </div>
+            <!-- Kebab menu (⋮) in the top-right corner — holds every
+                 meta deck-level action (Dupliquer, Exporter, Supprimer,
+                 future Renommer/Archiver). The actions row is reserved
+                 for the single primary work-loop action (Play). Pulling
+                 Exporter in here too keeps the visible UI focused on
+                 "what am I doing right now" vs "what can I do with
+                 this deck globally". -->
+            <button id="btn-deck-kebab" type="button" class="kebab-trigger" aria-haspopup="menu" aria-expanded="false" aria-label="Plus d'actions">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>
+              </svg>
+            </button>
+            <div id="deck-kebab-menu" class="dropdown-menu kebab-menu" role="menu" hidden>
+              <button id="btn-rename-deck" type="button" class="dropdown-item" role="menuitem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Renommer
+              </button>
+              <button id="btn-duplicate-deck" type="button" class="dropdown-item" role="menuitem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Dupliquer
+              </button>
+              <button id="btn-export" type="button" class="dropdown-item" role="menuitem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Exporter
+              </button>
+              <button id="btn-delete-deck-summary" type="button" class="dropdown-item danger" role="menuitem">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                Supprimer ce deck
+              </button>
             </div>
           </header>
 
@@ -442,6 +495,14 @@
             <div class="panel-head">
               <h3>Cartes</h3>
               <span class="panel-meta"><strong class="num" id="manage-cards-count">—</strong></span>
+              <!-- Lang switch lives here, in the panel that owns the card
+                   list it filters (moved from the deck-summary block to
+                   match the claude.design layout). EN/FR drives card-name
+                   display in this panel + the commanders panel above. -->
+              <div class="lang-switch panel-head-action" role="radiogroup" aria-label="Langue d'affichage des cartes">
+                <button id="lang-switch-en" type="button" class="active" aria-pressed="true">EN</button>
+                <button id="lang-switch-fr" type="button" aria-pressed="false">FR</button>
+              </div>
             </div>
             <div class="manage-cards" id="manage-cards"></div>
           </section>
@@ -577,13 +638,15 @@
 <div class="ie-modal" id="ie-modal" role="dialog" aria-modal="true" aria-labelledby="ie-modal-title" tabindex="-1" hidden>
   <div class="ie-modal-content">
     <button id="ie-modal-close" class="ie-modal-close" type="button" aria-label="Fermer">×</button>
-    <h2 id="ie-modal-title" class="ie-modal-title">Decks</h2>
-    <div class="ie-tabs" role="tablist">
-      <button id="ie-tab-import" type="button" class="ie-tab active" role="tab" aria-selected="true">Importer</button>
-      <button id="ie-tab-export" type="button" class="ie-tab" role="tab" aria-selected="false">Exporter</button>
-    </div>
+    <!-- Title doubles as context indicator: "Importer une liste" when
+         entered via the deck-pill, "Exporter le deck" when entered
+         via the manage kebab. The dual-tab UI was dropped May 2026
+         because each entry point only needs one panel — the other
+         tab was always irrelevant noise + caused modal overflow on
+         shorter viewports. -->
+    <h2 id="ie-modal-title" class="ie-modal-title">Importer une liste</h2>
 
-    <div class="ie-panel" id="ie-panel-import" role="tabpanel" aria-labelledby="ie-tab-import">
+    <div class="ie-panel" id="ie-panel-import" role="region" aria-labelledby="ie-modal-title">
       <label for="import-name" class="sr-only">Nom du deck</label>
       <input id="import-name" type="text" placeholder="Nom du deck (ex: Meren EDH)">
       <label for="import-text" class="sr-only">Liste de cartes</label>
@@ -598,22 +661,38 @@
 ..."></textarea>
       <div class="import-preview" id="import-preview" aria-live="polite">Colle une liste pour voir le récap.</div>
       <div class="import-actions">
-        <button id="import-cancel" type="button">Annuler</button>
-        <button id="import-confirm" type="button" class="primary" disabled>Importer</button>
+        <button id="import-cancel" type="button" class="btn">Annuler</button>
+        <button id="import-confirm" type="button" class="btn primary" disabled>Importer</button>
       </div>
     </div>
 
-    <div class="ie-panel" id="ie-panel-export" role="tabpanel" aria-labelledby="ie-tab-export" hidden>
+    <div class="ie-panel" id="ie-panel-export" role="region" aria-labelledby="ie-modal-title" hidden>
       <label for="export-format">Format</label>
       <select id="export-format"></select>
       <div class="export-description" id="export-description" aria-live="polite"></div>
       <label for="export-output" class="sr-only">Decklist exportée</label>
       <textarea id="export-output" readonly></textarea>
       <div class="export-actions">
-        <button id="export-copy" type="button" class="primary">Copier dans le presse-papier</button>
-        <button id="export-download" type="button">Télécharger</button>
+        <button id="export-copy" type="button" class="btn primary">Copier dans le presse-papier</button>
+        <button id="export-download" type="button" class="btn">Télécharger</button>
         <span class="export-feedback" id="export-feedback" aria-live="polite"></span>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reusable confirm dialog — replaces native confirm() for any
+     destructive op (deck delete today, more later). Controller in
+     js/confirm-dialog.js exposes window.confirmDialog({title,
+     message, confirmLabel, danger}) → Promise<boolean>. Markup kept
+     in index.html (like the other modals) for consistency. -->
+<div id="confirm-modal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" tabindex="-1" hidden>
+  <div class="confirm-modal-content">
+    <h2 id="confirm-modal-title" class="confirm-modal-title">Confirmation</h2>
+    <p id="confirm-modal-message" class="confirm-modal-message"></p>
+    <div class="confirm-modal-actions">
+      <button id="confirm-modal-cancel" type="button" class="btn">Annuler</button>
+      <button id="confirm-modal-ok" type="button" class="btn primary">Confirmer</button>
     </div>
   </div>
 </div>

@@ -70,9 +70,11 @@ test("Legality panel runs Commander checks for Commander-sized decks", async ({ 
 });
 
 test("Legality panel respects the deck.format selector (commander → limited)", async ({ page }) => {
-  // Switch the active deck's format from Commander to "Format libre".
+  // Switch the active deck's format from Commander to "Format libre"
+  // via the meta-row edit dropdown (replaces the previous <select>).
   await page.click("#tab-manage");
-  await page.locator("#manage-format-select").selectOption("limited");
+  await page.click("#manage-deck-format-trigger");
+  await page.click('#manage-deck-format-menu [data-format="limited"]');
 
   await page.click("#tab-analyze");
   // The panel now shows the format-libre placeholder, not the EDH rules.
@@ -90,9 +92,11 @@ test("Legality section is rendered above Orientation in the analyze view", async
 });
 
 test("Bracket panel renders a badge, label and methodology note", async ({ page }) => {
-  await expect(page.locator(".bracket-badge")).toBeVisible();
+  /* The analyze view's bracket is the large circle (.bracket-circle).
+   * The inline pill in the deck-summary uses .bracket-badge. */
+  await expect(page.locator("#analyze-bracket .bracket-circle")).toBeVisible();
   // The badge holds a single digit (1–4).
-  const badgeText = await page.locator(".bracket-badge").textContent();
+  const badgeText = await page.locator("#analyze-bracket .bracket-circle").textContent();
   expect(badgeText.trim()).toMatch(/^[1-5]$/);
   // The note explains the limitation (Scryfall doesn't expose every criterion).
   await expect(page.locator(".bracket-meta .note")).toContainText(/mass land destruction/i);

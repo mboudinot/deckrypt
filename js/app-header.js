@@ -148,8 +148,29 @@ function refreshDeckPill() {
   }
 }
 
+/* Toggle the entire deck-summary kebab menu's trigger based on
+ * whether a deck is loaded. With no deck, Dupliquer / Supprimer
+ * are both no-ops (handlers bail) — hiding the whole menu keeps
+ * the empty-state surface clean. The function name + the el ref
+ * stay as "DeleteButton" for historical callsite continuity. */
 function updateDeleteButton() {
-  els.btnDeleteDeck.hidden = !findDeck(state.currentDeckId);
+  const kebab = document.getElementById("btn-deck-kebab");
+  if (kebab) kebab.hidden = !findDeck(state.currentDeckId);
+}
+
+/* Move `aria-current="true"` to whichever dropdown item matches the
+ * active deck. Cheap walk over already-built DOM — used after every
+ * switchDeck so the highlight follows the user's selection without
+ * rebuilding the whole menu (which would lose focus state). */
+function refreshDeckDropdownActive() {
+  if (!els.deckDropdownList) return;
+  for (const btn of els.deckDropdownList.querySelectorAll(".dropdown-item")) {
+    if (btn.dataset.deckId === state.currentDeckId) {
+      btn.setAttribute("aria-current", "true");
+    } else {
+      btn.removeAttribute("aria-current");
+    }
+  }
 }
 
 /* Wire the header deck-pill dropdown via the shared setupDropdown

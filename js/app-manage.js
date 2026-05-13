@@ -91,6 +91,119 @@ async function ensureFrenchTranslationsForCurrentDeck() {
   if (state.manageLang === "fr" && !els.viewManage.hidden) renderManageView();
 }
 
+/* Inline rename for the active deck. Triggered by the kebab menu's
+ * "Renommer" item — swaps the h1 for an input, focuses + selects
+ * the current name, and commits on Enter / blur (Escape cancels).
+ *
+ * State machine guarded by `renameInProgress` so the blur handler
+ * that fires AFTER an Enter commit doesn't run a second time on
+ * the now-empty input. */
+let renameInProgress = false;
+
+function startRenameDeck() {
+  const def = findDeck(state.currentDeckId);
+  if (!def) return;
+  const h1 = document.getElementById("manage-deck-name");
+  const input = document.getElementById("manage-deck-name-input");
+  if (!h1 || !input) return;
+  renameInProgress = true;
+  input.value = def.name;
+  h1.hidden = true;
+  input.hidden = false;
+  /* requestAnimationFrame: focus + select after the input becomes
+   * visible — focusing on `display:none` is a silent no-op. */
+  requestAnimationFrame(() => {
+    input.focus();
+    input.select();
+  });
+}
+
+/* Description: click-to-edit, textarea + Save/Cancel buttons. Same
+ * state-machine pattern as the rename flow — `descEditInProgress`
+ * guards against the blur/double-fire race when Save is clicked. */
+let descEditInProgress = false;
+const DESCRIPTION_PLACEHOLDER = "Ajoute une description (mulligan rule, win con, notes de testing…)";
+
+function refreshDeckDescription(def) {
+  const display = document.getElementById("manage-deck-description");
+  if (!display) return;
+  const desc = (def?.description || "").trim();
+  if (desc) {
+    display.textContent = desc;
+    display.classList.remove("is-empty");
+  } else {
+    display.textContent = DESCRIPTION_PLACEHOLDER;
+    display.classList.add("is-empty");
+  }
+}
+
+function startEditDescription() {
+  const def = findDeck(state.currentDeckId);
+  if (!def) return;
+  const display = document.getElementById("manage-deck-description");
+  const editor = document.getElementById("manage-deck-description-editor");
+  const input = document.getElementById("manage-deck-description-input");
+  if (!display || !editor || !input) return;
+  descEditInProgress = true;
+  input.value = def.description || "";
+  display.hidden = true;
+  editor.hidden = false;
+  /* requestAnimationFrame because focusing on a still-hidden element
+   * is a silent no-op. Cursor at end > select-all because edits tend
+   * to be appends, not full replacements. */
+  requestAnimationFrame(() => {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
+function endEditDescription(save) {
+  if (!descEditInProgress) return;
+  descEditInProgress = false;
+  const display = document.getElementById("manage-deck-description");
+  const editor = document.getElementById("manage-deck-description-editor");
+  const input = document.getElementById("manage-deck-description-input");
+  if (!display || !editor || !input) return;
+  if (save) {
+    const def = findDeck(state.currentDeckId);
+    const newDesc = input.value.trim();
+    const current = (def?.description || "").trim();
+    if (def && newDesc !== current) {
+      if (newDesc) def.description = newDesc;
+      else delete def.description;
+      commitDeckChange(def);
+    }
+  }
+  editor.hidden = true;
+  display.hidden = false;
+  refreshDeckDescription(findDeck(state.currentDeckId));
+}
+
+function endRenameDeck(save) {
+  if (!renameInProgress) return;
+  renameInProgress = false;
+  const h1 = document.getElementById("manage-deck-name");
+  const input = document.getElementById("manage-deck-name-input");
+  if (!h1 || !input) return;
+  if (save) {
+    const def = findDeck(state.currentDeckId);
+    const newName = input.value.trim();
+    if (def && newName && newName !== def.name) {
+      def.name = newName;
+      if (commitDeckChange(def)) {
+        /* Refresh every surface that displays the name: deck-pill +
+         * dropdown labels (populateDeckSelect) and the manage view's
+         * h1 + meta (renderDeckSummary). commitDeckChange already
+         * updated localStorage + state.resolved.def. */
+        populateDeckSelect();
+        renderDeckSummary(def);
+      }
+    }
+  }
+  input.hidden = true;
+  h1.hidden = false;
+}
+
 /* Persist a format change (Commander / Format libre) on the active
  * deck and refresh the views that depend on it (the manage view's
  * selector display + the analyze view's legality and suggestions). */
@@ -232,9 +345,9 @@ function renderManageView(ctx = null) {
   els.manageMeta.textContent =
     `${pluralFr(def.commanders.length, "commandant")} · ${totalCards} cartes principales`;
   els.manageCardsCount.textContent = `${pluralFr(def.cards.length, "ligne")} (${totalCards} au total)`;
-  // Format selector: explicit field on the deck, fallback to commander
-  // for legacy decks saved before the field existed.
-  els.formatSelect.value = def.format || "commander";
+  /* Format edit no longer uses a <select> — the deck-summary's
+   * #manage-deck-format-label is set by renderDeckSummary below from
+   * def.format, and clicking it opens a dropdown to switch. */
 
   /* Deck summary header (commander art + meta + actions) and the
    * side panel (composition + bracket). These depend on
@@ -845,33 +958,58 @@ function renderDeckSummary(def) {
   const archEl = document.getElementById("manage-deck-archetype");
   if (!artEl) return; // legacy markup, refonte not applied
 
+  /* Tags row elements — kept hidden when there's nothing meaningful to
+   * surface (no deck, no resolved data) so we don't paint empty pills. */
+  const bracketEl = document.getElementById("manage-deck-bracket");
+  const bracketNumEl = document.getElementById("manage-deck-bracket-num");
+  const bracketLabelEl = document.getElementById("manage-deck-bracket-label");
+  const countTagEl = document.getElementById("manage-deck-count-tag");
+  const rlTagEl = document.getElementById("manage-deck-rl-tag");
+  const rlCountEl = document.getElementById("manage-deck-rl-count");
+  const syncTagEl = document.getElementById("manage-deck-sync-tag");
+  const syncLabelEl = document.getElementById("manage-deck-sync-label");
+
   if (!def) {
-    artEl.removeAttribute("src");
-    artEl.alt = "";
+    artEl.replaceChildren();
     nameEl.textContent = "—";
+    refreshDeckDescription(null);
     formatEl.textContent = "—";
     sizeEl.textContent = "0";
     pipsEl.replaceChildren();
     archEl.textContent = "—";
+    if (bracketEl) bracketEl.hidden = true;
+    if (countTagEl) countTagEl.hidden = true;
+    if (rlTagEl) rlTagEl.hidden = true;
+    if (syncTagEl) syncTagEl.hidden = true;
     return;
   }
   nameEl.textContent = def.name;
+  refreshDeckDescription(def);
   formatEl.textContent = (def.format === "limited") ? "Format libre" : "Commander";
   const total = (def.commanders?.length || 0) + def.cards.reduce((s, c) => s + (c.qty || 0), 0);
   sizeEl.textContent = String(total);
 
-  /* Commander art: prefer normal, fall back to faces[0] for DFCs. */
-  const cmdr = state.resolved && state.resolved.commanders && state.resolved.commanders[0];
-  const artUrl = cmdr && (
-    (cmdr.image_uris && cmdr.image_uris.normal)
-    || (cmdr.card_faces && cmdr.card_faces[0] && cmdr.card_faces[0].image_uris && cmdr.card_faces[0].image_uris.normal)
-  );
-  if (artUrl) {
-    artEl.src = artUrl;
-    artEl.alt = cmdr.name || "";
-  } else {
-    artEl.removeAttribute("src");
-    artEl.alt = "";
+  /* Commander art: prefer `art_crop` (Scryfall's illustration-only
+   * crop — no card frame, name, or text box) for a clean "visual"
+   * effect matching the mockup. Fall back to `normal` when art_crop
+   * isn't on the cached object (older cache entries) or to the
+   * front face for double-faced cards.
+   *
+   * Partner / partners-with decks: render ONE <img> per commander,
+   * stacked vertically (CSS handles the equal split via flex).
+   * Sultai (Ukkima + Cazur) is the canonical 2-commander case. */
+  const pickArt = (uris) => uris && (uris.art_crop || uris.normal);
+  const commanders = (state.resolved && state.resolved.commanders) || [];
+  artEl.replaceChildren();
+  for (const cmdr of commanders) {
+    const url = pickArt(cmdr.image_uris)
+      || (cmdr.card_faces && cmdr.card_faces[0] && pickArt(cmdr.card_faces[0].image_uris));
+    if (!url) continue;
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = cmdr.name || "";
+    img.loading = "lazy";
+    artEl.appendChild(img);
   }
 
   /* Color pips: union of commanders' color_identity. */
@@ -898,6 +1036,115 @@ function renderDeckSummary(def) {
     if (top) archLabel = top.label;
   }
   archEl.textContent = archLabel;
+
+  /* === Tags row (bracket / count / RL / sync) ============================
+   * All four tags depend on different signals and degrade gracefully:
+   *   - bracket : needs state.resolved (Scryfall data on every card).
+   *   - count   : works from def alone, always shown.
+   *   - RL      : needs state.resolved (Scryfall's `reserved` flag).
+   *   - sync    : reads window.sync.currentUser + the pending queue.
+   * Anything that lacks its signal is hidden rather than showing "—". */
+  if (countTagEl) {
+    const cmdrCount = def.commanders?.length || 0;
+    const deckCount = def.cards.reduce((s, c) => s + (c.qty || 0), 0);
+    const target = (def.format === "limited") ? 40 : 99;
+    countTagEl.textContent = cmdrCount > 0
+      ? `${deckCount} + ${cmdrCount} commandant${cmdrCount > 1 ? "s" : ""}`
+      : `${deckCount} / ${target}`;
+    countTagEl.hidden = false;
+  }
+  if (bracketEl && state.resolved && typeof bracketEstimate === "function") {
+    const allCards = [...state.resolved.commanders, ...state.resolved.deck];
+    const b = bracketEstimate(allCards);
+    bracketNumEl.textContent = String(b.minBracket);
+    bracketLabelEl.textContent = b.label;
+    bracketEl.hidden = false;
+  } else if (bracketEl) {
+    bracketEl.hidden = true;
+  }
+  if (rlTagEl && state.resolved) {
+    /* Reserved List: Scryfall flags each card with `reserved:true` when
+     * it's on Wizards' reserved list. We count distinct printings — the
+     * user cares about how many lines are RL, not the expanded total. */
+    const rlCount = (state.resolved.deck || []).filter((c) => c && c.reserved === true).length
+      + (state.resolved.commanders || []).filter((c) => c && c.reserved === true).length;
+    if (rlCount > 0) {
+      rlCountEl.textContent = String(rlCount);
+      rlTagEl.hidden = false;
+    } else {
+      rlTagEl.hidden = true;
+    }
+  } else if (rlTagEl) {
+    rlTagEl.hidden = true;
+  }
+  if (syncTagEl) refreshSyncTag(syncTagEl, syncLabelEl);
+}
+
+/* Sync indicator state machine — negative-space design: the tag is
+ * HIDDEN by default and surfaces only when there's something the
+ * user can act on (or worry about). Two cases trigger it:
+ *
+ *   offline → "Hors-ligne" (grey dot). Immediate.
+ *   queue non-empty for ≥ 3 s → "Sync en attente (N)" (amber dot).
+ *
+ * The 3 s grace period suppresses the brief flash that happens on
+ * every normal save (queue grows then drains in < 1 s in test mode,
+ * < 500 ms in prod). Without the grace the tag would blink amber
+ * on every keystroke — noisy and not actionable.
+ *
+ * Module-level state tracks "when did the queue become non-empty?"
+ * so we can compute elapsed time on each render. A setTimeout
+ * re-triggers renderDeckSummary at the 3 s mark so the tag appears
+ * even without further queue mutations. */
+let syncPendingSinceTs = null;
+let syncPendingTimer = null;
+const SYNC_PENDING_GRACE_MS = 3000;
+
+function refreshSyncTag(tag, label) {
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const user = window.sync?.currentUser?.();
+  const queue = (user && window.syncQueue?.readQueue) ? window.syncQueue.readQueue(user.uid) : [];
+
+  /* Reset visual classes — caller can decide which (if any) to add. */
+  tag.classList.remove("is-pending", "is-offline");
+
+  if (offline) {
+    tag.classList.add("is-offline");
+    label.textContent = "Hors-ligne";
+    tag.hidden = false;
+    return;
+  }
+  if (queue.length === 0) {
+    /* Happy path: queue is empty → silence. Clear any pending grace
+     * timer so a future enqueue starts a fresh window. */
+    syncPendingSinceTs = null;
+    if (syncPendingTimer) {
+      clearTimeout(syncPendingTimer);
+      syncPendingTimer = null;
+    }
+    tag.hidden = true;
+    return;
+  }
+  /* Queue non-empty: figure out how long it's been so. */
+  if (syncPendingSinceTs === null) syncPendingSinceTs = Date.now();
+  const elapsed = Date.now() - syncPendingSinceTs;
+  if (elapsed >= SYNC_PENDING_GRACE_MS) {
+    tag.classList.add("is-pending");
+    label.textContent = `Sync en attente (${queue.length})`;
+    tag.hidden = false;
+    return;
+  }
+  /* Within the grace period — stay silent. Schedule a re-check at
+   * the exact moment the grace expires; if the queue drains before
+   * then, the next renderDeckSummary will reset the timer. */
+  tag.hidden = true;
+  if (!syncPendingTimer) {
+    syncPendingTimer = setTimeout(() => {
+      syncPendingTimer = null;
+      const def = findDeck(state.currentDeckId);
+      if (def) renderDeckSummary(def);
+    }, SYNC_PENDING_GRACE_MS - elapsed);
+  }
 }
 
 function renderSideComposition() {

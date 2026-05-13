@@ -62,14 +62,15 @@ test("clicking the deck pill toggles its dropdown menu", async ({ page }) => {
   await expect(page.locator("#deck-dropdown-menu")).toBeHidden();
 });
 
-test("deck dropdown lists every deck + has Import + Delete actions", async ({ page }) => {
+test("deck dropdown lists every deck + has Import action", async ({ page }) => {
   await page.click("#btn-deck-pill");
   /* The dropdown's deck list has one button per deck. */
   const deckButtons = page.locator("#deck-dropdown-list .dropdown-item");
   expect(await deckButtons.count()).toBeGreaterThan(0);
-  /* Import + Delete affordances live inside the same menu. */
+  /* Import lives inside the same menu. Delete used to be here too,
+   * but moved to the Manage view's deck-summary panel as part of
+   * the refonte (matches the claude.design layout). */
   await expect(page.locator("#btn-import-toggle")).toBeVisible();
-  await expect(page.locator("#btn-delete-deck")).toBeVisible();
 });
 
 test("clicking outside the deck dropdown closes it", async ({ page }) => {

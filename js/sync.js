@@ -136,6 +136,25 @@ function onAuthChange(cb) {
   return () => authSubscribers.delete(cb);
 }
 
+/* Pending-queue change observers. Fires when the queue grows (an
+ * entry was enqueued via commitDeck/commitDeleteDeck) and when it
+ * shrinks (an entry was successfully drained to Firestore, or the
+ * queue was cleared on signOut). Callers don't get the queue
+ * contents — just a "something changed, re-check via readQueue if
+ * you care" signal. Used by the manage view's sync indicator to
+ * refresh from `Sync en attente (N)` to `Synchronisé` once the
+ * push actually lands. */
+const queueSubscribers = new Set();
+function onQueueChange(cb) {
+  queueSubscribers.add(cb);
+  return () => queueSubscribers.delete(cb);
+}
+function notifyQueueChange() {
+  for (const cb of queueSubscribers) {
+    try { cb(); } catch (e) { console.error("queue subscriber threw:", e); }
+  }
+}
+
 async function signInWithGoogle() {
   const result = await signInWithPopup(auth, new GoogleAuthProvider());
   return toUser(result.user);
@@ -161,6 +180,7 @@ async function signOut() {
   setSessionHint(false);
   if (uidToCleanup && window.syncQueue?.queueKeyForUid) {
     try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uidToCleanup)); } catch (e) {}
+    notifyQueueChange();
   }
   if (TEST_MODE) {
     /* In tests we skipped the Firebase Auth subscription, so we have
@@ -276,6 +296,7 @@ async function loadAllDecks() {
 function enqueueAndDrain(uid, entry) {
   const q = window.syncQueue.readQueue(uid);
   window.syncQueue.writeQueue(uid, window.syncQueue.dedupEnqueue(q, entry));
+  notifyQueueChange();
   void drainQueue();
 }
 
@@ -309,6 +330,7 @@ async function drainQueue() {
       }
       queue = queue.slice(1);
       window.syncQueue.writeQueue(uid, queue);
+      notifyQueueChange();
     }
   } finally {
     drainInFlight = false;
@@ -337,6 +359,8 @@ window.sync = {
   commitDeck,
   commitDeleteDeck,
   loadAllDecks,
+  /* Queue state observer (sync indicator in the manage view) */
+  onQueueChange,
   /* Manual queue control (debugging / migration UI) */
   drainQueue,
 };

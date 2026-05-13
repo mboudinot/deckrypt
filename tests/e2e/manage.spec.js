@@ -66,11 +66,14 @@ test("− and + buttons update qty live and persist via localStorage", async ({ 
 });
 
 test("removing the last deck shows the empty selector", async ({ page }) => {
-  // Switch back to play view to reach the delete button.
-  await page.click("#tab-play");
-  page.on("dialog", (d) => d.accept()); // confirm "Supprimer le deck"
-  await openDeckMenu(page);
-  await page.click("#btn-delete-deck");
+  /* Trash lives in the deck-summary's kebab menu (⋮) — open it
+   * first, then click the Supprimer item, then confirm in the
+   * dedicated confirm modal (replaced the native confirm() in
+   * May 2026). */
+  await page.click("#btn-deck-kebab");
+  await page.click("#btn-delete-deck-summary");
+  await expect(page.locator("#confirm-modal")).toBeVisible();
+  await page.click("#confirm-modal-ok");
   await expect(page.locator("#deck-select option")).toHaveCount(0);
 });
 

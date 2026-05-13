@@ -56,7 +56,7 @@ test("analyze view is pre-rendered before its first tab click (instant switch)",
   await page.locator("#commander-zone .card").first().waitFor();
   // Same idea for the analyze view — bracket and suggestions are
   // already populated even though the panel is hidden.
-  await expect(page.locator("#analyze-bracket .bracket-badge")).toBeAttached();
+  await expect(page.locator("#analyze-bracket .bracket-circle")).toBeAttached();
   await expect(page.locator("#analyze-suggestions .suggestion-row").first()).toBeAttached();
 });
 

@@ -309,7 +309,7 @@
   background: var(--surface-2);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 12px;
   font-family: inherit;
   font-size: 0.95rem;
@@ -391,7 +391,7 @@
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 6px 8px;
   font: inherit;
   font-size: 0.9rem;
@@ -415,7 +415,7 @@
   background: var(--surface-2);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 12px;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.85rem;
@@ -444,7 +444,11 @@
   align-items: center;
   gap: 16px;
 }
-.bracket-badge {
+/* Analyze view's bracket — large 64x64 circle anchoring the bracket
+ * section header. Originally named .bracket-badge; renamed when
+ * .bracket-badge was reclaimed for the inline pill variant used in
+ * the deck-summary panel (see below). */
+.bracket-circle {
   flex: 0 0 auto;
   width: 64px; height: 64px;
   border-radius: 50%;
@@ -1146,51 +1150,84 @@
   position: absolute;
   top: 10px;
   right: 12px;
+  /* Fixed square + flex-center the glyph: padding-based "centering"
+   * leaves the × visually off-center on hover because the glyph
+   * itself sits above its baseline. Same pattern as .login-close. */
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--text-muted);
   font-size: 1.6rem;
   line-height: 1;
-  padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 .ie-modal-close:hover:not(:disabled) {
   background: var(--surface-2);
   color: var(--text);
   border: none;
 }
-.ie-tabs {
-  display: flex;
-  gap: 4px;
-  background: var(--surface-2);
+/* Reusable confirm dialog. Same backdrop + content scaffolding as
+ * .ie-modal, narrower (450px) since the content is just title +
+ * one-line message + 2 buttons. The .danger variant on the confirm
+ * button uses the error palette — same as .dropdown-item.danger but
+ * applied to a button. */
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+  padding: 20px;
+}
+.confirm-modal.open { display: flex; }
+.confirm-modal[hidden] { display: none; }
+.confirm-modal-content {
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px;
-  align-self: flex-start;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: min(90vw, 450px);
+  padding: 22px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.ie-tab {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  padding: 6px 18px;
-  font-size: 0.9rem;
+.confirm-modal-title {
+  margin: 0;
+  font-size: 1.05rem;
   font-weight: 600;
-  border-radius: 999px;
-  cursor: pointer;
 }
-.ie-tab:hover:not(.active):not(:disabled) {
-  background: transparent;
-  color: var(--text);
-  border: none;
+.confirm-modal-message {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
-.ie-tab.active {
-  background: var(--accent);
-  color: var(--accent-text);
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
-.ie-tab.active:hover:not(:disabled) {
-  background: var(--accent-2);
-  color: var(--accent-text);
+.btn.primary.danger,
+.btn.danger {
+  background: var(--error);
+  color: white;
+  border-color: var(--error);
 }
+.btn.primary.danger:hover:not(:disabled),
+.btn.danger:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--error) 80%, black);
+  border-color: color-mix(in oklch, var(--error) 80%, black);
+  color: white;
+}
+
 .ie-panel {
   display: flex;
   flex-direction: column;
@@ -1206,11 +1243,26 @@
   background: var(--surface-2);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 10px 12px;
   font-family: inherit;
   font-size: 0.95rem;
   width: 100%;
+}
+/* Select-specific: strip the native dropdown arrow, paint our own
+ * chevron with breathing room from the right edge. Native browser
+ * arrows sit ~4px from the edge by default — too close given our
+ * 12px horizontal padding. The padding-right + bg-position keep the
+ * glyph in line with the textual content's vertical center. */
+.ie-panel select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 36px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8578' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px;
 }
 .ie-panel textarea {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -1219,7 +1271,10 @@
   resize: vertical;
 }
 #export-output {
-  min-height: 280px;
+  /* Bounded by viewport so the export modal stays within 90vh on
+   * any screen — the user scrolls inside this textarea rather than
+   * the whole modal. */
+  height: clamp(180px, 38vh, 320px);
   background: var(--bg);
 }
 .import-preview {
@@ -2364,48 +2419,137 @@ kbd {
 }
 [data-direction="editorial"] .deck-summary { padding: 28px; }
 .deck-art {
-  width: 180px;
+  width: 220px;
   aspect-ratio: 488 / 680;
   border-radius: var(--radius);
   overflow: hidden;
   flex-shrink: 0;
   position: relative;
   background: var(--surface-2);
+  /* Flex column lets multiple images (partner / partners-with decks)
+   * stack vertically and divide the panel height equally. With a
+   * single commander the lone <img> fills the whole container. */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .deck-art img {
   width: 100%;
-  height: 100%;
+  /* `flex: 1 1 0` + `min-height: 0` makes N images split the panel
+   * height evenly without overflowing the aspect-ratio'd container. */
+  flex: 1 1 0;
+  min-height: 0;
   object-fit: cover;
   display: block;
 }
-.deck-art:empty,
-.deck-art img:not([src]),
-.deck-art img[src=""] { display: none; }
+.deck-art:empty { /* keep the placeholder background visible */ }
 .deck-summary-body {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .deck-summary-body h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 [data-direction="editorial"] .deck-summary-body h1 {
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 400;
   letter-spacing: -0.03em;
 }
+/* Inline rename input — geometry matches the h1 so the swap is
+ * invisible. The user clicks "Renommer" in the kebab menu, the h1
+ * is hidden, this input takes its place, focused with text selected.
+ * Enter / blur commits, Escape cancels (see startRenameDeck +
+ * endRenameDeck in app-manage.js). */
+.deck-summary-name-input {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 2px 10px;
+  width: 100%;
+  max-width: 100%;
+  outline: none;
+  box-sizing: border-box;
+}
+[data-direction="editorial"] .deck-summary-name-input {
+  font-size: 36px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+.deck-summary-name-input:focus { box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 25%, transparent); }
+
+/* Description: <button> styled flat so it reads as inline text but
+ * keeps a11y (focusable, Enter to activate). Click → swap to editor.
+ * The .is-empty variant shows the placeholder copy in italic + muted
+ * color so the user sees it as an invitation, not real content. */
+.deck-description {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  margin: 0;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 0.12s;
+}
+.deck-description:hover:not(:disabled) {
+  background: var(--surface-2);
+  /* Override the global button:hover rules so the description
+   * doesn't pick up a border / accent color. */
+  border: none;
+  color: var(--text);
+}
+.deck-description.is-empty {
+  font-style: italic;
+  color: var(--text-muted);
+}
+.deck-description[hidden] { display: none; }
+
+/* Editor: textarea + actions row. Hidden by default, shown when the
+ * user clicks the description display. */
+.deck-description-editor { display: flex; flex-direction: column; gap: 8px; }
+.deck-description-editor[hidden] { display: none; }
+.deck-description-editor textarea {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  resize: vertical;
+  min-height: 80px;
+  max-height: 240px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.deck-description-editor textarea:focus { outline: none; border-color: var(--accent); }
+.deck-description-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .deck-meta-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   font-size: 13px;
   color: var(--text-2);
@@ -2413,39 +2557,189 @@ kbd {
 .deck-meta-row strong { color: var(--text); font-weight: 600; }
 .deck-meta-row .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .deck-meta-sep {
+  /* Pure CSS dot — the span MUST stay empty in markup. Width/height
+   * apply because .deck-meta-row is a flex container (no display
+   * override needed). */
   width: 4px; height: 4px;
   background: var(--text-muted);
   border-radius: 50%;
-  display: inline-block;
+  flex: 0 0 auto;
 }
+/* Tags row in the deck-summary block: bracket pill, count, RL count,
+ * and sync indicator. The sync indicator is pushed to the right via
+ * margin-left:auto so it visually anchors at the opposite edge from
+ * the bracket — same composition as the mockup. */
 .deck-summary-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  margin-top: 4px;
 }
-.deck-summary-format {
+.deck-sync-tag { margin-left: auto; }
+
+/* Inline pill version of the bracket badge (mockup's deck-summary
+ * variant — distinct from .bracket-circle which is the analyze
+ * view's large circle anchor). */
+.bracket-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  padding: 4px 12px 4px 4px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
   font-size: 12px;
-  color: var(--text-muted);
 }
-.deck-summary-format .label { text-transform: var(--label-transform); letter-spacing: var(--label-tracking); }
-.deck-summary-format .select-field {
-  padding: 6px 28px 6px 10px;
+.bracket-badge-num {
+  width: 22px;
+  height: 22px;
+  background: var(--accent-text);
+  color: var(--accent);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+/* Generic info tag — neutral pill, used for the count + Reserved List
+ * indicators and as the base for the sync tag's variants. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
-  min-width: 0;
+  font-weight: 500;
 }
+/* `.tag` sets `display: inline-flex` which has the same specificity
+ * as the UA `[hidden]` rule — author wins on source order, so the
+ * element stays visible even with `hidden=""`. Specificity-bump
+ * here makes the hidden attribute actually hide the tag. Same
+ * pattern as the May 2026 view-toggle regression (see CLAUDE.md). */
+.tag[hidden] { display: none; }
+
+/* Sync indicator — three states keyed by classes on the wrapper.
+ *   default (no extra class) : synchronisé → green dot.
+ *   .is-pending              : queue has entries → amber dot.
+ *   .is-offline              : navigator.onLine === false → grey.
+ * Defined as 6px circle inside the tag pill (matches the mockup's
+ * `<span style={{ width: 6, height: 6, borderRadius: "50%" }} />`). */
+.deck-sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  flex: 0 0 auto;
+}
+.deck-sync-tag.is-pending .deck-sync-dot { background: var(--warning); }
+.deck-sync-tag.is-offline .deck-sync-dot { background: var(--text-muted); }
+.deck-sync-tag.is-pending { border-color: var(--warning); }
+
+/* Format-edit trigger in the meta-row. Looks like inline text until
+ * hover, when a subtle background hints clickability. Chevron sits
+ * to the right of the format name. The companion dropdown uses the
+ * generic .dropdown-menu and is positioned absolutely. */
+.meta-edit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.meta-edit-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  padding: 2px 6px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 0.12s;
+}
+.meta-edit-trigger:hover:not(:disabled),
+.meta-edit-trigger[aria-expanded="true"] {
+  background: var(--surface-2);
+}
+.meta-edit-trigger svg { opacity: 0.55; }
+.meta-edit-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  z-index: 50;
+}
+
 .deck-summary-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 6px;
+  align-items: center;
 }
+
+/* Kebab menu (⋮) anchored in the top-right of the .deck-summary
+ * panel. Holds the rare deck-level actions (Dupliquer, Supprimer,
+ * future Renommer/Archiver) so they don't crowd the visible actions
+ * row, and so destructive ops aren't permanently primed for a
+ * misclick. .deck-summary needs position:relative for the anchor;
+ * we set it via the rule below (the panel already has padding etc).
+ *
+ * Conscious deviation from the claude.design mockup, which puts the
+ * trash inline in the actions row. The deviation is documented in
+ * memory/project_manage_view_choices.md. */
+.deck-summary { position: relative; }
+.kebab-trigger {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.kebab-trigger:hover:not(:disabled),
+.kebab-trigger[aria-expanded="true"] {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+.kebab-menu {
+  position: absolute;
+  top: 50px;
+  right: 14px;
+  min-width: 200px;
+  z-index: 5;
+}
+/* .dropdown-item.danger styling lives in components.css. */
+
+/* Lang switch when used as a panel-head action (Cartes panel). It
+ * lives in .panel-head's flex row alongside the title + meta. */
+.panel-head-action { margin-left: auto; }
+
 @media (max-width: 760px) {
   .deck-summary { flex-direction: column; }
   .deck-art { width: 120px; }
+  /* On narrow viewports, drop the right-alignment on the sync tag
+   * + panel-head action so they keep their visual order without
+   * wrapping awkwardly. */
+  .deck-sync-tag, .panel-head-action { margin-left: 0; }
 }
 
 /* --- Add-card panel layout adapts to the new 2-col grid --- */

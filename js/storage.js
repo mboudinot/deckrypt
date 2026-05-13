@@ -26,6 +26,11 @@ function isValidDeck(d) {
   if (!Array.isArray(d.commanders) || !d.commanders.every(isValidDeckEntry)) return false;
   if (!Array.isArray(d.cards) || !d.cards.every(isValidDeckCard)) return false;
   if (d.format !== undefined && !VALID_DECK_FORMATS.has(d.format)) return false;
+  /* `description` is an optional free-text field — shape check only,
+   * no length cap (the textarea enforces 2000 chars client-side; if
+   * something larger landed here via devtools we don't reject the
+   * whole deck — the textarea handles overflow via max-height + scroll). */
+  if (d.description !== undefined && typeof d.description !== "string") return false;
   return true;
 }
 

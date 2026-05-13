@@ -540,7 +540,7 @@ function renderBracket(deck) {
 
   els.analyzeBracket.replaceChildren();
   const badge = document.createElement("div");
-  badge.className = "bracket-badge";
+  badge.className = "bracket-circle";
   badge.textContent = est.minBracket;
   els.analyzeBracket.appendChild(badge);
 
