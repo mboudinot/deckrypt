@@ -52,23 +52,22 @@ function renderGalleryView(ctx = null) {
     );
   }
 
-  /* Bucket the main-deck entries by primary type, then sort each
-   * bucket by CMC ascending and name. Same TYPE_ORDER + TYPE_LABELS_FR
-   * the manage view uses — globals from app-manage.js. */
+  /* Bucket the main-deck entries by primary type AND cache each
+   * entry's CMC so the comparator below doesn't re-call `cardFor`
+   * O(N log N) times. Same TYPE_ORDER + TYPE_LABELS_FR the manage
+   * view uses — globals from app-manage.js. */
   const buckets = new Map(TYPE_ORDER.map((t) => [t, []]));
+  const cmcs = new Map();
   for (const e of def.cards) {
     const card = cardFor(e);
     const t = card ? primaryTypeOf(card) : null;
     const key = t || "Inconnu";
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(e);
+    cmcs.set(e, card && typeof card.cmc === "number" ? card.cmc : 99);
   }
-  const cmcOf = (entry) => {
-    const c = cardFor(entry);
-    return c && typeof c.cmc === "number" ? c.cmc : 99;
-  };
   for (const list of buckets.values()) {
-    list.sort((a, b) => (cmcOf(a) - cmcOf(b)) || a.name.localeCompare(b.name));
+    list.sort((a, b) => (cmcs.get(a) - cmcs.get(b)) || a.name.localeCompare(b.name));
   }
 
   for (const [type, list] of buckets) {

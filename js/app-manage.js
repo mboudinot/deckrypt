@@ -498,28 +498,32 @@ function colorSortKey(card) {
 }
 
 function appendCardGroupsByType(entries, thumbFor, displayName) {
-  // Build per-type buckets in the canonical display order.
+  /* One pass: bucket each entry by type AND cache its sort keys
+   * (colour band + CMC). The comparator below is called O(N log N)
+   * times per bucket — without this memoisation each comparison
+   * would re-call `thumbFor(a)` + `thumbFor(b)` and recompute the
+   * colour key, ~6× the cost of the actual comparison. */
   const buckets = new Map(TYPE_ORDER.map((t) => [t, []]));
+  const sortKeys = new Map();
   for (const e of entries) {
     const card = thumbFor(e);
     const t = card ? primaryTypeOf(card) : null;
     const key = t || "Inconnu";
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(e);
+    sortKeys.set(e, {
+      color: colorSortKey(card),
+      cmc: card && typeof card.cmc === "number" ? card.cmc : 99,
+    });
   }
 
   // Sort within each bucket: colour band → CMC → name (locale).
-  const cmcOf = (entry) => {
-    const c = thumbFor(entry);
-    return c && typeof c.cmc === "number" ? c.cmc : 99;
-  };
   for (const list of buckets.values()) {
     list.sort((a, b) => {
-      const ka = colorSortKey(thumbFor(a));
-      const kb = colorSortKey(thumbFor(b));
-      if (ka !== kb) return ka - kb;
-      const d = cmcOf(a) - cmcOf(b);
-      if (d !== 0) return d;
+      const ka = sortKeys.get(a);
+      const kb = sortKeys.get(b);
+      if (ka.color !== kb.color) return ka.color - kb.color;
+      if (ka.cmc !== kb.cmc) return ka.cmc - kb.cmc;
       return a.name.localeCompare(b.name);
     });
   }
@@ -1099,11 +1103,20 @@ function renderDeckSummary(def) {
     if (syncTagEl) syncTagEl.hidden = true;
     return;
   }
+  /* Local alias for `state.resolved` (Scryfall-enriched commanders +
+   * deck arrays) — referenced from 5 distinct guard branches below;
+   * reading the global through one variable keeps the function easier
+   * to scan AND avoids 5 separate "what if state changes mid-render"
+   * questions. The deck-count reduce is also lifted out: the size
+   * pill and the count tag both need it, no point computing twice. */
+  const resolved = state.resolved;
+  const cmdrCount = def.commanders?.length || 0;
+  const deckCount = def.cards.reduce((s, c) => s + (c.qty || 0), 0);
+
   nameEl.textContent = def.name;
   refreshDeckDescription(def);
   formatEl.textContent = (def.format === "limited") ? "Format libre" : "Commander";
-  const total = (def.commanders?.length || 0) + def.cards.reduce((s, c) => s + (c.qty || 0), 0);
-  sizeEl.textContent = String(total);
+  sizeEl.textContent = String(cmdrCount + deckCount);
 
   /* Commander art: prefer `art_crop` (Scryfall's illustration-only
    * crop — no card frame, name, or text box) for a clean "visual"
@@ -1115,7 +1128,7 @@ function renderDeckSummary(def) {
    * stacked vertically (CSS handles the equal split via flex).
    * Sultai (Ukkima + Cazur) is the canonical 2-commander case. */
   const pickArt = (uris) => uris && (uris.art_crop || uris.normal);
-  const commanders = (state.resolved && state.resolved.commanders) || [];
+  const commanders = (resolved && resolved.commanders) || [];
   artEl.replaceChildren();
   for (const cmdr of commanders) {
     const url = pickArt(cmdr.image_uris)
@@ -1131,8 +1144,8 @@ function renderDeckSummary(def) {
   /* Color pips: union of commanders' color_identity. */
   pipsEl.replaceChildren();
   const colors = new Set();
-  if (state.resolved) {
-    for (const c of state.resolved.commanders) {
+  if (resolved) {
+    for (const c of resolved.commanders) {
       if (Array.isArray(c.color_identity)) for (const cid of c.color_identity) colors.add(cid);
     }
   }
@@ -1146,8 +1159,8 @@ function renderDeckSummary(def) {
 
   /* Top archetype, when one stands out. */
   let archLabel = "Profil mixte";
-  if (state.resolved && typeof detectArchetypes === "function") {
-    const archs = detectArchetypes(state.resolved);
+  if (resolved && typeof detectArchetypes === "function") {
+    const archs = detectArchetypes(resolved);
     const top = archs.find((a) => a.confidence >= 0.35) || archs[0];
     if (top) archLabel = top.label;
   }
@@ -1155,22 +1168,20 @@ function renderDeckSummary(def) {
 
   /* === Tags row (bracket / count / RL / sync) ============================
    * All four tags depend on different signals and degrade gracefully:
-   *   - bracket : needs state.resolved (Scryfall data on every card).
+   *   - bracket : needs resolved (Scryfall data on every card).
    *   - count   : works from def alone, always shown.
-   *   - RL      : needs state.resolved (Scryfall's `reserved` flag).
+   *   - RL      : needs resolved (Scryfall's `reserved` flag).
    *   - sync    : reads window.sync.currentUser + the pending queue.
    * Anything that lacks its signal is hidden rather than showing "—". */
   if (countTagEl) {
-    const cmdrCount = def.commanders?.length || 0;
-    const deckCount = def.cards.reduce((s, c) => s + (c.qty || 0), 0);
     const target = (def.format === "limited") ? 40 : 99;
     countTagEl.textContent = cmdrCount > 0
       ? `${deckCount} + ${cmdrCount} commandant${cmdrCount > 1 ? "s" : ""}`
       : `${deckCount} / ${target}`;
     countTagEl.hidden = false;
   }
-  if (bracketEl && state.resolved && typeof bracketEstimate === "function") {
-    const allCards = [...state.resolved.commanders, ...state.resolved.deck];
+  if (bracketEl && resolved && typeof bracketEstimate === "function") {
+    const allCards = [...resolved.commanders, ...resolved.deck];
     const b = bracketEstimate(allCards);
     bracketNumEl.textContent = String(b.minBracket);
     bracketLabelEl.textContent = b.label;
@@ -1178,12 +1189,12 @@ function renderDeckSummary(def) {
   } else if (bracketEl) {
     bracketEl.hidden = true;
   }
-  if (rlTagEl && state.resolved) {
+  if (rlTagEl && resolved) {
     /* Reserved List: Scryfall flags each card with `reserved:true` when
      * it's on Wizards' reserved list. We count distinct printings — the
      * user cares about how many lines are RL, not the expanded total. */
-    const rlCount = (state.resolved.deck || []).filter((c) => c && c.reserved === true).length
-      + (state.resolved.commanders || []).filter((c) => c && c.reserved === true).length;
+    const rlCount = (resolved.deck || []).filter((c) => c && c.reserved === true).length
+      + (resolved.commanders || []).filter((c) => c && c.reserved === true).length;
     if (rlCount > 0) {
       rlCountEl.textContent = String(rlCount);
       rlTagEl.hidden = false;
