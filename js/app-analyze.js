@@ -34,7 +34,6 @@ function renderAnalyzeView() {
      els.analyzeArchetypes, els.analyzeManaBase]
       .forEach((el) => el.replaceChildren(placeholderText("Aucun deck à analyser.")));
     els.analyzeComposition.replaceChildren();
-    els.analyzeBracketLabel.textContent = "—";
     [els.analyzeCurveInfo, els.analyzeSubtypesInfo, els.analyzeTokensInfo,
      els.analyzeSuggestionsInfo, els.analyzeThemesInfo,
      els.analyzeArchetypesInfo, els.analyzeManaBaseInfo]
@@ -536,7 +535,6 @@ function renderSuggestionsPanel(resolved) {
 
 function renderBracket(deck) {
   const est = bracketEstimate(deck);
-  els.analyzeBracketLabel.textContent = `Bracket ${est.minBracket}+`;
 
   els.analyzeBracket.replaceChildren();
   const badge = document.createElement("div");
@@ -547,6 +545,7 @@ function renderBracket(deck) {
   const meta = document.createElement("div");
   meta.className = "bracket-meta";
   const label = document.createElement("strong");
+  label.className = "bracket-info-title";
   label.textContent = est.label;
   meta.appendChild(label);
 

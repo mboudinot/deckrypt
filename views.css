@@ -157,8 +157,11 @@
   letter-spacing: 0;
 }
 .card-group-chevron {
+  position: relative;
+  top: 1px;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 1.4rem;
+  line-height: 1;
   margin-left: 6px;
   transition: transform 0.2s ease;
 }
@@ -556,69 +559,109 @@
 .bracket-panel {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 24px;
 }
-/* Analyze view's bracket — large 64x64 circle anchoring the bracket
- * section header. Originally named .bracket-badge; renamed when
- * .bracket-badge was reclaimed for the inline pill variant used in
- * the deck-summary panel (see below). */
+/* Analyze view's bracket — large 88×88 circle anchoring the bracket
+ * panel. Mirrors the mockup `.bracket-large` class; we kept the name
+ * `.bracket-circle` (renamed from `.bracket-badge` during the refonte
+ * to free that name for the inline pill variant used in the
+ * deck-summary panel). The 56×56 sibling in the manage-side panel
+ * uses `.bracket-large` — see below. */
 .bracket-circle {
+  position: relative;
   flex: 0 0 auto;
-  width: 64px; height: 64px;
+  width: 88px; height: 88px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.8rem;
-  font-weight: 700;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 36px;
+  font-weight: 800;
   background: var(--surface-2);
-  border: 2px solid var(--accent);
+  border: 3px solid var(--accent);
   color: var(--accent);
 }
-.bracket-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.bracket-meta strong { font-size: 1rem; }
+/* Shared "/5" badge + editorial override apply to BOTH the analyze
+ * 88×88 (.bracket-circle) and the manage-side 56×56 (.bracket-large)
+ * variants. Only the base sizes / borders / font sizes differ. */
+.bracket-circle::after,
+.bracket-large::after {
+  content: "/5";
+  position: absolute;
+  bottom: -8px;
+  right: -8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 11px;
+  padding: 2px 6px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+[data-direction="editorial"] .bracket-circle,
+[data-direction="editorial"] .bracket-large {
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.bracket-meta { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bracket-info-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+[data-direction="editorial"] .bracket-info-title {
+  font-size: 28px;
+  font-weight: 400;
+}
 .bracket-meta .gc-count { color: var(--text-muted); font-size: 0.85rem; }
 .bracket-meta .note { color: var(--text-muted); font-size: 0.8rem; line-height: 1.4; }
 
 /* Game-changer accordion. Native <summary> bullet replaced by a
    chevron that rotates on open. Body uses .cards/.card styles so
-   GCs render at the same 146px thumbnail size as the play view. */
-/* Amber accent — Game Changers are prestigious / power-tier cards,
-   not warnings. Red (var(--mtg-r)) used to read as "something's wrong";
-   amber (same hue as Planeswalker in TYPE_COLORS) signals
-   "noteworthy / legendary" instead. */
+   GCs render at the same 146px thumbnail size as the play view.
+   Bicolor identity: left border matches the bracket-circle next to
+   it (`var(--accent)`), while the chevron + hover-bg keep the
+   amber-gold signal via `var(--warning)` (gold #fcd34d studio /
+   dark amber-brown #b45309 editorial) so GC items still stand out
+   from regular suggestion rows. */
 .gc-details {
-  margin-top: 6px;
-  border: 1px solid var(--border);
-  border-left: 4px solid #fbbf24;
-  border-radius: 8px;
+  margin-top: 8px;
   background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
 }
 .gc-summary {
   list-style: none;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 12px 14px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 8px;
   user-select: none;
 }
 .gc-summary::-webkit-details-marker { display: none; }
-.gc-summary:hover { background: rgba(251, 191, 36, 0.10); }
+.gc-summary:hover { background: color-mix(in oklch, var(--warning) 12%, transparent); }
 .gc-summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 .gc-summary .gc-count {
-  color: #fbbf24;
+  color: var(--text);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 13px;
   flex: 1;
 }
 .gc-chevron {
-  color: #fbbf24;
-  font-size: 0.85rem;
+  color: var(--warning);
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 700;
   transition: transform 0.2s ease;
 }
 .gc-details[open] .gc-chevron { transform: rotate(180deg); }
@@ -3036,6 +3079,9 @@ kbd {
   flex-direction: column;
   gap: 10px;
 }
+/* Manage-side variant of .bracket-circle — same look at 56×56.
+ * Shared ::after badge + editorial override are defined alongside
+ * .bracket-circle above. */
 .bracket-large {
   position: relative;
   width: 56px;
@@ -3050,25 +3096,6 @@ kbd {
   font-size: 22px;
   font-weight: 700;
   flex-shrink: 0;
-}
-.bracket-large::after {
-  content: "/5";
-  position: absolute;
-  bottom: -8px;
-  right: -8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 11px;
-  padding: 2px 6px;
-  color: var(--text-muted);
-  font-family: var(--font-sans);
-  font-weight: 500;
-}
-[data-direction="editorial"] .bracket-large {
-  border-radius: 12px;
-  font-family: var(--font-display);
-  font-weight: 700;
 }
 .manage-side-bracket-head {
   display: flex;

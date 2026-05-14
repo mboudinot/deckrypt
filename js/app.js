@@ -181,7 +181,6 @@ function _cacheManageElements() {
 
 function _cacheAnalyzeElements() {
   els.analyzeBracket = document.getElementById("analyze-bracket");
-  els.analyzeBracketLabel = document.getElementById("analyze-bracket-label");
   els.analyzeSuggestions = document.getElementById("analyze-suggestions");
   els.analyzeSuggestionsInfo = document.getElementById("analyze-suggestions-info");
   els.analyzeArchetypes = document.getElementById("analyze-archetypes");
