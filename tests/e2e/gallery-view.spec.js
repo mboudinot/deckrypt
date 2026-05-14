@@ -40,10 +40,10 @@ test("Galerie groups cards by type with section titles + counts", async ({ page 
   expect(await groups.count()).toBeGreaterThan(0);
   /* The seeded Sultai deck has commanders + main-deck Lands and
    * Creatures at minimum. Each group title carries a running count. */
-  const labels = await groups.locator(".gallery-group-title span:first-child").allTextContents();
+  const labels = await groups.locator(".panel-head h3").allTextContents();
   expect(labels).toContain("Commandants");
-  // Per-type counts are numeric and non-zero.
-  for (const c of await groups.locator(".gallery-group-count").all()) {
+  // Per-type counts are numeric and non-zero — panel-meta reads "N carte(s)".
+  for (const c of await groups.locator(".panel-meta").all()) {
     expect(parseInt((await c.textContent()).trim(), 10)).toBeGreaterThan(0);
   }
 });

@@ -53,21 +53,32 @@ function renderGalleryView(ctx = null) {
   }
 
   /* Bucket the main-deck entries by primary type AND cache each
-   * entry's CMC so the comparator below doesn't re-call `cardFor`
-   * O(N log N) times. Same TYPE_ORDER + TYPE_LABELS_FR the manage
-   * view uses — globals from app-manage.js. */
+   * entry's sort keys so the comparator below doesn't re-call `cardFor`
+   * O(N log N) times. Same TYPE_ORDER + TYPE_LABELS_FR + sort order
+   * (colour band → CMC → name) as the manage view, so cards land in
+   * the same buckets and the same intra-bucket order in both views —
+   * globals from app-manage.js (colorSortKey too). */
   const buckets = new Map(TYPE_ORDER.map((t) => [t, []]));
-  const cmcs = new Map();
+  const sortKeys = new Map();
   for (const e of def.cards) {
     const card = cardFor(e);
     const t = card ? primaryTypeOf(card) : null;
     const key = t || "Inconnu";
     if (!buckets.has(key)) buckets.set(key, []);
     buckets.get(key).push(e);
-    cmcs.set(e, card && typeof card.cmc === "number" ? card.cmc : 99);
+    sortKeys.set(e, {
+      color: colorSortKey(card),
+      cmc: card && typeof card.cmc === "number" ? card.cmc : 99,
+    });
   }
   for (const list of buckets.values()) {
-    list.sort((a, b) => (cmcs.get(a) - cmcs.get(b)) || a.name.localeCompare(b.name));
+    list.sort((a, b) => {
+      const ka = sortKeys.get(a);
+      const kb = sortKeys.get(b);
+      if (ka.color !== kb.color) return ka.color - kb.color;
+      if (ka.cmc !== kb.cmc) return ka.cmc - kb.cmc;
+      return a.name.localeCompare(b.name);
+    });
   }
 
   for (const [type, list] of buckets) {
@@ -84,18 +95,19 @@ function renderGalleryView(ctx = null) {
 
 function makeGalleryGroup(label, entries, cardFor) {
   const section = document.createElement("section");
-  section.className = "gallery-group";
+  section.className = "panel gallery-group";
 
+  const head = document.createElement("div");
+  head.className = "panel-head";
   const title = document.createElement("h3");
-  title.className = "gallery-group-title";
-  const labelSpan = document.createElement("span");
-  labelSpan.textContent = label;
-  title.appendChild(labelSpan);
-  const count = document.createElement("strong");
-  count.className = "gallery-group-count";
-  count.textContent = entries.reduce((n, e) => n + (e.qty || 1), 0);
-  title.appendChild(count);
-  section.appendChild(title);
+  title.textContent = label;
+  head.appendChild(title);
+  const total = entries.reduce((n, e) => n + (e.qty || 1), 0);
+  const meta = document.createElement("span");
+  meta.className = "panel-meta";
+  meta.textContent = `${total} carte${total > 1 ? "s" : ""}`;
+  head.appendChild(meta);
+  section.appendChild(head);
 
   const grid = document.createElement("div");
   grid.className = "gallery-grid";
@@ -128,6 +140,15 @@ function makeGalleryTile(entry, card) {
     placeholder.textContent = entry.name;
     tile.appendChild(placeholder);
     tile.disabled = true;
+  }
+
+  if (card && card.game_changer === true) {
+    const gc = document.createElement("span");
+    gc.className = "gc-mark";
+    gc.textContent = "GC";
+    gc.title = "Game Changer";
+    gc.setAttribute("aria-label", "Game Changer");
+    tile.appendChild(gc);
   }
 
   const qty = entry.qty || 1;

@@ -1748,33 +1748,19 @@ html:has(.modal-backdrop:not([hidden])) {
    lazy-loaded so the gallery is cheap to pre-render: nothing
    fetches until the user actually opens the Galerie tab.
    ============================================================ */
-.gallery-area {
+/* Gallery groups are panels — same `.panel` look as the analyze view.
+ * The `gap` lives on #gallery-content (the direct parent of the group
+ * sections) because `.gallery-area` only has one child (#gallery-content)
+ * so its own gap has no effect on group spacing. */
+#gallery-content {
+  display: flex;
+  flex-direction: column;
   gap: 24px;
 }
 .gallery-group {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-.gallery-group-title {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0;
-  padding: 6px 0 4px;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.7px;
-}
-.gallery-group-count {
-  margin-left: auto;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
-  letter-spacing: 0;
 }
 .gallery-grid {
   display: grid;
@@ -3504,7 +3490,8 @@ kbd {
    Driven by `card.game_changer` from Scryfall. Color is the same
    amber the Manage view already uses for the GC accordion, so the
    visual identity stays consistent across views. */
-.card .gc-mark {
+.card .gc-mark,
+.gallery-tile .gc-mark {
   position: absolute;
   top: 6px;
   left: 6px;
@@ -3523,4 +3510,14 @@ kbd {
   box-shadow: 0 2px 6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.3);
   z-index: 2;
   pointer-events: none;
+}
+/* Gallery tiles are much bigger than play-view cards (~280px vs ~146px)
+ * so the 18px pin reads as a speck. Scale up here only. */
+.gallery-tile .gc-mark {
+  top: 8px;
+  left: 8px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
 }
