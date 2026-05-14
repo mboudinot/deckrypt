@@ -5,7 +5,9 @@
  * Reads `state`, `els` and shared helpers (`placeholderText`,
  * `makeCardEl`, `makeXIcon`, `showModal`, `closeModal`,
  * `commitDeckChange`, `rerenderDeckViews`, `setStatus`, `findDeck`).
- * Load order: after app-play.js (for placeholderText / makeXIcon),
+ * Load order: after app-play.js (for placeholderText / makeXIcon)
+ * and after app-manage-side.js (renderSideComposition /
+ * renderSideBracket — split out when this file passed 1300 lines),
  * after pure modules, before app.js. */
 
 const MANAGE_LANG_KEY = "mtg-hand-sim:manage-lang";
@@ -219,7 +221,12 @@ function setDeckFormat(format) {
 
 /* Build a manage-view card row. Resolved Scryfall data is optional —
  * we render with the card name even if Scryfall hasn't been hit yet
- * (e.g. before the first switch to the play view). */
+ * (e.g. before the first switch to the play view).
+ *
+ * The body is a thin orchestrator: each section of the row is built
+ * by its own `_buildCardRow*` helper below. Keeps this function
+ * readable as a top-down list of "what's on a row" rather than 100
+ * lines of mixed DOM scaffolding. */
 function makeManageCardRow(entry, resolvedCard, opts) {
   const row = document.createElement("div");
   row.className = "card-row";
@@ -230,7 +237,22 @@ function makeManageCardRow(entry, resolvedCard, opts) {
      * gets cleared on the same timer). */
     row.classList.add("card-row--just-added");
   }
+  /* Per-render displayName closure (bulk-translation-aware) so a
+   * 100-card render doesn't read localStorage 100 times. */
+  const labelText = opts.displayName ? opts.displayName(entry) : getDisplayName(entry);
+  const isTranslating = state.manageLang === "fr" && pendingTranslations.has(entry.name);
+  if (isTranslating) row.classList.add("is-translating");
 
+  row.appendChild(_buildCardRowThumb(entry, resolvedCard));
+  row.appendChild(_buildCardRowName(entry, resolvedCard, labelText, isTranslating));
+  row.appendChild(_buildCardRowMana(resolvedCard));
+  row.appendChild(_buildCardRowPrintingPill(entry, opts.kind));
+  if (opts.kind === "card") row.appendChild(_buildCardRowQty(entry));
+  row.appendChild(_buildCardRowRemove(entry, opts.kind));
+  return row;
+}
+
+function _buildCardRowThumb(entry, resolvedCard) {
   const thumb = document.createElement("button");
   thumb.type = "button";
   thumb.className = "card-row-thumb";
@@ -252,13 +274,12 @@ function makeManageCardRow(entry, resolvedCard, opts) {
     thumb.disabled = true;
     thumb.setAttribute("aria-label", `Image indisponible pour ${entry.name}`);
   }
-  row.appendChild(thumb);
+  return thumb;
+}
 
+function _buildCardRowName(entry, resolvedCard, labelText, isTranslating) {
   const name = document.createElement("div");
   name.className = "card-row-name";
-  // Accept a per-render displayName closure (bulk-translation-aware)
-  // so a 100-card render doesn't read localStorage 100 times.
-  const labelText = opts.displayName ? opts.displayName(entry) : getDisplayName(entry);
   const labelSpan = document.createElement("span");
   labelSpan.className = "card-row-name-label";
   labelSpan.textContent = labelText;
@@ -273,20 +294,21 @@ function makeManageCardRow(entry, resolvedCard, opts) {
     chip.setAttribute("aria-label", "Game Changer");
     name.appendChild(chip);
   }
-  if (state.manageLang === "fr" && pendingTranslations.has(entry.name)) {
-    row.classList.add("is-translating");
+  if (isTranslating) {
     const spinner = document.createElement("span");
     spinner.className = "card-row-spinner";
     spinner.setAttribute("aria-hidden", "true");
     name.appendChild(spinner);
   }
-  row.appendChild(name);
+  return name;
+}
 
-  /* Mana cost — one badge per `{…}` symbol in the card's
-   * `mana_cost`. The colour-band gives an instant read of the
-   * card's identity within its type group (which sorts by colour),
-   * the generic-cost numbers make the curve scannable. Empty for
-   * lands and cards without a cost. */
+/* Inline mana cost — one badge per `{…}` symbol in the card's
+ * `mana_cost`. The colour-band gives an instant read of the card's
+ * identity within its type group (which sorts by colour), the
+ * generic-cost numbers make the curve scannable. Empty for lands
+ * and cards without a cost. */
+function _buildCardRowMana(resolvedCard) {
   const mana = document.createElement("span");
   mana.className = "mana-cost card-row-mana";
   if (resolvedCard && typeof resolvedCard.mana_cost === "string" && resolvedCard.mana_cost) {
@@ -294,8 +316,10 @@ function makeManageCardRow(entry, resolvedCard, opts) {
       mana.appendChild(makeManaSymbol(sym));
     }
   }
-  row.appendChild(mana);
+  return mana;
+}
 
+function _buildCardRowPrintingPill(entry, kind) {
   const printing = document.createElement("button");
   printing.type = "button";
   printing.className = "card-row-printing";
@@ -303,38 +327,38 @@ function makeManageCardRow(entry, resolvedCard, opts) {
     ? `${entry.set.toUpperCase()} #${entry.collector_number || "?"}`
     : "édition par défaut";
   printing.title = "Changer l'édition";
-  printing.addEventListener("click", () => openPrintingPicker(entry, opts.kind));
-  row.appendChild(printing);
+  printing.addEventListener("click", () => openPrintingPicker(entry, kind));
+  return printing;
+}
 
-  if (opts.kind === "card") {
-    const qty = document.createElement("div");
-    qty.className = "card-row-qty";
-    const minus = document.createElement("button");
-    minus.type = "button";
-    minus.textContent = "−";
-    minus.setAttribute("aria-label", "Retirer un exemplaire");
-    minus.addEventListener("click", () => onQtyDelta(entry, -1));
-    const value = document.createElement("span");
-    value.textContent = entry.qty;
-    const plus = document.createElement("button");
-    plus.type = "button";
-    plus.textContent = "+";
-    plus.setAttribute("aria-label", "Ajouter un exemplaire");
-    plus.addEventListener("click", () => onQtyDelta(entry, +1));
-    qty.append(minus, value, plus);
-    row.appendChild(qty);
-  }
+function _buildCardRowQty(entry) {
+  const qty = document.createElement("div");
+  qty.className = "card-row-qty";
+  const minus = document.createElement("button");
+  minus.type = "button";
+  minus.textContent = "−";
+  minus.setAttribute("aria-label", "Retirer un exemplaire");
+  minus.addEventListener("click", () => onQtyDelta(entry, -1));
+  const value = document.createElement("span");
+  value.textContent = entry.qty;
+  const plus = document.createElement("button");
+  plus.type = "button";
+  plus.textContent = "+";
+  plus.setAttribute("aria-label", "Ajouter un exemplaire");
+  plus.addEventListener("click", () => onQtyDelta(entry, +1));
+  qty.append(minus, value, plus);
+  return qty;
+}
 
+function _buildCardRowRemove(entry, kind) {
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "card-row-remove";
   remove.title = "Retirer du deck";
   remove.setAttribute("aria-label", `Retirer ${entry.name} du deck`);
   remove.appendChild(makeXIcon(14));
-  remove.addEventListener("click", () => onRemoveEntry(entry, opts.kind));
-  row.appendChild(remove);
-
-  return row;
+  remove.addEventListener("click", () => onRemoveEntry(entry, kind));
+  return remove;
 }
 
 /* `ctx` is optional but supplied by rerenderDeckViews — when it's
@@ -1052,22 +1076,16 @@ function markRecentlyAdded(names) {
 }
 
 /* ============================================================
- * Deck summary header (commander art + name + meta + actions)
- * + side panel (composition + bracket).
+ * Deck summary header (commander art + name + meta + actions).
  *
- * These fill the new manage-view shell. They lean on the same
- * resolved deck data the rest of the view consumes — when
- * state.resolved is null we render a minimal placeholder so the
- * page doesn't look broken on cold load.
+ * Leans on the same resolved deck data the rest of the view
+ * consumes — when state.resolved is null we render a minimal
+ * placeholder so the page doesn't look broken on cold load.
+ *
+ * Side-panel renderers (`renderSideComposition`, `renderSideBracket`)
+ * live in `js/app-manage-side.js` — split out when this file
+ * crossed 1300 lines.
  * ============================================================ */
-
-const COMPOSITION_ROWS = [
-  { label: "Terrains",     count: (cards) => countLands(cards) },
-  { label: "Rampe",        count: (cards) => countRamp(cards) },
-  { label: "Pioche",       count: (cards) => countDraw(cards) },
-  { label: "Interaction",  count: (cards) => countInteraction(cards) },
-  { label: "Board wipes",  count: (cards) => countBoardWipes(cards) },
-];
 
 function renderDeckSummary(def) {
   const artEl = document.getElementById("manage-deck-art");
@@ -1104,10 +1122,7 @@ function renderDeckSummary(def) {
     return;
   }
   /* Local alias for `state.resolved` (Scryfall-enriched commanders +
-   * deck arrays) — referenced from 5 distinct guard branches below;
-   * reading the global through one variable keeps the function easier
-   * to scan AND avoids 5 separate "what if state changes mid-render"
-   * questions. The deck-count reduce is also lifted out: the size
+   * deck arrays). The deck-count reduce is also lifted out: the size
    * pill and the count tag both need it, no point computing twice. */
   const resolved = state.resolved;
   const cmdrCount = def.commanders?.length || 0;
@@ -1118,18 +1133,32 @@ function renderDeckSummary(def) {
   formatEl.textContent = (def.format === "limited") ? "Format libre" : "Commander";
   sizeEl.textContent = String(cmdrCount + deckCount);
 
-  /* Commander art: prefer `art_crop` (Scryfall's illustration-only
-   * crop — no card frame, name, or text box) for a clean "visual"
-   * effect matching the mockup. Fall back to `normal` when art_crop
-   * isn't on the cached object (older cache entries) or to the
-   * front face for double-faced cards.
-   *
-   * Partner / partners-with decks: render ONE <img> per commander,
-   * stacked vertically (CSS handles the equal split via flex).
-   * Sultai (Ukkima + Cazur) is the canonical 2-commander case. */
-  const pickArt = (uris) => uris && (uris.art_crop || uris.normal);
-  const commanders = (resolved && resolved.commanders) || [];
+  /* Each section below is a thin call to a `_render*Tag` helper. The
+   * tags row (count / bracket / RL / sync) deliberately degrades
+   * piecewise: count works from `def` alone; the other three need
+   * `resolved` and stay hidden until it's populated. */
+  _renderCommanderArt(artEl, resolved);
+  _renderCommanderPips(pipsEl, resolved);
+  _renderArchetypeLabel(archEl, resolved);
+  _renderCountTag(countTagEl, def, cmdrCount, deckCount);
+  _renderBracketTag(bracketEl, bracketNumEl, bracketLabelEl, resolved);
+  _renderRlTag(rlTagEl, rlCountEl, resolved);
+  if (syncTagEl) refreshSyncTag(syncTagEl, syncLabelEl);
+}
+
+/* Commander art: prefer `art_crop` (Scryfall's illustration-only
+ * crop — no card frame, name, or text box) for a clean "visual"
+ * effect matching the mockup. Fall back to `normal` when art_crop
+ * isn't on the cached object (older cache entries) or to the front
+ * face for double-faced cards.
+ *
+ * Partner / partners-with decks: render ONE <img> per commander,
+ * stacked vertically (CSS handles the equal split via flex). Sultai
+ * (Ukkima + Cazur) is the canonical 2-commander case. */
+function _renderCommanderArt(artEl, resolved) {
   artEl.replaceChildren();
+  const commanders = (resolved && resolved.commanders) || [];
+  const pickArt = (uris) => uris && (uris.art_crop || uris.normal);
   for (const cmdr of commanders) {
     const url = pickArt(cmdr.image_uris)
       || (cmdr.card_faces && cmdr.card_faces[0] && pickArt(cmdr.card_faces[0].image_uris));
@@ -1140,14 +1169,16 @@ function renderDeckSummary(def) {
     img.loading = "lazy";
     artEl.appendChild(img);
   }
+}
 
-  /* Color pips: union of commanders' color_identity. */
+/* Color pips: union of commanders' color_identity, rendered in
+ * canonical WUBRG order. */
+function _renderCommanderPips(pipsEl, resolved) {
   pipsEl.replaceChildren();
+  if (!resolved) return;
   const colors = new Set();
-  if (resolved) {
-    for (const c of resolved.commanders) {
-      if (Array.isArray(c.color_identity)) for (const cid of c.color_identity) colors.add(cid);
-    }
+  for (const c of resolved.commanders) {
+    if (Array.isArray(c.color_identity)) for (const cid of c.color_identity) colors.add(cid);
   }
   for (const c of ["W", "U", "B", "R", "G"]) {
     if (!colors.has(c)) continue;
@@ -1156,8 +1187,11 @@ function renderDeckSummary(def) {
     p.setAttribute("aria-label", c);
     pipsEl.appendChild(p);
   }
+}
 
-  /* Top archetype, when one stands out. */
+/* Top archetype label, when one stands out (≥ 35 % confidence).
+ * Falls back to "Profil mixte" otherwise. */
+function _renderArchetypeLabel(archEl, resolved) {
   let archLabel = "Profil mixte";
   if (resolved && typeof detectArchetypes === "function") {
     const archs = detectArchetypes(resolved);
@@ -1165,46 +1199,51 @@ function renderDeckSummary(def) {
     if (top) archLabel = top.label;
   }
   archEl.textContent = archLabel;
+}
 
-  /* === Tags row (bracket / count / RL / sync) ============================
-   * All four tags depend on different signals and degrade gracefully:
-   *   - bracket : needs resolved (Scryfall data on every card).
-   *   - count   : works from def alone, always shown.
-   *   - RL      : needs resolved (Scryfall's `reserved` flag).
-   *   - sync    : reads window.sync.currentUser + the pending queue.
-   * Anything that lacks its signal is hidden rather than showing "—". */
-  if (countTagEl) {
-    const target = (def.format === "limited") ? 40 : 99;
-    countTagEl.textContent = cmdrCount > 0
-      ? `${deckCount} + ${cmdrCount} commandant${cmdrCount > 1 ? "s" : ""}`
-      : `${deckCount} / ${target}`;
-    countTagEl.hidden = false;
-  }
-  if (bracketEl && resolved && typeof bracketEstimate === "function") {
-    const allCards = [...resolved.commanders, ...resolved.deck];
-    const b = bracketEstimate(allCards);
-    bracketNumEl.textContent = String(b.minBracket);
-    bracketLabelEl.textContent = b.label;
-    bracketEl.hidden = false;
-  } else if (bracketEl) {
+/* Count tag — works from def alone (no resolved needed). Shown
+ * always, format depends on deck.format (commander vs limited). */
+function _renderCountTag(countTagEl, def, cmdrCount, deckCount) {
+  if (!countTagEl) return;
+  const target = (def.format === "limited") ? 40 : 99;
+  countTagEl.textContent = cmdrCount > 0
+    ? `${deckCount} + ${cmdrCount} commandant${cmdrCount > 1 ? "s" : ""}`
+    : `${deckCount} / ${target}`;
+  countTagEl.hidden = false;
+}
+
+/* Bracket tag — needs resolved (Scryfall flags + analytics). Hidden
+ * until bracketEstimate is available AND resolved data is in. */
+function _renderBracketTag(bracketEl, bracketNumEl, bracketLabelEl, resolved) {
+  if (!bracketEl) return;
+  if (!resolved || typeof bracketEstimate !== "function") {
     bracketEl.hidden = true;
+    return;
   }
-  if (rlTagEl && resolved) {
-    /* Reserved List: Scryfall flags each card with `reserved:true` when
-     * it's on Wizards' reserved list. We count distinct printings — the
-     * user cares about how many lines are RL, not the expanded total. */
-    const rlCount = (resolved.deck || []).filter((c) => c && c.reserved === true).length
-      + (resolved.commanders || []).filter((c) => c && c.reserved === true).length;
-    if (rlCount > 0) {
-      rlCountEl.textContent = String(rlCount);
-      rlTagEl.hidden = false;
-    } else {
-      rlTagEl.hidden = true;
-    }
-  } else if (rlTagEl) {
+  const allCards = [...resolved.commanders, ...resolved.deck];
+  const b = bracketEstimate(allCards);
+  bracketNumEl.textContent = String(b.minBracket);
+  bracketLabelEl.textContent = b.label;
+  bracketEl.hidden = false;
+}
+
+/* Reserved List tag — needs resolved (Scryfall's `reserved` flag).
+ * Counts distinct printings: the user cares about how many lines
+ * are RL, not the expanded total. Hidden when the count is 0. */
+function _renderRlTag(rlTagEl, rlCountEl, resolved) {
+  if (!rlTagEl) return;
+  if (!resolved) {
+    rlTagEl.hidden = true;
+    return;
+  }
+  const rlCount = (resolved.deck || []).filter((c) => c && c.reserved === true).length
+    + (resolved.commanders || []).filter((c) => c && c.reserved === true).length;
+  if (rlCount > 0) {
+    rlCountEl.textContent = String(rlCount);
+    rlTagEl.hidden = false;
+  } else {
     rlTagEl.hidden = true;
   }
-  if (syncTagEl) refreshSyncTag(syncTagEl, syncLabelEl);
 }
 
 /* Sync indicator state machine — negative-space design: the tag is
@@ -1274,82 +1313,4 @@ function refreshSyncTag(tag, label) {
   }
 }
 
-function renderSideComposition() {
-  const el = document.getElementById("manage-side-composition");
-  if (!el) return;
-  el.replaceChildren();
-  if (!state.resolved) {
-    const p = document.createElement("p");
-    p.className = "manage-side-placeholder";
-    p.textContent = "Chargement…";
-    el.appendChild(p);
-    return;
-  }
-  const cards = state.resolved.deck || [];
-  const total = cards.length || 1;
-  for (const row of COMPOSITION_ROWS) {
-    const n = row.count(cards);
-    const wrap = document.createElement("div");
-    wrap.className = "composition-row";
-    const head = document.createElement("div");
-    head.className = "composition-row-head";
-    const lab = document.createElement("span");
-    lab.className = "label";
-    lab.textContent = row.label;
-    const val = document.createElement("span");
-    val.className = "value num";
-    val.textContent = String(n);
-    head.appendChild(lab);
-    head.appendChild(val);
-    wrap.appendChild(head);
-    const bar = document.createElement("div");
-    bar.className = "composition-row-bar";
-    const fill = document.createElement("div");
-    fill.className = "composition-row-bar-fill";
-    fill.style.width = Math.min(100, (n / total) * 100) + "%";
-    bar.appendChild(fill);
-    wrap.appendChild(bar);
-    el.appendChild(wrap);
-  }
-}
-
-function renderSideBracket() {
-  const el = document.getElementById("manage-side-bracket");
-  const labelEl = document.getElementById("manage-side-bracket-label");
-  if (!el || !labelEl) return;
-  el.replaceChildren();
-  if (!state.resolved || typeof bracketEstimate !== "function") {
-    labelEl.textContent = "—";
-    const p = document.createElement("p");
-    p.className = "manage-side-placeholder";
-    p.textContent = "Chargement…";
-    el.appendChild(p);
-    return;
-  }
-  const fullDeck = [...state.resolved.commanders, ...state.resolved.deck];
-  const result = bracketEstimate(fullDeck);
-  labelEl.textContent = `min ${result.minBracket}`;
-
-  const head = document.createElement("div");
-  head.className = "manage-side-bracket-head";
-  const num = document.createElement("span");
-  num.className = "bracket-large";
-  num.textContent = String(result.minBracket);
-  head.appendChild(num);
-  const info = document.createElement("div");
-  const lab = document.createElement("div");
-  lab.className = "label";
-  lab.textContent = result.label;
-  const sub = document.createElement("div");
-  sub.className = "sub";
-  sub.textContent = `${result.gameChangerCount} Game Changer${result.gameChangerCount > 1 ? "s" : ""} détecté${result.gameChangerCount > 1 ? "s" : ""}`;
-  info.appendChild(lab);
-  info.appendChild(sub);
-  head.appendChild(info);
-  el.appendChild(head);
-
-  const verdict = document.createElement("p");
-  verdict.className = "manage-side-bracket-verdict";
-  verdict.textContent = result.note;
-  el.appendChild(verdict);
-}
+/* renderSideComposition + renderSideBracket moved to js/app-manage-side.js */
