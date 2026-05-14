@@ -17,14 +17,21 @@
        font-src  + fonts.gstatic.com    - the woff2 files themselves
      img-src + data: — inline SVG chevrons in CSS background-image
        (select fields, dropdown triggers). Without this the browser
-       blocks the data: URI and the chevron disappears silently. -->
+       blocks the data: URI and the chevron disappears silently.
+     connect-src + 'self' + gstatic.com — DevTools-only probes:
+       Chrome fetches /.well-known/appspecific/com.chrome.devtools.json
+       (same-origin, needs 'self') and Firebase SDK source maps from
+       gstatic.com when DevTools is open. Firefox silently skips both,
+       which is why the violations only show in Chrome. Neither
+       affects production users, but allowing them keeps the console
+       clean for anyone debugging. -->
 <!-- `frame-ancestors` is intentionally NOT in this meta CSP: the
      directive is spec'd to work only via an HTTP response header
      (per the CSP spec) and the browser warns when it sees it in a
      <meta>. Static GitHub Pages can't set custom headers, so true
      clickjacking protection would require a server in front. Left
      out to keep the console clean. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src https://api.scryfall.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src 'self' https://api.scryfall.com https://www.gstatic.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none';">
 <meta name="referrer" content="no-referrer">
 <title>Deckrypt</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">

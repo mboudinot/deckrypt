@@ -27,12 +27,18 @@
 
   /* Default to locked. The hint is set by sync.js when Firebase Auth
    * confirms a user, and cleared on signOut + on any null transition.
-   * No hint = no recent session = show the overlay immediately. */
+   * No hint = no recent session = show the overlay immediately.
+   * Hint present = we ALSO paint the header account button in its
+   * "authed placeholder" shape (`.has-session-hint`) so a returning
+   * user doesn't see the red "Connexion" CTA flash before Firebase
+   * Auth's async resolve replaces it with the real avatar + name. */
   let hasSession = false;
   try {
     hasSession = localStorage.getItem("mtg-hand-sim:has-session-v1") === "1";
   } catch (e) { /* fall through to locked */ }
-  if (!hasSession) {
+  if (hasSession) {
+    document.documentElement.classList.add("has-session-hint");
+  } else {
     document.documentElement.classList.add("auth-locked");
   }
 })();

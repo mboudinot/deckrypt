@@ -355,6 +355,11 @@
      * are no-ops). */
     function applyAuthState(user) {
       refreshAccountButton(user);
+      /* The hint class served its purpose (paint the optimistic
+       * authed placeholder pre-paint) the moment we have a real
+       * answer from Firebase. Drop it so a later sign-out or sign-in
+       * doesn't repaint the placeholder over the real state. */
+      document.documentElement.classList.remove("has-session-hint");
       if (user) {
         document.documentElement.classList.remove("auth-locked");
         if (!overlay.hidden) setOverlayVisible(false);
