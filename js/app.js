@@ -1136,6 +1136,7 @@ function init() {
   bindEvents();
   setupDropTargets();
   setupAddCardUI();
+  setupNavIndicator();
 
   // Restore the user's last manage-view language preference. Done
   // before any render so the first paint is in the right language.

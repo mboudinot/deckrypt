@@ -31,7 +31,13 @@ html.auth-locked #login-overlay[hidden] { display: block; }
    ============================================================ */
 .app-header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  /* Brand + nav clustered on the left, flexible spacer in the middle,
+   * header-right on the right. The previous centred-nav layouts
+   * (auto 1fr auto then 1fr auto 1fr) made the nav drift when the
+   * deck pill resized — switching decks dragged the menu sideways.
+   * Left-anchoring the nav next to the brand keeps it stationary
+   * regardless of the right-side content width. */
+  grid-template-columns: auto auto 1fr auto;
   align-items: center;
   gap: 24px;
   margin-bottom: 24px;
@@ -57,8 +63,8 @@ html.auth-locked #login-overlay[hidden] { display: block; }
   border-radius: var(--radius-pill);
   padding: 4px;
   gap: 2px;
+  /* Containing block for the .nav-indicator absolute child. */
   position: relative;
-  justify-self: center;
 }
 [data-direction="editorial"] .nav {
   background: transparent;
@@ -109,6 +115,89 @@ html.auth-locked #login-overlay[hidden] { display: block; }
 [data-direction="editorial"] .nav-tab.active {
   background: transparent;
   border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+/* Hover-on-active must NOT zero the active styling. The generic
+ * .nav-tab:hover rule above wins on specificity (0,3,0 vs 0,2,0
+ * for plain .nav-tab.active); rank-up here (0,4,0) restores the
+ * active background/border-color when the cursor is over the
+ * currently selected tab. Without this, the pill (Studio) or the
+ * underline (Editorial) flickers off on hover. */
+.nav-tab.active:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+[data-direction="editorial"] .nav-tab.active:hover:not(:disabled) {
+  background: transparent;
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Sliding indicator under the nav. A single absolutely-positioned
+ * span carries the active visual (pill in Studio, 2px underline in
+ * Editorial) and is moved via translateX/width on hover by
+ * js/nav-indicator.js. The .nav-tab.active rules above remain the
+ * CSS-only fallback when JS is off (no .has-indicator on .nav). */
+.nav-indicator {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 0;
+  height: calc(100% - 8px);
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  transform: translateX(0);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+[data-direction="editorial"] .nav-indicator {
+  top: auto;
+  bottom: 0;
+  height: 2px;
+  border-radius: 0;
+}
+.nav-tab {
+  position: relative;
+  z-index: 1;
+}
+/* When JS has taken over, the native active visuals move onto the
+ * indicator — clear them on the tab itself so they don't double up. */
+.nav.has-indicator .nav-tab.active,
+.nav.has-indicator .nav-tab.active:hover:not(:disabled) {
+  background: transparent;
+}
+[data-direction="editorial"] .nav.has-indicator .nav-tab.active,
+[data-direction="editorial"] .nav.has-indicator .nav-tab.active:hover:not(:disabled) {
+  border-bottom-color: transparent;
+}
+
+/* Text-color shuffle while the indicator is in transit (Studio).
+ *
+ * The pill carries the accent block; the active tab's text uses
+ * --accent-text (dark, designed to sit on the bright pill). When
+ * the cursor hovers another tab the pill slides away, exposing the
+ * active tab's dark text on the nav's dark neutral surface — it
+ * vanishes. So while .nav is hovered: the active tab (if not the
+ * hover target) takes the readable neutral text, and whichever tab
+ * sits under the indicator (the hover target, or the active one if
+ * cursor is over it) wears --accent-text.
+ *
+ * Editorial doesn't have this problem: the underline doesn't change
+ * the tab's background, and its hover color is var(--accent) which
+ * already reads on the neutral surface — explicit override keeps the
+ * Studio rule from leaking into Editorial. */
+.nav.has-indicator:hover .nav-tab.active:not(:hover):not(:disabled) {
+  color: var(--text);
+}
+.nav.has-indicator:hover .nav-tab:hover:not(:disabled) {
+  color: var(--accent-text);
+}
+[data-direction="editorial"] .nav.has-indicator:hover .nav-tab.active:not(:hover):not(:disabled) {
+  color: var(--accent);
+}
+[data-direction="editorial"] .nav.has-indicator:hover .nav-tab:hover:not(:disabled) {
   color: var(--accent);
 }
 

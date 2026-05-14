@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
   await page.locator("#commander-zone .card").first().waitFor();
 });
 
-test("brand is on the left, nav is centered, deck pill + account are on the right", async ({ page }) => {
+test("header order: brand → nav → spacer → deck pill → account", async ({ page }) => {
   const brand = await page.locator(".brand").boundingBox();
   const nav = await page.locator(".nav").boundingBox();
   const deckPill = await page.locator("#btn-deck-pill").boundingBox();
@@ -22,6 +22,20 @@ test("brand is on the left, nav is centered, deck pill + account are on the righ
   expect(brand.x).toBeLessThan(nav.x);
   expect(nav.x + nav.width).toBeLessThan(deckPill.x);
   expect(deckPill.x).toBeLessThan(account.x);
+});
+
+test("nav sits next to the brand on the left (immune to deck-pill width)", async ({ page }) => {
+  /* Regression: the nav used to be centred inside a 1fr column and
+   * drifted sideways whenever the right-side header changed width
+   * (deck switch with different name length). It now lives in an
+   * `auto` column right after the brand, so its left edge is bound
+   * to the brand's right edge plus the grid gap (24px). */
+  const brand = await page.locator(".brand").boundingBox();
+  const nav = await page.locator(".nav").boundingBox();
+  const gap = nav.x - (brand.x + brand.width);
+  /* 24px grid gap, ±2px tolerance for sub-pixel rounding. */
+  expect(gap).toBeGreaterThanOrEqual(22);
+  expect(gap).toBeLessThanOrEqual(26);
 });
 
 test("all four nav tabs share the same vertical center", async ({ page }) => {
