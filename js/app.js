@@ -70,29 +70,60 @@ const RECENTLY_ADDED_TTL_MS = 2500;
 // ============================================================
 const els = {};
 
+/* Thin orchestrator — each `_cache*Elements()` helper owns the DOM
+ * refs for one view (or for shared infrastructure: modal, nav,
+ * global UI). Splitting this way keeps the file scannable and means
+ * adding / removing an element in a view only touches that view's
+ * helper. The dropZones array is built last because it depends on
+ * play-zone refs being populated. */
 function cacheElements() {
+  _cacheGlobalElements();
+  _cacheNavElements();
+  _cachePlayElements();
+  _cacheManageElements();
+  _cacheAnalyzeElements();
+  _cacheGalleryElements();
+  _cacheModalElements();
+  _cacheImportExportElements();
+  /* Header deck-pill + dropdown lookups owned by app-header.js. */
+  cacheHeaderElements();
+  _buildDropZones();
+}
+
+function _cacheGlobalElements() {
   els.deckSelect = document.getElementById("deck-select");
-  /* Trash button lives in the deck-summary panel since the manage-view
-   * refonte (was in the header deck-pill dropdown). Cached under the
-   * same name so existing call sites (updateDeleteButton, click wiring)
-   * keep working without renaming. */
-  els.btnDeleteDeck = document.getElementById("btn-delete-deck-summary");
-  els.btnDuplicateDeck = document.getElementById("btn-duplicate-deck");
-  els.btnImportToggle = document.getElementById("btn-import-toggle");
+  els.flashContainer = document.getElementById("flash-container");
+  els.translationBanner = document.getElementById("translation-banner");
+}
+
+function _cacheNavElements() {
+  els.tabPlay = document.getElementById("tab-play");
+  els.tabManage = document.getElementById("tab-manage");
+  els.tabAnalyze = document.getElementById("tab-analyze");
+  els.tabGallery = document.getElementById("tab-gallery");
+  els.viewPlay = document.getElementById("view-play");
+  els.viewManage = document.getElementById("view-manage");
+  els.viewAnalyze = document.getElementById("view-analyze");
+  els.viewGallery = document.getElementById("view-gallery");
+}
+
+function _cachePlayElements() {
   els.btnDraw = document.getElementById("btn-draw");
   els.btnNextTurn = document.getElementById("btn-next-turn");
   els.btnNew = document.getElementById("btn-new");
+  els.btnNextTurnLabel = document.getElementById("btn-next-turn-label");
+  /* Sidebar counters. */
   els.turnCounter = document.getElementById("turn-counter");
   els.libraryCount = document.getElementById("library-count");
   els.graveyardCount = document.getElementById("graveyard-count");
   els.battlefieldCount = document.getElementById("battlefield-count");
-  /* Game-state bar mirrors (top of #view-play). Same values as the
-   * sidebar counters above; we update both in renderGameBar so
-   * the user sees them wherever their eye lands. */
+  /* Game-state bar mirrors (top of #view-play) — same values as the
+   * sidebar counters above; we update both in renderGameBar so the
+   * user sees them wherever their eye lands. */
   els.gameStateTurn = document.getElementById("game-state-turn");
   els.gameStateLibrary = document.getElementById("game-state-library");
   els.gameStateHand = document.getElementById("game-state-hand");
-  els.btnNextTurnLabel = document.getElementById("btn-next-turn-label");
+  /* Zones. */
   els.commanderZone = document.getElementById("commander-zone");
   els.commanderInfo = document.getElementById("commander-info");
   els.battlefield = document.getElementById("battlefield");
@@ -104,44 +135,51 @@ function cacheElements() {
   els.graveyard = document.getElementById("graveyard");
   els.graveyardInfo = document.getElementById("graveyard-info");
   els.basicLands = document.getElementById("basic-lands");
+  /* Hand stats. */
   els.statLands = document.getElementById("stat-lands");
   els.statLandsSub = document.getElementById("stat-lands-sub");
   els.statSpells = document.getElementById("stat-spells");
   els.statSpellsSub = document.getElementById("stat-spells-sub");
   els.statSources = document.getElementById("stat-sources");
-  els.modal = document.getElementById("modal");
-  els.modalImg = document.getElementById("modal-img");
-  els.modalActions = document.getElementById("modal-actions");
-  els.importName = document.getElementById("import-name");
-  els.importText = document.getElementById("import-text");
-  els.importPreview = document.getElementById("import-preview");
-  els.importCancel = document.getElementById("import-cancel");
-  els.importConfirm = document.getElementById("import-confirm");
-  els.btnExport = document.getElementById("btn-export");
-  els.ieModal = document.getElementById("ie-modal");
-  els.ieModalClose = document.getElementById("ie-modal-close");
-  els.ieModalTitle = document.getElementById("ie-modal-title");
-  els.iePanelImport = document.getElementById("ie-panel-import");
-  els.iePanelExport = document.getElementById("ie-panel-export");
-  els.exportFormat = document.getElementById("export-format");
-  els.exportDescription = document.getElementById("export-description");
-  els.exportOutput = document.getElementById("export-output");
-  els.exportCopy = document.getElementById("export-copy");
-  els.exportDownload = document.getElementById("export-download");
-  els.exportFeedback = document.getElementById("export-feedback");
+  /* NodeList of basic-land buttons, populated by buildBasicLandButtons.
+   * Cached as an array so updateButtons doesn't re-query the DOM
+   * every render. */
+  els.basicLandButtons = [];
+}
 
-  els.tabPlay = document.getElementById("tab-play");
-  els.tabManage = document.getElementById("tab-manage");
-  els.tabAnalyze = document.getElementById("tab-analyze");
-  els.tabGallery = document.getElementById("tab-gallery");
-  /* Header deck-pill + dropdown lookups owned by app-header.js. */
-  cacheHeaderElements();
-  els.viewPlay = document.getElementById("view-play");
-  els.viewManage = document.getElementById("view-manage");
-  els.viewAnalyze = document.getElementById("view-analyze");
-  els.viewGallery = document.getElementById("view-gallery");
-  els.galleryContent = document.getElementById("gallery-content");
+function _cacheManageElements() {
+  /* Trash button lives in the deck-summary panel since the manage-view
+   * refonte (was in the header deck-pill dropdown). Cached under the
+   * same name so existing call sites (updateDeleteButton, click wiring)
+   * keep working without renaming. */
+  els.btnDeleteDeck = document.getElementById("btn-delete-deck-summary");
+  els.btnDuplicateDeck = document.getElementById("btn-duplicate-deck");
+  els.btnImportToggle = document.getElementById("btn-import-toggle");
+  els.manageDeckName = document.getElementById("manage-deck-name");
+  els.manageMeta = document.getElementById("manage-meta");
+  els.manageCommanders = document.getElementById("manage-commanders");
+  els.manageCards = document.getElementById("manage-cards");
+  els.manageCardsCount = document.getElementById("manage-cards-count");
+  els.addCardInput = document.getElementById("add-card-input");
+  els.addCardSuggestions = document.getElementById("add-card-suggestions");
+  els.addCardPasteText = document.getElementById("add-card-paste-text");
+  els.addCardPasteBtn = document.getElementById("add-card-paste-btn");
+  els.addCardDraft = document.getElementById("add-card-draft");
+  els.addCardDraftName = document.getElementById("add-card-draft-name");
+  els.addCardDraftPreview = document.getElementById("add-card-draft-preview");
+  els.addCardDraftPrinting = document.getElementById("add-card-draft-printing");
+  els.addCardDraftQty = document.getElementById("add-card-draft-qty");
+  els.addCardDraftCancel = document.getElementById("add-card-draft-cancel");
+  els.addCardDraftSubmit = document.getElementById("add-card-draft-submit");
+  els.langSwitchEn = document.getElementById("lang-switch-en");
+  els.langSwitchFr = document.getElementById("lang-switch-fr");
+  /* Format edit lives in the deck-summary meta-row (click on the
+   * format text → dropdown). Replaces the old <select> field. */
+  els.formatTrigger = document.getElementById("manage-deck-format-trigger");
+  els.formatMenu = document.getElementById("manage-deck-format-menu");
+}
 
+function _cacheAnalyzeElements() {
   els.analyzeBracket = document.getElementById("analyze-bracket");
   els.analyzeBracketLabel = document.getElementById("analyze-bracket-label");
   els.analyzeSuggestions = document.getElementById("analyze-suggestions");
@@ -162,35 +200,44 @@ function cacheElements() {
   els.analyzeTokensInfo = document.getElementById("analyze-tokens-info");
   els.analyzeManaBase = document.getElementById("analyze-mana-base");
   els.analyzeManaBaseInfo = document.getElementById("analyze-mana-base-info");
+}
 
-  els.manageDeckName = document.getElementById("manage-deck-name");
-  els.manageMeta = document.getElementById("manage-meta");
-  els.manageCommanders = document.getElementById("manage-commanders");
-  els.manageCards = document.getElementById("manage-cards");
-  els.manageCardsCount = document.getElementById("manage-cards-count");
-  els.addCardInput = document.getElementById("add-card-input");
-  els.addCardSuggestions = document.getElementById("add-card-suggestions");
-  els.addCardPasteText = document.getElementById("add-card-paste-text");
-  els.addCardPasteBtn = document.getElementById("add-card-paste-btn");
-  els.addCardDraft = document.getElementById("add-card-draft");
-  els.addCardDraftName = document.getElementById("add-card-draft-name");
-  els.addCardDraftPreview = document.getElementById("add-card-draft-preview");
-  els.addCardDraftPrinting = document.getElementById("add-card-draft-printing");
-  els.addCardDraftQty = document.getElementById("add-card-draft-qty");
-  els.addCardDraftCancel = document.getElementById("add-card-draft-cancel");
-  els.addCardDraftSubmit = document.getElementById("add-card-draft-submit");
-  els.langSwitchEn = document.getElementById("lang-switch-en");
-  els.langSwitchFr = document.getElementById("lang-switch-fr");
-  els.translationBanner = document.getElementById("translation-banner");
-  els.flashContainer = document.getElementById("flash-container");
-  /* Format edit lives in the deck-summary meta-row (click on the
-   * format text → dropdown). Replaces the old <select> field. */
-  els.formatTrigger = document.getElementById("manage-deck-format-trigger");
-  els.formatMenu = document.getElementById("manage-deck-format-menu");
+function _cacheGalleryElements() {
+  els.galleryContent = document.getElementById("gallery-content");
+}
 
-  // Build once: which DOM zones receive drops, and which game zone they
-  // resolve to. The lands block resolves to the same `battlefield`
-  // game zone (renderBattlefield filters the array for display).
+function _cacheModalElements() {
+  els.modal = document.getElementById("modal");
+  els.modalImg = document.getElementById("modal-img");
+  els.modalActions = document.getElementById("modal-actions");
+}
+
+function _cacheImportExportElements() {
+  els.importName = document.getElementById("import-name");
+  els.importText = document.getElementById("import-text");
+  els.importPreview = document.getElementById("import-preview");
+  els.importCancel = document.getElementById("import-cancel");
+  els.importConfirm = document.getElementById("import-confirm");
+  els.btnExport = document.getElementById("btn-export");
+  els.ieModal = document.getElementById("ie-modal");
+  els.ieModalClose = document.getElementById("ie-modal-close");
+  els.ieModalTitle = document.getElementById("ie-modal-title");
+  els.iePanelImport = document.getElementById("ie-panel-import");
+  els.iePanelExport = document.getElementById("ie-panel-export");
+  els.exportFormat = document.getElementById("export-format");
+  els.exportDescription = document.getElementById("export-description");
+  els.exportOutput = document.getElementById("export-output");
+  els.exportCopy = document.getElementById("export-copy");
+  els.exportDownload = document.getElementById("export-download");
+  els.exportFeedback = document.getElementById("export-feedback");
+}
+
+/* Build once: which DOM zones receive drops, and which game zone
+ * they resolve to. The lands block resolves to the same
+ * `battlefield` game zone (renderBattlefield filters the array for
+ * display). Must run after `_cachePlayElements` has populated the
+ * zone refs. */
+function _buildDropZones() {
   els.dropZones = [
     { el: els.hand, zone: "hand" },
     { el: els.battlefield, zone: "battlefield" },
@@ -198,10 +245,6 @@ function cacheElements() {
     { el: els.graveyard, zone: "graveyard" },
     { el: els.commanderZone, zone: "command" },
   ];
-  // NodeList of basic-land buttons, populated by buildBasicLandButtons.
-  // Cached here as an array so updateButtons doesn't re-query the DOM
-  // every render.
-  els.basicLandButtons = [];
 }
 
 // ============================================================

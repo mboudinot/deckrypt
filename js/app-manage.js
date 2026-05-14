@@ -2,11 +2,12 @@
  * printing picker, remove buttons, format selector, EN/FR card-name
  * toggle, add-card UI (autocomplete + paste-add).
  *
- * Reads `state`, `els` and shared helpers (`placeholderText`,
- * `makeCardEl`, `makeXIcon`, `showModal`, `closeModal`,
- * `commitDeckChange`, `rerenderDeckViews`, `setStatus`, `findDeck`).
- * Load order: after app-play.js (for placeholderText / makeXIcon)
- * and after app-manage-side.js (renderSideComposition /
+ * Reads `state`, `els` and shared helpers: `placeholderText` +
+ * `makeXIcon` from `dom-helpers.js`, `makeCardEl` from `app-play.js`,
+ * `showModal` / `closeModal` / `commitDeckChange` /
+ * `rerenderDeckViews` / `setStatus` / `findDeck` from `app.js`.
+ * Load order: after dom-helpers.js, after app-play.js (for
+ * `makeCardEl`), after app-manage-side.js (renderSideComposition /
  * renderSideBracket — split out when this file passed 1300 lines),
  * after pure modules, before app.js. */
 

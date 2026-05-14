@@ -21,45 +21,10 @@ const BASIC_LANDS = [
 ];
 
 // ============================================================
-// Rendering helpers (shared with manage + analyze views)
+// Rendering helpers
 // ============================================================
-function placeholderText(text) {
-  const div = document.createElement("div");
-  div.className = "placeholder-empty";
-  div.textContent = text;
-  return div;
-}
-
-/* X (close/remove) SVG built via DOM APIs rather than innerHTML —
- * avoids the pattern of "innerHTML with template literal" that's only
- * safe when the content is fully static, and trivially copy-pasted
- * into unsafe contexts later. Used by manage card-rows for the
- * "remove from deck" affordance. */
-const SVG_NS = "http://www.w3.org/2000/svg";
-function makeXIcon(size = 14) {
-  const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", String(size));
-  svg.setAttribute("height", String(size));
-  svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("focusable", "false");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "2");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-
-  const a = document.createElementNS(SVG_NS, "line");
-  a.setAttribute("x1", "6"); a.setAttribute("y1", "6");
-  a.setAttribute("x2", "18"); a.setAttribute("y2", "18");
-  svg.appendChild(a);
-  const b = document.createElementNS(SVG_NS, "line");
-  b.setAttribute("x1", "18"); b.setAttribute("y1", "6");
-  b.setAttribute("x2", "6"); b.setAttribute("y2", "18");
-  svg.appendChild(b);
-
-  return svg;
-}
+// `placeholderText` and `makeXIcon` moved to js/dom-helpers.js
+// (shared with manage / analyze / gallery views).
 
 /* Build a card DOM node. Generic — same builder for commanders and
  * game instances; the caller supplies tap state, aria text, and the
