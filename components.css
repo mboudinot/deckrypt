@@ -361,9 +361,14 @@ html.has-session-hint .account.account-anon .account-name {
 }
 .color-pips:empty { display: none; }
 .pip-dot {
-  width: 9px; height: 9px;
+  width: 12px; height: 12px;
   border-radius: 50%;
   display: inline-block;
+  /* Subtle inner shadow so the B pip (near-black) stays readable on
+   * the dark studio surface without needing a separate border-only
+   * rule. The other pips (W/U/R/G) have enough chroma that the
+   * shadow is barely perceptible. */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
 }
 .pip-dot.dot-w { background: var(--mtg-w); }
 .pip-dot.dot-u { background: var(--mtg-u); }
@@ -573,7 +578,9 @@ section {
 }
 .land-btn.W { color: var(--mtg-w); border-color: rgba(245, 233, 192, 0.35); }
 .land-btn.U { color: var(--mtg-u); border-color: rgba(78, 168, 222, 0.35); }
-.land-btn.B { color: var(--mtg-b); border-color: rgba(167, 139, 250, 0.35); }
+/* B uses near-black `--mtg-b` post-migration; keep the dot/border
+ * in mtg-b but the label uses --text so it stays legible on studio. */
+.land-btn.B { color: var(--text); border-color: rgba(80, 80, 95, 0.45); }
 .land-btn.R { color: var(--mtg-r); border-color: rgba(255, 138, 115, 0.35); }
 .land-btn.G { color: var(--mtg-g); border-color: rgba(110, 231, 183, 0.35); }
 .land-btn.W .dot { background: var(--mtg-w); }
@@ -586,7 +593,7 @@ section {
    flatten everything to --accent and lose the WUBRG identity). */
 .land-btn.W:hover:not(:disabled) { background: rgba(245, 233, 192, 0.18); border-color: var(--mtg-w); color: var(--mtg-w); }
 .land-btn.U:hover:not(:disabled) { background: rgba(78, 168, 222, 0.18); border-color: var(--mtg-u); color: var(--mtg-u); }
-.land-btn.B:hover:not(:disabled) { background: rgba(167, 139, 250, 0.18); border-color: var(--mtg-b); color: var(--mtg-b); }
+.land-btn.B:hover:not(:disabled) { background: rgba(80, 80, 95, 0.22); border-color: var(--mtg-b); color: var(--text); }
 .land-btn.R:hover:not(:disabled) { background: rgba(255, 138, 115, 0.18); border-color: var(--mtg-r); color: var(--mtg-r); }
 .land-btn.G:hover:not(:disabled) { background: rgba(110, 231, 183, 0.18); border-color: var(--mtg-g); color: var(--mtg-g); }
 .land-btn:hover:not(:disabled) {
@@ -695,7 +702,11 @@ section {
 .pip .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .pip.W .dot { background: var(--mtg-w); } .pip.W { color: var(--mtg-w); }
 .pip.U .dot { background: var(--mtg-u); } .pip.U { color: var(--mtg-u); }
-.pip.B .dot { background: var(--mtg-b); } .pip.B { color: var(--mtg-b); }
+/* B uses a near-black `--mtg-b` (post-purple migration), so we keep
+ * the dot in mtg-b but fall back to the neutral text colour for the
+ * label — `var(--mtg-b)` as text would be invisible on the studio
+ * dark surface. */
+.pip.B .dot { background: var(--mtg-b); } .pip.B { color: var(--text); }
 .pip.R .dot { background: var(--mtg-r); } .pip.R { color: var(--mtg-r); }
 .pip.G .dot { background: var(--mtg-g); } .pip.G { color: var(--mtg-g); }
 

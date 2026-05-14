@@ -8,16 +8,20 @@
 
 :root {
   /* WUBRG palette — refined in oklch for perceptual consistency.
-     These stay constant across directions (they ARE Magic colors). */
+     These stay constant across directions (they ARE Magic colors).
+     Black (B) tracks Scryfall's official rendering (~#0D0F0F): a
+     near-black slate, NOT the older purple tint. Purple was a
+     decorative carry-over from earlier MTG palettes — the actual
+     Magic Black is dark grey on the cards. */
   --mtg-w: oklch(0.93 0.07 95);
   --mtg-u: oklch(0.68 0.16 240);
-  --mtg-b: oklch(0.72 0.13 295);
+  --mtg-b: oklch(0.22 0.015 280);
   --mtg-r: oklch(0.72 0.18 25);
   --mtg-g: oklch(0.78 0.16 160);
 
   --mtg-w-bg: oklch(0.93 0.07 95 / 0.14);
   --mtg-u-bg: oklch(0.68 0.16 240 / 0.14);
-  --mtg-b-bg: oklch(0.72 0.13 295 / 0.14);
+  --mtg-b-bg: oklch(0.22 0.015 280 / 0.30);
   --mtg-r-bg: oklch(0.72 0.18 25 / 0.14);
   --mtg-g-bg: oklch(0.78 0.16 160 / 0.14);
 }
@@ -103,16 +107,17 @@
 
   --grid-bg: none;
 
-  /* WUBRG slightly darker for legibility on light bg */
+  /* WUBRG slightly darker for legibility on light bg. Black (B)
+   * matches the cross-theme near-black slate (see root WUBRG note). */
   --mtg-w: oklch(0.65 0.08 85);
   --mtg-u: oklch(0.5 0.18 240);
-  --mtg-b: oklch(0.5 0.15 295);
+  --mtg-b: oklch(0.18 0.015 280);
   --mtg-r: oklch(0.55 0.22 25);
   --mtg-g: oklch(0.55 0.16 160);
 
   --mtg-w-bg: oklch(0.65 0.08 85 / 0.12);
   --mtg-u-bg: oklch(0.5 0.18 240 / 0.10);
-  --mtg-b-bg: oklch(0.5 0.15 295 / 0.10);
+  --mtg-b-bg: oklch(0.18 0.015 280 / 0.12);
   --mtg-r-bg: oklch(0.55 0.22 25 / 0.10);
   --mtg-g-bg: oklch(0.55 0.16 160 / 0.10);
 }

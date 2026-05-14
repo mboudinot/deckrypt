@@ -470,22 +470,34 @@ function parseManaSymbols(cost) {
   return matches.map((s) => s.slice(1, -1));
 }
 
-/* Build one `.mana-symbol` span for a parsed symbol. WUBRG → solid
- * colour disc, no glyph; generic + X/Y/Z + numbers → grey disc with
- * the value; hybrid / Phyrexian / snow / colourless → grey disc with
- * the literal symbol (cheap, doesn't need a full mana-symbol font). */
+/* Build one `<img>` element for a parsed mana symbol, pointing at
+ * the self-hosted Scryfall SVG. Naming convention follows Scryfall's
+ * own URLs (strip braces, drop slashes, uppercase): `{W}` → W.svg,
+ * `{2/U}` → 2U.svg, `{W/P}` → WP.svg, etc. Full set (84 symbols
+ * at time of writing) lives in `assets/mana-symbols/` with a
+ * `manifest.json` describing each one — refreshable when WotC ships
+ * a new symbol.
+ *
+ * The error handler is the forward-compat seam: if a new extension
+ * introduces a symbol we haven't downloaded yet, the row renders a
+ * neutral text-disc fallback instead of a broken-image icon. */
 function makeManaSymbol(raw) {
-  const sp = document.createElement("span");
   const inner = (raw || "").toUpperCase();
-  if (["W", "U", "B", "R", "G"].includes(inner)) {
-    sp.className = `mana-symbol s-${inner.toLowerCase()}`;
-    sp.setAttribute("aria-label", inner);
-  } else {
-    sp.className = "mana-symbol s-c";
+  const file = inner.replace(/\//g, "") + ".svg";
+  const img = document.createElement("img");
+  img.className = "mana-symbol";
+  img.src = `assets/mana-symbols/${file}`;
+  img.alt = inner;
+  img.setAttribute("aria-label", inner);
+  img.loading = "lazy";
+  img.addEventListener("error", () => {
+    const sp = document.createElement("span");
+    sp.className = "mana-symbol mana-symbol-fallback";
     sp.textContent = inner;
     sp.setAttribute("aria-label", inner);
-  }
-  return sp;
+    img.replaceWith(sp);
+  });
+  return img;
 }
 
 /* Group the deck entries by primary type (Land / Creature / …),

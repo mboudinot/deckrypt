@@ -1,0 +1,697 @@
+{
+  "fetched_at": "2026-05-14",
+  "symbols": [
+    {
+      "symbol": "{T}",
+      "inner": "T",
+      "file": "T.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{Q}",
+      "inner": "Q",
+      "file": "Q.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{E}",
+      "inner": "E",
+      "file": "E.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{P}",
+      "inner": "P",
+      "file": "P.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{PW}",
+      "inner": "PW",
+      "file": "PW.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{CHAOS}",
+      "inner": "CHAOS",
+      "file": "CHAOS.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{A}",
+      "inner": "A",
+      "file": "A.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{TK}",
+      "inner": "TK",
+      "file": "TK.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{X}",
+      "inner": "X",
+      "file": "X.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{Y}",
+      "inner": "Y",
+      "file": "Y.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{Z}",
+      "inner": "Z",
+      "file": "Z.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{0}",
+      "inner": "0",
+      "file": "0.svg",
+      "colors": [],
+      "mana_value": 0.0
+    },
+    {
+      "symbol": "{\u00bd}",
+      "inner": "\u00bd",
+      "file": "HALF.svg",
+      "colors": [],
+      "mana_value": 0.5
+    },
+    {
+      "symbol": "{1}",
+      "inner": "1",
+      "file": "1.svg",
+      "colors": [],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{2}",
+      "inner": "2",
+      "file": "2.svg",
+      "colors": [],
+      "mana_value": 2.0
+    },
+    {
+      "symbol": "{3}",
+      "inner": "3",
+      "file": "3.svg",
+      "colors": [],
+      "mana_value": 3.0
+    },
+    {
+      "symbol": "{4}",
+      "inner": "4",
+      "file": "4.svg",
+      "colors": [],
+      "mana_value": 4.0
+    },
+    {
+      "symbol": "{5}",
+      "inner": "5",
+      "file": "5.svg",
+      "colors": [],
+      "mana_value": 5.0
+    },
+    {
+      "symbol": "{6}",
+      "inner": "6",
+      "file": "6.svg",
+      "colors": [],
+      "mana_value": 6.0
+    },
+    {
+      "symbol": "{7}",
+      "inner": "7",
+      "file": "7.svg",
+      "colors": [],
+      "mana_value": 7.0
+    },
+    {
+      "symbol": "{8}",
+      "inner": "8",
+      "file": "8.svg",
+      "colors": [],
+      "mana_value": 8.0
+    },
+    {
+      "symbol": "{9}",
+      "inner": "9",
+      "file": "9.svg",
+      "colors": [],
+      "mana_value": 9.0
+    },
+    {
+      "symbol": "{10}",
+      "inner": "10",
+      "file": "10.svg",
+      "colors": [],
+      "mana_value": 10.0
+    },
+    {
+      "symbol": "{11}",
+      "inner": "11",
+      "file": "11.svg",
+      "colors": [],
+      "mana_value": 11.0
+    },
+    {
+      "symbol": "{12}",
+      "inner": "12",
+      "file": "12.svg",
+      "colors": [],
+      "mana_value": 12.0
+    },
+    {
+      "symbol": "{13}",
+      "inner": "13",
+      "file": "13.svg",
+      "colors": [],
+      "mana_value": 13.0
+    },
+    {
+      "symbol": "{14}",
+      "inner": "14",
+      "file": "14.svg",
+      "colors": [],
+      "mana_value": 14.0
+    },
+    {
+      "symbol": "{15}",
+      "inner": "15",
+      "file": "15.svg",
+      "colors": [],
+      "mana_value": 15.0
+    },
+    {
+      "symbol": "{16}",
+      "inner": "16",
+      "file": "16.svg",
+      "colors": [],
+      "mana_value": 16.0
+    },
+    {
+      "symbol": "{17}",
+      "inner": "17",
+      "file": "17.svg",
+      "colors": [],
+      "mana_value": 17.0
+    },
+    {
+      "symbol": "{18}",
+      "inner": "18",
+      "file": "18.svg",
+      "colors": [],
+      "mana_value": 18.0
+    },
+    {
+      "symbol": "{19}",
+      "inner": "19",
+      "file": "19.svg",
+      "colors": [],
+      "mana_value": 19.0
+    },
+    {
+      "symbol": "{20}",
+      "inner": "20",
+      "file": "20.svg",
+      "colors": [],
+      "mana_value": 20.0
+    },
+    {
+      "symbol": "{100}",
+      "inner": "100",
+      "file": "100.svg",
+      "colors": [],
+      "mana_value": 100.0
+    },
+    {
+      "symbol": "{1000000}",
+      "inner": "1000000",
+      "file": "1000000.svg",
+      "colors": [],
+      "mana_value": 1000000.0
+    },
+    {
+      "symbol": "{\u221e}",
+      "inner": "\u221e",
+      "file": "INFINITY.svg",
+      "colors": [],
+      "mana_value": null
+    },
+    {
+      "symbol": "{W/U}",
+      "inner": "W/U",
+      "file": "WU.svg",
+      "colors": [
+        "W",
+        "U"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{W/B}",
+      "inner": "W/B",
+      "file": "WB.svg",
+      "colors": [
+        "W",
+        "B"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{B/R}",
+      "inner": "B/R",
+      "file": "BR.svg",
+      "colors": [
+        "B",
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{B/G}",
+      "inner": "B/G",
+      "file": "BG.svg",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{U/B}",
+      "inner": "U/B",
+      "file": "UB.svg",
+      "colors": [
+        "U",
+        "B"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{U/R}",
+      "inner": "U/R",
+      "file": "UR.svg",
+      "colors": [
+        "U",
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{R/G}",
+      "inner": "R/G",
+      "file": "RG.svg",
+      "colors": [
+        "R",
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{R/W}",
+      "inner": "R/W",
+      "file": "RW.svg",
+      "colors": [
+        "W",
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{G/W}",
+      "inner": "G/W",
+      "file": "GW.svg",
+      "colors": [
+        "W",
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{G/U}",
+      "inner": "G/U",
+      "file": "GU.svg",
+      "colors": [
+        "U",
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{B/G/P}",
+      "inner": "B/G/P",
+      "file": "BGP.svg",
+      "colors": [
+        "B",
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{B/R/P}",
+      "inner": "B/R/P",
+      "file": "BRP.svg",
+      "colors": [
+        "B",
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{G/U/P}",
+      "inner": "G/U/P",
+      "file": "GUP.svg",
+      "colors": [
+        "U",
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{G/W/P}",
+      "inner": "G/W/P",
+      "file": "GWP.svg",
+      "colors": [
+        "W",
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{R/G/P}",
+      "inner": "R/G/P",
+      "file": "RGP.svg",
+      "colors": [
+        "R",
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{R/W/P}",
+      "inner": "R/W/P",
+      "file": "RWP.svg",
+      "colors": [
+        "W",
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{U/B/P}",
+      "inner": "U/B/P",
+      "file": "UBP.svg",
+      "colors": [
+        "U",
+        "B"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{U/R/P}",
+      "inner": "U/R/P",
+      "file": "URP.svg",
+      "colors": [
+        "U",
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{W/B/P}",
+      "inner": "W/B/P",
+      "file": "WBP.svg",
+      "colors": [
+        "W",
+        "B"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{W/U/P}",
+      "inner": "W/U/P",
+      "file": "WUP.svg",
+      "colors": [
+        "W",
+        "U"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{C/W}",
+      "inner": "C/W",
+      "file": "CW.svg",
+      "colors": [
+        "W"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{C/U}",
+      "inner": "C/U",
+      "file": "CU.svg",
+      "colors": [
+        "U"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{C/B}",
+      "inner": "C/B",
+      "file": "CB.svg",
+      "colors": [
+        "B"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{C/R}",
+      "inner": "C/R",
+      "file": "CR.svg",
+      "colors": [
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{C/G}",
+      "inner": "C/G",
+      "file": "CG.svg",
+      "colors": [
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{2/W}",
+      "inner": "2/W",
+      "file": "2W.svg",
+      "colors": [
+        "W"
+      ],
+      "mana_value": 2.0
+    },
+    {
+      "symbol": "{2/U}",
+      "inner": "2/U",
+      "file": "2U.svg",
+      "colors": [
+        "U"
+      ],
+      "mana_value": 2.0
+    },
+    {
+      "symbol": "{2/B}",
+      "inner": "2/B",
+      "file": "2B.svg",
+      "colors": [
+        "B"
+      ],
+      "mana_value": 2.0
+    },
+    {
+      "symbol": "{2/R}",
+      "inner": "2/R",
+      "file": "2R.svg",
+      "colors": [
+        "R"
+      ],
+      "mana_value": 2.0
+    },
+    {
+      "symbol": "{2/G}",
+      "inner": "2/G",
+      "file": "2G.svg",
+      "colors": [
+        "G"
+      ],
+      "mana_value": 2.0
+    },
+    {
+      "symbol": "{H}",
+      "inner": "H",
+      "file": "H.svg",
+      "colors": [],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{W/P}",
+      "inner": "W/P",
+      "file": "WP.svg",
+      "colors": [
+        "W"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{U/P}",
+      "inner": "U/P",
+      "file": "UP.svg",
+      "colors": [
+        "U"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{B/P}",
+      "inner": "B/P",
+      "file": "BP.svg",
+      "colors": [
+        "B"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{R/P}",
+      "inner": "R/P",
+      "file": "RP.svg",
+      "colors": [
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{G/P}",
+      "inner": "G/P",
+      "file": "GP.svg",
+      "colors": [
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{C/P}",
+      "inner": "C/P",
+      "file": "CP.svg",
+      "colors": [],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{HW}",
+      "inner": "HW",
+      "file": "HW.svg",
+      "colors": [
+        "W"
+      ],
+      "mana_value": 0.5
+    },
+    {
+      "symbol": "{HR}",
+      "inner": "HR",
+      "file": "HR.svg",
+      "colors": [
+        "R"
+      ],
+      "mana_value": 0.5
+    },
+    {
+      "symbol": "{W}",
+      "inner": "W",
+      "file": "W.svg",
+      "colors": [
+        "W"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{U}",
+      "inner": "U",
+      "file": "U.svg",
+      "colors": [
+        "U"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{B}",
+      "inner": "B",
+      "file": "B.svg",
+      "colors": [
+        "B"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{R}",
+      "inner": "R",
+      "file": "R.svg",
+      "colors": [
+        "R"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{G}",
+      "inner": "G",
+      "file": "G.svg",
+      "colors": [
+        "G"
+      ],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{C}",
+      "inner": "C",
+      "file": "C.svg",
+      "colors": [],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{S}",
+      "inner": "S",
+      "file": "S.svg",
+      "colors": [],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{L}",
+      "inner": "L",
+      "file": "L.svg",
+      "colors": [],
+      "mana_value": 1.0
+    },
+    {
+      "symbol": "{D}",
+      "inner": "D",
+      "file": "D.svg",
+      "colors": [],
+      "mana_value": 0
+    }
+  ]
+}

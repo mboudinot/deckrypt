@@ -176,7 +176,7 @@
 .card-row {
   display: grid;
   /* thumb · name · color-pips · printing · qty · remove */
-  grid-template-columns: 50px 1fr auto auto auto auto;
+  grid-template-columns: 70px 1fr auto auto auto auto;
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
@@ -192,12 +192,10 @@
   margin: 0;
 }
 
-/* Inline mana cost — one disc per `{…}` symbol, in printed order.
- * WUBRG → solid colour using the WUBRG tokens (same hue as the
- * commander pips); generic / X / hybrid → grey with the literal
- * number or letter inside. Discs are visually lightweight (15px,
- * subtle inner shadow) so a 4-symbol cost doesn't dominate the
- * row. */
+/* Inline mana cost — one SVG per `{…}` symbol, in printed order.
+ * The SVGs live in `assets/mana-symbols/` and are the canonical
+ * Scryfall artwork (WotC Fan Content Policy). Each SVG embeds its
+ * own colour and depth, so this rule is just about sizing + flow. */
 .mana-cost {
   display: inline-flex;
   align-items: center;
@@ -205,26 +203,32 @@
   flex-shrink: 0;
 }
 .mana-symbol {
+  /* 18 px: at 15 px the iconography (sun for W, water drop for U,
+   * etc.) was too small to read and the symbols looked like plain
+   * colour discs. 18 px makes the glyphs recognisable while keeping
+   * a typical 4-symbol cost under ~80 px of row width. */
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+/* Forward-compat fallback: rendered by `makeManaSymbol`'s `error`
+ * handler when a symbol's SVG isn't in `assets/mana-symbols/` (a
+ * brand-new extension we haven't refreshed yet). Mirrors the old
+ * pre-SVG disc styling so the row stays legible. */
+.mana-symbol-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 15px;
-  height: 15px;
   border-radius: 50%;
-  font-size: 9px;
+  background: color-mix(in oklch, var(--text-muted) 22%, transparent);
+  color: var(--text-2);
+  font-size: 10px;
   font-weight: 700;
   font-family: var(--font-mono);
   line-height: 1;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
-}
-.mana-symbol.s-w { background: var(--mtg-w); color: #1a1814; }
-.mana-symbol.s-u { background: var(--mtg-u); color: #ffffff; }
-.mana-symbol.s-b { background: var(--mtg-b); color: #ffffff; }
-.mana-symbol.s-r { background: var(--mtg-r); color: #ffffff; }
-.mana-symbol.s-g { background: var(--mtg-g); color: #1a1814; }
-.mana-symbol.s-c {
-  background: color-mix(in oklch, var(--text-muted) 22%, transparent);
-  color: var(--text-2);
 }
 /* Just-added highlight: a brief accent-colored flash that fades back
  * to the row's normal surface. Timing mirrors RECENTLY_ADDED_TTL_MS
@@ -245,7 +249,7 @@
    size. Override the global button styles (padding/font/colour-flip
    on hover) since this is a media affordance, not a text button. */
 .card-row-thumb {
-  width: 50px;
+  width: 70px;
   aspect-ratio: 488 / 680;
   border-radius: 4px;
   background: rgba(0,0,0,0.3);
@@ -268,6 +272,16 @@
 .card-row-thumb:disabled {
   cursor: default;
   opacity: 0.6;
+}
+/* Commander rows live in their own panel (#manage-commanders) and
+ * deserve a bigger thumbnail — they're the deck's centerpiece, not
+ * just another line. ~+40 % vs the card-row default, with the grid's
+ * first track widened to match. */
+#manage-commanders .card-row {
+  grid-template-columns: 100px 1fr auto auto auto auto;
+}
+#manage-commanders .card-row-thumb {
+  width: 100px;
 }
 .card-row-name {
   font-size: 0.95rem;
