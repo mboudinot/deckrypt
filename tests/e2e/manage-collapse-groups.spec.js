@@ -5,7 +5,10 @@ import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
  * fold types they don't currently care about (terrains, créatures,
  * etc.). The collapsed state is stored on `state.collapsedManageGroups`
  * and survives re-renders triggered by edits — closing "Terrains"
- * and then bumping a Creature's qty doesn't reopen "Terrains". */
+ * and then bumping a Creature's qty doesn't reopen "Terrains".
+ *
+ * NB: groups are by *type* (Land / Creature / …); the per-row colour
+ * indicator (`.mana-cost`) signals colour within each type bucket. */
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
@@ -13,6 +16,10 @@ test.beforeEach(async ({ page }) => {
   await seedSultaiDeck(page);
   await page.goto("/index.html");
   await page.click("#tab-manage");
+});
+
+const terrainsGroup = (page) => page.locator(".card-group", {
+  has: page.locator(".card-group-label", { hasText: "Terrains" }),
 });
 
 test("all card-groups render open by default", async ({ page }) => {
@@ -27,28 +34,24 @@ test("all card-groups render open by default", async ({ page }) => {
 });
 
 test("clicking a group's title collapses it; the card rows hide", async ({ page }) => {
-  const terrainsGroup = page.locator(".card-group", {
-    has: page.locator(".card-group-title", { hasText: "Terrains" }),
-  });
-  const cardsBefore = await terrainsGroup.locator(".card-row").count();
+  const grp = terrainsGroup(page);
+  const cardsBefore = await grp.locator(".card-row").count();
   expect(cardsBefore).toBeGreaterThan(0);
 
-  await terrainsGroup.locator("summary").click();
-  await expect(terrainsGroup).not.toHaveAttribute("open", "");
+  await grp.locator("summary").click();
+  await expect(grp).not.toHaveAttribute("open", "");
   // Card rows still in DOM but their containing <details> is closed,
   // so Playwright treats them as hidden.
-  await expect(terrainsGroup.locator(".card-row").first()).toBeHidden();
+  await expect(grp.locator(".card-row").first()).toBeHidden();
 });
 
 test("re-clicking re-opens the group", async ({ page }) => {
-  const terrainsGroup = page.locator(".card-group", {
-    has: page.locator(".card-group-title", { hasText: "Terrains" }),
-  });
-  await terrainsGroup.locator("summary").click();
-  await expect(terrainsGroup).not.toHaveAttribute("open", "");
-  await terrainsGroup.locator("summary").click();
-  await expect(terrainsGroup).toHaveAttribute("open", "");
-  await expect(terrainsGroup.locator(".card-row").first()).toBeVisible();
+  const grp = terrainsGroup(page);
+  await grp.locator("summary").click();
+  await expect(grp).not.toHaveAttribute("open", "");
+  await grp.locator("summary").click();
+  await expect(grp).toHaveAttribute("open", "");
+  await expect(grp.locator(".card-row").first()).toBeVisible();
 });
 
 test("collapsed state survives an edit-triggered re-render", async ({ page }) => {
@@ -57,34 +60,28 @@ test("collapsed state survives an edit-triggered re-render", async ({ page }) =>
    * → renderManageView rebuilds every group). Without state, the new
    * Terrains group would render with the default open state — losing
    * the user's choice. */
-  const terrainsGroup = page.locator(".card-group", {
-    has: page.locator(".card-group-title", { hasText: "Terrains" }),
-  });
-  await terrainsGroup.locator("summary").click();
-  await expect(terrainsGroup).not.toHaveAttribute("open", "");
+  const grp = terrainsGroup(page);
+  await grp.locator("summary").click();
+  await expect(grp).not.toHaveAttribute("open", "");
 
   // Trigger a re-render via a qty change on the first creature.
   const creatureRow = page.locator(".card-group", {
-    has: page.locator(".card-group-title", { hasText: "Créatures" }),
+    has: page.locator(".card-group-label", { hasText: "Créatures" }),
   }).locator(".card-row").first();
   await creatureRow.locator(".card-row-qty button", { hasText: "+" }).click();
 
   // Terrains should still be collapsed after the re-render.
-  await expect(page.locator(".card-group", {
-    has: page.locator(".card-group-title", { hasText: "Terrains" }),
-  })).not.toHaveAttribute("open", "");
+  await expect(terrainsGroup(page)).not.toHaveAttribute("open", "");
 });
 
 test("chevron rotates with the open/closed state", async ({ page }) => {
-  const terrainsGroup = page.locator(".card-group", {
-    has: page.locator(".card-group-title", { hasText: "Terrains" }),
-  });
-  const chevron = terrainsGroup.locator(".card-group-chevron");
+  const grp = terrainsGroup(page);
+  const chevron = grp.locator(".card-group-chevron");
   // Open by default → 180deg rotation (matrix(-1, 0, 0, -1, 0, 0)).
   const initial = await chevron.evaluate((el) => getComputedStyle(el).transform);
   expect(initial).toMatch(/matrix\(-1/);
 
-  await terrainsGroup.locator("summary").click();
+  await grp.locator("summary").click();
   await page.waitForTimeout(260);  // outwait the 200ms transition
   const after = await chevron.evaluate((el) => getComputedStyle(el).transform);
   // Closed → 0deg rotation (identity matrix or "none").

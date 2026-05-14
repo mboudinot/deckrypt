@@ -13,7 +13,7 @@ test("Manage view groups card rows by primary type with headers", async ({ page 
   await expect(page.locator(".card-group").first()).toBeVisible();
   // Section titles for at least one of the well-populated buckets in
   // the seeded Sultai deck (Lands, Creatures).
-  const labels = await page.locator(".card-group-title span:first-child").allTextContents();
+  const labels = await page.locator(".card-group-label").allTextContents();
   expect(labels).toEqual(expect.arrayContaining(["Terrains"]));
   expect(labels).toEqual(expect.arrayContaining(["Créatures"]));
   // Each title carries a running count.
@@ -281,4 +281,43 @@ test("printing picker renders multiple columns at default viewport", async ({ pa
   expect(pickerBox.width).toBeGreaterThan(800);
   // Each tile carries an explicit set/cn caption.
   await expect(page.locator(".printing-tile-cap").first()).toBeVisible();
+});
+
+test("opening the printing picker locks body scroll behind it", async ({ page }) => {
+  /* The page behind a modal must not drift when the user wheels
+   * inside a tall picker — declarative `html:has(.modal.open)` rule
+   * in views.css. */
+  const before = await page.evaluate(() => getComputedStyle(document.documentElement).overflow);
+  expect(before).not.toBe("hidden");
+
+  await page.locator("#manage-cards .card-row-printing").first().click();
+  await expect(page.locator(".printing-picker")).toBeVisible();
+
+  const during = await page.evaluate(() => getComputedStyle(document.documentElement).overflow);
+  expect(during).toBe("hidden");
+
+  await page.locator(".printing-picker-close").click();
+  await expect(page.locator("#modal")).not.toHaveClass(/open/);
+
+  const after = await page.evaluate(() => getComputedStyle(document.documentElement).overflow);
+  expect(after).not.toBe("hidden");
+});
+
+test("printing picker has a sticky close X that dismisses without selecting", async ({ page }) => {
+  /* The picker fills most of the modal at full grid height, so the
+   * `.modal` click-outside zone is a sliver — the user previously
+   * had to scroll up to find it. A sticky × at the picker's top-right
+   * gives a predictable exit at all times. */
+  await page.locator("#manage-cards .card-row-printing").first().click();
+  const closeBtn = page.locator(".printing-picker-close");
+  await expect(closeBtn).toBeVisible();
+
+  // Close-X sits at the top-right of the picker, NOT inside the grid.
+  const pickerBox = await page.locator(".printing-picker").boundingBox();
+  const btnBox = await closeBtn.boundingBox();
+  expect(btnBox.x + btnBox.width).toBeGreaterThan(pickerBox.x + pickerBox.width - 50);
+  expect(btnBox.y).toBeLessThan(pickerBox.y + 50);
+
+  await closeBtn.click();
+  await expect(page.locator("#modal")).not.toHaveClass(/open/);
 });

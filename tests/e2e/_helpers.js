@@ -77,7 +77,16 @@ export async function mockScryfall(page) {
           ["Cazur, Ruthless Stalker", ["B", "G"]],
         ]);
         const isCommander = id.name && SEEDED_COMMANDERS.has(id.name);
-        const colorIdentity = isCommander ? SEEDED_COMMANDERS.get(id.name) : [];
+        /* Basic lands carry the colour they produce as their identity
+         * so the manage view's colour-grouping has realistic buckets
+         * (Forest → "Vert", Island → "Bleu", etc.); commanders carry
+         * the declared multi-colour identity from SEEDED_COMMANDERS;
+         * everything else stays colourless in the mock. */
+        const colorIdentity = isCommander
+          ? SEEDED_COMMANDERS.get(id.name)
+          : isBasicLand
+            ? [BASIC_LAND_COLOR[id.name]]
+            : [];
         const typeLine = isBasicLand
           ? `Basic Land — ${id.name}`
           : isCommander

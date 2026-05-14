@@ -3,9 +3,9 @@
  * toggle, add-card UI (autocomplete + paste-add).
  *
  * Reads `state`, `els` and shared helpers (`placeholderText`,
- * `makeCardEl`, `makeTrashIcon`, `showModal`, `closeModal`,
+ * `makeCardEl`, `makeXIcon`, `showModal`, `closeModal`,
  * `commitDeckChange`, `rerenderDeckViews`, `setStatus`, `findDeck`).
- * Load order: after app-play.js (for placeholderText / makeTrashIcon),
+ * Load order: after app-play.js (for placeholderText / makeXIcon),
  * after pure modules, before app.js. */
 
 const MANAGE_LANG_KEY = "mtg-hand-sim:manage-lang";
@@ -282,6 +282,20 @@ function makeManageCardRow(entry, resolvedCard, opts) {
   }
   row.appendChild(name);
 
+  /* Mana cost — one badge per `{…}` symbol in the card's
+   * `mana_cost`. The colour-band gives an instant read of the
+   * card's identity within its type group (which sorts by colour),
+   * the generic-cost numbers make the curve scannable. Empty for
+   * lands and cards without a cost. */
+  const mana = document.createElement("span");
+  mana.className = "mana-cost card-row-mana";
+  if (resolvedCard && typeof resolvedCard.mana_cost === "string" && resolvedCard.mana_cost) {
+    for (const sym of parseManaSymbols(resolvedCard.mana_cost)) {
+      mana.appendChild(makeManaSymbol(sym));
+    }
+  }
+  row.appendChild(mana);
+
   const printing = document.createElement("button");
   printing.type = "button";
   printing.className = "card-row-printing";
@@ -313,10 +327,10 @@ function makeManageCardRow(entry, resolvedCard, opts) {
 
   const remove = document.createElement("button");
   remove.type = "button";
-  remove.className = "card-row-remove ghost icon-only";
+  remove.className = "card-row-remove";
   remove.title = "Retirer du deck";
   remove.setAttribute("aria-label", `Retirer ${entry.name} du deck`);
-  remove.appendChild(makeTrashIcon(14));
+  remove.appendChild(makeXIcon(14));
   remove.addEventListener("click", () => onRemoveEntry(entry, opts.kind));
   row.appendChild(remove);
 
@@ -389,16 +403,19 @@ function renderManageView(ctx = null) {
     return resolveForEntry(entry);
   };
   const displayName = (entry) => {
+    /* Canonicalise first, translate second. A paste-add of "1 island"
+     * gives the entry name "island" (lowercase), but the FR cache is
+     * keyed by Scryfall's "Island" — without this normalisation the
+     * lookup misses and the row stays English on the EN→FR toggle.
+     * Fallback to the entry's raw name while the async resolve is
+     * still in flight (no resolved card yet). */
+    const resolved = resolveForEntry(entry);
+    const canonical = (resolved && resolved.name) || entry.name;
     if (translate) {
-      const fr = translate(entry.name);
+      const fr = translate(canonical);
       if (fr) return fr;
     }
-    /* Prefer the canonical Scryfall name when we have it — so a
-     * paste-add of "1 sol ring" displays as "Sol Ring" instead of
-     * the user's lowercase typing. Fallback to the entry's raw name
-     * while the async resolve is still in flight. */
-    const resolved = resolveForEntry(entry);
-    return (resolved && resolved.name) || entry.name;
+    return canonical;
   };
 
   els.manageCommanders.replaceChildren();
@@ -420,8 +437,37 @@ function renderManageView(ctx = null) {
   }
 }
 
+/* Parse a Scryfall `mana_cost` string into an ordered list of raw
+ * symbol payloads. "{2}{U}{B}" → ["2", "U", "B"]. Order matters for
+ * rendering — the inline mana-cost reads like the printed card. */
+function parseManaSymbols(cost) {
+  const matches = (cost || "").match(/\{[^}]+\}/g) || [];
+  return matches.map((s) => s.slice(1, -1));
+}
+
+/* Build one `.mana-symbol` span for a parsed symbol. WUBRG → solid
+ * colour disc, no glyph; generic + X/Y/Z + numbers → grey disc with
+ * the value; hybrid / Phyrexian / snow / colourless → grey disc with
+ * the literal symbol (cheap, doesn't need a full mana-symbol font). */
+function makeManaSymbol(raw) {
+  const sp = document.createElement("span");
+  const inner = (raw || "").toUpperCase();
+  if (["W", "U", "B", "R", "G"].includes(inner)) {
+    sp.className = `mana-symbol s-${inner.toLowerCase()}`;
+    sp.setAttribute("aria-label", inner);
+  } else {
+    sp.className = "mana-symbol s-c";
+    sp.textContent = inner;
+    sp.setAttribute("aria-label", inner);
+  }
+  return sp;
+}
+
 /* Group the deck entries by primary type (Land / Creature / …),
- * sort each group by CMC then name, and render with a typed header.
+ * sort each group by colour band (mono W→U→B→R→G → multi → colourless)
+ * then CMC then name, and render with a typed header. The colour is
+ * conveyed VISUALLY by the per-row `.mana-cost` pips on the right —
+ * we don't write the colour in the group title.
  * Falls back to a single "Inconnu" bucket for cards we couldn't
  * resolve via Scryfall yet. */
 const TYPE_ORDER = [
@@ -440,6 +486,17 @@ const TYPE_LABELS_FR = {
   Inconnu: "Inconnu",
 };
 
+/* Sort key for colour-band ordering inside a type bucket:
+ * 0..4 = mono W/U/B/R/G, 5 = multi, 6 = colourless, 7 = unknown. */
+function colorSortKey(card) {
+  if (!card || !Array.isArray(card.color_identity)) return 7;
+  const ci = card.color_identity;
+  if (ci.length === 0) return 6;
+  if (ci.length >= 2) return 5;
+  const idx = COLOR_ORDER.indexOf(ci[0]);
+  return idx === -1 ? 7 : idx;
+}
+
 function appendCardGroupsByType(entries, thumbFor, displayName) {
   // Build per-type buckets in the canonical display order.
   const buckets = new Map(TYPE_ORDER.map((t) => [t, []]));
@@ -451,13 +508,20 @@ function appendCardGroupsByType(entries, thumbFor, displayName) {
     buckets.get(key).push(e);
   }
 
-  // Sort within each bucket: CMC ascending, then name (locale).
+  // Sort within each bucket: colour band → CMC → name (locale).
   const cmcOf = (entry) => {
     const c = thumbFor(entry);
     return c && typeof c.cmc === "number" ? c.cmc : 99;
   };
   for (const list of buckets.values()) {
-    list.sort((a, b) => (cmcOf(a) - cmcOf(b)) || a.name.localeCompare(b.name));
+    list.sort((a, b) => {
+      const ka = colorSortKey(thumbFor(a));
+      const kb = colorSortKey(thumbFor(b));
+      if (ka !== kb) return ka - kb;
+      const d = cmcOf(a) - cmcOf(b);
+      if (d !== 0) return d;
+      return a.name.localeCompare(b.name);
+    });
   }
 
   for (const [type, list] of buckets) {
@@ -474,6 +538,7 @@ function appendCardGroupsByType(entries, thumbFor, displayName) {
     const summary = document.createElement("summary");
     summary.className = "card-group-title";
     const label = document.createElement("span");
+    label.className = "card-group-label";
     label.textContent = TYPE_LABELS_FR[type] || type;
     summary.appendChild(label);
     const count = document.createElement("strong");
@@ -549,6 +614,19 @@ async function openPrintingPicker(entry, kind) {
   const picker = document.createElement("div");
   picker.className = "printing-picker";
 
+  /* Sticky close (×) in the picker's top-right corner. The picker
+   * fills most of the modal at full grid height, so the `.modal`
+   * click-outside zone shrinks to a sliver — the user previously had
+   * to scroll up to a tiny strip to dismiss. The sticky X gives a
+   * predictable exit at all times. */
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "printing-picker-close";
+  close.setAttribute("aria-label", "Fermer");
+  close.appendChild(makeXIcon(18));
+  close.addEventListener("click", closeModal);
+  picker.appendChild(close);
+
   const title = document.createElement("h3");
   title.className = "printing-picker-title";
   // Show the FR name when the manage view is in FR mode — getDisplayName
@@ -558,7 +636,19 @@ async function openPrintingPicker(entry, kind) {
 
   const grid = document.createElement("div");
   grid.className = "printing-grid";
-  grid.appendChild(placeholderText("Chargement des éditions…"));
+  /* Fetch-stage loader — centered spinner + label, spans the whole
+   * grid width via `grid-column: 1 / -1`. Replaced by the real tiles
+   * once `searchPrintings` resolves. */
+  const loader = document.createElement("div");
+  loader.className = "printing-loader";
+  const spinner = document.createElement("span");
+  spinner.className = "printing-loader-spinner";
+  spinner.setAttribute("aria-hidden", "true");
+  const loaderText = document.createElement("span");
+  loaderText.textContent = "Chargement des éditions…";
+  loader.append(spinner, loaderText);
+  loader.setAttribute("role", "status");
+  grid.appendChild(loader);
   picker.appendChild(grid);
 
   els.modalActions.appendChild(picker);
@@ -582,27 +672,53 @@ async function openPrintingPicker(entry, kind) {
 
   grid.replaceChildren();
   for (const p of printings) {
-    const tile = document.createElement("button");
-    tile.type = "button";
+    /* `<div role="button">` rather than `<button>` because Chromium
+     * doesn't let a real `<button>` grow to contain the ::before
+     * padding-bottom block we use to reserve the card's aspect ratio
+     * (button's content area is an "intrinsic" rendering context).
+     * Accessibility: same `role`, `tabindex`, Enter/Space activation
+     * as a button, plus the aria-label. */
+    const tile = document.createElement("div");
     tile.className = "printing-tile";
+    tile.setAttribute("role", "button");
+    tile.tabIndex = 0;
     tile.title = `${p.set_name || p.set?.toUpperCase()} · #${p.collector_number}`;
-    // Use "normal" (488×680) instead of "small" — at our 170-200px
-    // tile width the small version visibly blurs.
+    tile.setAttribute(
+      "aria-label",
+      `Choisir ${p.name} ${p.set_name || p.set?.toUpperCase()} #${p.collector_number}`,
+    );
+    // Use "normal" (488×680) instead of "small" — at 280-320 px tile
+    // width the small version visibly blurs.
     const src = cardImage(p, "normal");
     if (src) {
+      /* Tiles start in `.is-loading` (shimmer animation), drop it on
+       * the image's load/error so the flat surface bg takes over. With
+       * 100+ printings of basic lands, images stream in over a few
+       * seconds — the shimmer signals progress per tile. */
+      tile.classList.add("is-loading");
       const img = document.createElement("img");
       img.src = src;
       img.alt = `${p.name} (${p.set?.toUpperCase()} #${p.collector_number})`;
       img.loading = "lazy";
+      const stopShimmer = () => tile.classList.remove("is-loading");
+      img.addEventListener("load", stopShimmer);
+      img.addEventListener("error", stopShimmer);
       tile.appendChild(img);
     }
     const cap = document.createElement("span");
     cap.className = "printing-tile-cap";
     cap.textContent = `${(p.set || "?").toUpperCase()} · #${p.collector_number}`;
     tile.appendChild(cap);
-    tile.addEventListener("click", () => {
+    const activate = () => {
       applyPrintingChange(entry, kind, p.set, p.collector_number);
       closeModal();
+    };
+    tile.addEventListener("click", activate);
+    tile.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        activate();
+      }
     });
     grid.appendChild(tile);
   }

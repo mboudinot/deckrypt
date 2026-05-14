@@ -11,31 +11,35 @@
   font-size: 0.9rem;
   color: var(--text-muted);
 }
-/* EN | FR pill switch — sits inside the manage deck-summary tags row. */
+/* EN | FR filter-style switch — sits inside the manage Cartes panel
+ * head. Mirrors the claude.design mockup's `.filter-btn` segmented
+ * pattern (surface bg, accent on active) instead of the older pill
+ * (surface-2 inset, larger radius). */
 .lang-switch {
   display: inline-flex;
   margin-left: auto;
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px;
+  border-radius: var(--radius);
+  padding: 3px;
   gap: 2px;
 }
 .lang-switch button {
   background: transparent;
-  border: none;
+  border: 0;
   color: var(--text-muted);
-  padding: 3px 12px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  border-radius: 999px;
-  letter-spacing: 0.4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
 }
 .lang-switch button:hover:not(.active):not(:disabled) {
-  background: transparent;
+  background: var(--surface-2);
   color: var(--text);
-  border: none;
+  border: 0;
 }
 .lang-switch button.active {
   background: var(--accent);
@@ -112,7 +116,10 @@
 }
 .card-group-title {
   display: flex;
-  align-items: baseline;
+  /* center (not baseline) so the per-group `.pip-dot` colour mark
+   * lines up with the label / count without dangling above the
+   * baseline (a baseline-less circle would otherwise sit too high). */
+  align-items: center;
   gap: 8px;
   padding: 6px 0 4px;
   margin-top: 12px;
@@ -125,6 +132,14 @@
   cursor: pointer;
   list-style: none;            /* hide the default disclosure triangle */
   user-select: none;
+}
+/* Per-group colour pip — sits inside `.card-group-title` for the
+ * WUBRG buckets. Slightly larger than the per-row pip so it stays
+ * legible against the uppercase title typography. */
+.card-group-title > .pip-dot {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
 }
 .card-group-title::-webkit-details-marker { display: none; }
 .card-group-title:hover { color: var(--text); }
@@ -160,13 +175,56 @@
 }
 .card-row {
   display: grid;
-  grid-template-columns: 50px 1fr auto auto auto;
+  /* thumb · name · color-pips · printing · qty · remove */
+  grid-template-columns: 50px 1fr auto auto auto auto;
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+/* When the resolved card has no mana_cost (lands, unresolved cards)
+ * the mana-cost slot collapses but keeps its column so the other
+ * rows align. */
+.card-row > .mana-cost:empty {
+  width: 0;
+  margin: 0;
+}
+
+/* Inline mana cost — one disc per `{…}` symbol, in printed order.
+ * WUBRG → solid colour using the WUBRG tokens (same hue as the
+ * commander pips); generic / X / hybrid → grey with the literal
+ * number or letter inside. Discs are visually lightweight (15px,
+ * subtle inner shadow) so a 4-symbol cost doesn't dominate the
+ * row. */
+.mana-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.mana-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+.mana-symbol.s-w { background: var(--mtg-w); color: #1a1814; }
+.mana-symbol.s-u { background: var(--mtg-u); color: #ffffff; }
+.mana-symbol.s-b { background: var(--mtg-b); color: #ffffff; }
+.mana-symbol.s-r { background: var(--mtg-r); color: #ffffff; }
+.mana-symbol.s-g { background: var(--mtg-g); color: #1a1814; }
+.mana-symbol.s-c {
+  background: color-mix(in oklch, var(--text-muted) 22%, transparent);
+  color: var(--text-2);
 }
 /* Just-added highlight: a brief accent-colored flash that fades back
  * to the row's normal surface. Timing mirrors RECENTLY_ADDED_TTL_MS
@@ -280,19 +338,61 @@
   align-items: center;
   gap: 6px;
 }
+/* `+` sits on the baseline, `−` is mid-cap-height; with default
+ * baseline alignment they drift visually against each other AND
+ * against the qty value. Flex-centre forces them to the optical
+ * middle of the button regardless of glyph metrics.
+ * Visually quiet: muted glyph, no border, transparent bg — the row
+ * is the affordance, the +/- are subtle handles that surface on
+ * hover. */
 .card-row-qty button {
-  padding: 2px 8px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  min-width: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+}
+.card-row-qty button:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
 }
 .card-row-qty span {
-  min-width: 24px;
+  min-width: 22px;
   text-align: center;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.card-row-remove { padding: 6px; }
+/* X remove — no frame (transparent bg + transparent border), bolder
+ * glyph (text-2 default, error on hover) for clear "delete" intent. */
+.card-row-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-2);
+}
+.card-row-remove svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}
+.card-row-remove:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--error);
+}
 
 /* Add-card panel */
 .add-card-block {
@@ -1034,12 +1134,38 @@
    inside the modal-actions flex container (a bare grid would size to
    its content's min-width and collapse to a single column). */
 .printing-picker {
+  position: relative;
   width: 94vw;
   max-width: 1600px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+/* Sticky close (×) at the picker's top-right. Always reachable —
+ * doesn't require the user to scroll past the grid to find a clickable
+ * `.modal` backdrop strip (the picker fills most of the viewport). */
+.printing-picker-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-2);
+}
+.printing-picker-close:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.printing-picker-close svg { width: 18px; height: 18px; stroke-width: 2.25; }
 .printing-picker-title {
   margin: 0;
   font-size: 1rem;
@@ -1048,30 +1174,92 @@
   text-align: center;
   letter-spacing: 0.3px;
 }
-/* 220 px ≈ a Magic card at near-real-life size on a typical screen.
-   At our 1600 px max-width that gives 6 columns; on a 1280 px viewport
-   ~5. Below ~520 px it falls to 2 columns automatically. */
+/* Fetch-stage loader inside the printing-grid — `grid-column: 1 / -1`
+ * makes the row span every column so the spinner sits dead-centre
+ * regardless of how many columns the viewport renders. Replaced by
+ * real tiles once `searchPrintings` resolves. */
+.printing-loader {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+.printing-loader-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid color-mix(in oklch, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: lang-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .printing-loader-spinner { animation: none; }
+}
+
+/* Tiles sized at min 280 px so the card name printed in the art's
+   title bar stays legible (≈ 13 px font at that scale). At our
+   1600 px max-width that gives 5 columns; on a 1280 px viewport
+   ~4. Below ~580 px it falls to a single column automatically.
+   Gap = 22 px so the hover-zoom (see below) can bump the tile a few
+   px without bleeding into its neighbours — at 14 px the older
+   1.18 scale covered ~6 px of each adjacent tile and made it hard
+   to aim for the right card. */
 .printing-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 22px;
   max-height: 82vh;
   overflow-y: auto;
-  padding: 4px;
+  /* Padding leaves enough room above for the scaled tiles on the top
+   * row to expand without being clipped by the scroll container. */
+  padding: 8px 4px;
 }
+/* Reserve the card's height BEFORE the image loads via the classic
+ * padding-bottom trick — applied DIRECTLY on the tile (not a ::before
+ * pseudo). `aspect-ratio` on a grid child is ignored during row
+ * sizing (auto-rows defaults to min-content, which is 0 for an
+ * aspect-ratio-only box); same goes for a ::before with %-padding
+ * (also resolves to 0 for min-content). With `padding-bottom` on the
+ * tile + `box-sizing: content-box`, the padding contributes to the
+ * tile's box height directly, so the grid rows finally pick up the
+ * card-shaped slot we want. 139.34 % = 680/488 (Magic card ratio). */
 .printing-tile {
   position: relative;
-  padding: 0;
+  box-sizing: content-box;
+  width: 100%;
+  height: 0;
+  padding-bottom: 139.34%;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  aspect-ratio: 488 / 680;
+}
+/* Shimmer while the tile's image is still streaming in. Cleared by
+ * JS on the img's load/error event so the flat surface bg returns. */
+.printing-tile.is-loading {
+  background: linear-gradient(90deg,
+    var(--surface-2) 25%,
+    color-mix(in oklch, var(--surface-2) 60%, var(--surface-3)) 50%,
+    var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .printing-tile.is-loading { animation: none; }
 }
 .printing-tile img {
-  width: 100%; height: 100%;
-  object-fit: cover; display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .printing-tile-cap {
   position: absolute;
@@ -1089,14 +1277,17 @@
 .printing-tile {
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
-/* Hover: scale up + raise z-index so the tile floats above its
-   neighbours. Lets the user inspect the art and the set/cn caption
-   without opening anything. */
+/* Hover: subtle scale + accent border + lifted shadow so the tile
+   reads as "selectable" without invading its neighbours. Earlier we
+   used scale(1.18) which bled ~20 px past the tile's grid cell and
+   made it hard to click the right card in a busy grid; scale(1.06)
+   gives the same "lift" cue while keeping the click target stable
+   within the gap. */
 .printing-tile:hover:not(:disabled),
 .printing-tile:focus-visible:not(:disabled) {
   border-color: var(--accent);
-  transform: scale(1.18);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+  transform: scale(1.06);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
   z-index: 5;
 }
 
@@ -1112,6 +1303,18 @@
   cursor: zoom-out;
 }
 .modal.open { display: flex; }
+
+/* Lock the body scroll behind any open modal so the page doesn't
+ * drift when the user wheels inside a tall picker. `:has()` keeps
+ * the rule declarative — no JS state to keep in sync with the
+ * open/close paths. Covers every modal flavour (card-preview,
+ * import/export, confirm, settings backdrop). */
+html:has(.modal.open),
+html:has(.ie-modal.open),
+html:has(.confirm-modal.open),
+html:has(.modal-backdrop:not([hidden])) {
+  overflow: hidden;
+}
 
 /* Import / Export modal — separate from the card-preview modal
    because it has editable content (textarea) and we DON'T want a

@@ -30,12 +30,13 @@ function placeholderText(text) {
   return div;
 }
 
-/* Trash-can SVG built via DOM APIs rather than innerHTML — avoids the
- * pattern of "innerHTML with template literal" that's only safe when
- * the content is fully static, and trivially copy-pasted into unsafe
- * contexts later. */
+/* X (close/remove) SVG built via DOM APIs rather than innerHTML —
+ * avoids the pattern of "innerHTML with template literal" that's only
+ * safe when the content is fully static, and trivially copy-pasted
+ * into unsafe contexts later. Used by manage card-rows for the
+ * "remove from deck" affordance. */
 const SVG_NS = "http://www.w3.org/2000/svg";
-function makeTrashIcon(size = 14) {
+function makeXIcon(size = 14) {
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("width", String(size));
@@ -48,13 +49,14 @@ function makeTrashIcon(size = 14) {
   svg.setAttribute("stroke-linecap", "round");
   svg.setAttribute("stroke-linejoin", "round");
 
-  const polyline = document.createElementNS(SVG_NS, "polyline");
-  polyline.setAttribute("points", "3 6 5 6 21 6");
-  svg.appendChild(polyline);
-
-  const path = document.createElementNS(SVG_NS, "path");
-  path.setAttribute("d", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2");
-  svg.appendChild(path);
+  const a = document.createElementNS(SVG_NS, "line");
+  a.setAttribute("x1", "6"); a.setAttribute("y1", "6");
+  a.setAttribute("x2", "18"); a.setAttribute("y2", "18");
+  svg.appendChild(a);
+  const b = document.createElementNS(SVG_NS, "line");
+  b.setAttribute("x1", "18"); b.setAttribute("y1", "6");
+  b.setAttribute("x2", "6"); b.setAttribute("y2", "18");
+  svg.appendChild(b);
 
   return svg;
 }
