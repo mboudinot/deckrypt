@@ -21,7 +21,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "npx http-server -p 8765 -s -c-1",
+    command: "pnpm exec http-server -p 8765 -s -c-1",
     url: "http://127.0.0.1:8765/index.html",
     reuseExistingServer: !process.env.CI,
     timeout: 10_000,
