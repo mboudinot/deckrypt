@@ -64,13 +64,19 @@ function setupNavIndicator() {
 
   /* Theme switch changes .nav padding/gap and .nav-tab padding, so
    * tab widths and offsets shift. The pixel-pinned indicator otherwise
-   * straddles two tabs until the next hover repositions it. rAF lets
-   * the browser apply the new layout before we measure. */
+   * straddles two tabs until the next hover repositions it.
+   *
+   * Double-rAF: the first frame lets the browser apply the theme CSS
+   * change, the second runs after the resulting layout pass so our
+   * getBoundingClientRect reads reflect the new geometry. A single
+   * rAF can fire before the layout pass on slower runners (caught by
+   * CI as a 7px miss vs the 2px tolerance), leaving the indicator
+   * pinned to the old measurement with nothing to retrigger it. */
   const themeObserver = new MutationObserver(() => {
-    requestAnimationFrame(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       const hovered = nav.querySelector(".nav-tab:hover");
       positionOn(hovered || nav.querySelector(".nav-tab.active"));
-    });
+    }));
   });
   themeObserver.observe(document.documentElement, {
     attributes: true,
