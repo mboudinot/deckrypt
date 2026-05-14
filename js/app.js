@@ -192,7 +192,7 @@ function _cacheAnalyzeElements() {
   els.analyzeCurve = document.getElementById("analyze-curve");
   els.analyzeCurveInfo = document.getElementById("analyze-curve-info");
   els.analyzeTypes = document.getElementById("analyze-types");
-  els.analyzeSources = document.getElementById("analyze-sources");
+  els.analyzeTypesInfo = document.getElementById("analyze-types-info");
   els.analyzeSubtypes = document.getElementById("analyze-subtypes");
   els.analyzeSubtypesInfo = document.getElementById("analyze-subtypes-info");
   els.analyzeTokens = document.getElementById("analyze-tokens");
@@ -980,7 +980,7 @@ function showAnalyzeSkeleton() {
   for (const el of [
     els.analyzeBracket, els.analyzeLegality, els.analyzeArchetypes,
     els.analyzeSuggestions, els.analyzeThemes, els.analyzeCurve,
-    els.analyzeTypes, els.analyzeSources, els.analyzeManaBase,
+    els.analyzeTypes, els.analyzeManaBase,
     els.analyzeSubtypes, els.analyzeTokens,
   ]) {
     el.replaceChildren(makeSkeletonBlock());

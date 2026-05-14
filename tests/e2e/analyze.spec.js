@@ -114,14 +114,6 @@ test("Type chart shows at least one coloured segment + a legend row", async ({ p
   await expect(page.locator(".type-chart-legend-row").first()).toBeVisible();
 });
 
-test("Sources de mana renders coloured pips when the deck produces colours", async ({ page }) => {
-  // The mock returns produced_mana=[] for every card, so we don't
-  // assert on specific colours — just on the absence of a hard crash.
-  // The placeholder text is acceptable too.
-  const visible = await page.locator("#analyze-sources").isVisible();
-  expect(visible).toBe(true);
-});
-
 test("Subtype list renders pills (or a placeholder)", async ({ page }) => {
   // Sultai has many creatures; with the mock's type_line=Creature for
   // every card, the deck-analytics finds many subtypes — though the

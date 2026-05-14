@@ -23,19 +23,71 @@ const TYPE_COLORS = {
   Battle:       "#ec4899",  // pink
 };
 
-const COLOR_HEX = { W: "#f5e9c0", U: "#4ea8de", B: "#a78bfa", R: "#ff8a73", G: "#6ee7b7" };
+/* Note: TYPE_LABELS_FR is defined in app-manage.js and shared across
+ * classic scripts via the top-level script scope — we reuse it here
+ * (same translation as the manage and gallery views). */
+
+/* French labels for the most common MTG creature subtypes. Unknown
+ * subtypes fall back to the original English (Scryfall's raw value) —
+ * better partial coverage than no translation, and the user can extend
+ * this map as new tribal commanders show up. */
+const SUBTYPE_LABELS_FR = {
+  Advisor: "Conseiller", Angel: "Ange", Archer: "Archer", Archon: "Archonte",
+  Artificer: "Artificier", Assassin: "Assassin", Avatar: "Avatar", Barbarian: "Barbare",
+  Bear: "Ours", Beast: "Bête", Berserker: "Berserker", Bird: "Oiseau",
+  Boar: "Sanglier", Brushwagg: "Brushwagg", Cat: "Chat", Centaur: "Centaure",
+  Cephalid: "Céphalide", Chimera: "Chimère", Citizen: "Citoyen", Cleric: "Clerc",
+  Construct: "Construction", Crocodile: "Crocodile", Cyclops: "Cyclope",
+  Demigod: "Demi-Dieu", Demon: "Démon", Devil: "Diable", Dinosaur: "Dinosaure",
+  Djinn: "Djinn", Dog: "Chien", Dragon: "Dragon", Drake: "Drake",
+  Dryad: "Dryade", Dwarf: "Nain", Efreet: "Éfrit", Elder: "Ancien",
+  Eldrazi: "Eldrazi", Elemental: "Élémental", Elephant: "Éléphant", Elf: "Elfe",
+  Faerie: "Fée", Fish: "Poisson", Fox: "Renard", Frog: "Grenouille",
+  Fungus: "Champignon", Gargoyle: "Gargouille", Giant: "Géant", Gnome: "Gnome",
+  Goat: "Chèvre", Goblin: "Gobelin", God: "Dieu", Golem: "Golem",
+  Gorgon: "Gorgone", Griffin: "Griffon", Hag: "Sorcière", Halfling: "Halfelin",
+  Harpy: "Harpie", Hippogriff: "Hippogriffe", Horror: "Horreur", Horse: "Cheval",
+  Human: "Humain", Hydra: "Hydre", Hyena: "Hyène", Illusion: "Illusion",
+  Imp: "Diablotin", Incarnation: "Incarnation", Insect: "Insecte", Jellyfish: "Méduse",
+  Knight: "Chevalier", Kor: "Kor", Kraken: "Kraken", Lhurgoyf: "Lhurgoyf",
+  Lich: "Liche", Lizard: "Lézard", Manticore: "Manticore", Mercenary: "Mercenaire",
+  Merfolk: "Ondin", Minotaur: "Minotaure", Monk: "Moine", Monkey: "Singe",
+  Moonfolk: "Lunarien", Mutant: "Mutant", Myr: "Myr", Naga: "Naga",
+  Nightmare: "Cauchemar", Ninja: "Ninja", Noble: "Noble", Nymph: "Nymphe",
+  Octopus: "Pieuvre", Ogre: "Ogre", Ooze: "Substance", Orc: "Orque",
+  Otter: "Loutre", Ox: "Bœuf", Pegasus: "Pégase", Phoenix: "Phénix",
+  Phyrexian: "Phyrexian", Pirate: "Pirate", Praetor: "Préteur", Rabbit: "Lapin",
+  Rat: "Rat", Reflection: "Reflet", Rhino: "Rhinocéros", Rogue: "Voleur",
+  Sable: "Zibeline", Salamander: "Salamandre", Samurai: "Samouraï", Sasquatch: "Sasquatch",
+  Satyr: "Satyre", Scout: "Éclaireur", Serpent: "Serpent", Shade: "Ombre",
+  Shaman: "Chamane", Shapeshifter: "Métamorphe", Sheep: "Mouton", Siren: "Sirène",
+  Skeleton: "Squelette", Slith: "Slith", Sliver: "Slivoïde", Slug: "Limace",
+  Snake: "Serpent", Soldier: "Soldat", Soltari: "Soltari", Specter: "Spectre",
+  Spellshaper: "Façonneur de sorts", Sphinx: "Sphinx", Spider: "Araignée",
+  Spike: "Pointe", Spirit: "Esprit", Squid: "Calmar", Squirrel: "Écureuil",
+  Surrakar: "Surrakar", Survivor: "Survivant", Tetravite: "Tétravite", Thopter: "Thoptère",
+  Thrull: "Thrull", Treefolk: "Sylvin", Troll: "Troll", Turtle: "Tortue",
+  Unicorn: "Licorne", Vampire: "Vampire", Vedalken: "Védalken", Viashino: "Viashino",
+  Volver: "Volver", Wall: "Mur", Warlock: "Sorcier", Warrior: "Guerrier",
+  Werewolf: "Loup-garou", Whale: "Baleine", Wizard: "Magicien", Wolf: "Loup",
+  Wolverine: "Carcajou", Wombat: "Wombat", Worm: "Ver", Wraith: "Apparition",
+  Wurm: "Guivre", Yeti: "Yéti", Zombie: "Zombie",
+  Autres: "Autres",
+};
+
+const labelForSubtype = (s) => SUBTYPE_LABELS_FR[s] || s;
 
 function renderAnalyzeView() {
   const resolved = state.resolved;
   if (!resolved || (resolved.commanders.length === 0 && resolved.deck.length === 0)) {
     [els.analyzeBracket, els.analyzeCurve, els.analyzeTypes,
-     els.analyzeSources, els.analyzeSubtypes, els.analyzeTokens,
+     els.analyzeSubtypes, els.analyzeTokens,
      els.analyzeSuggestions, els.analyzeThemes, els.analyzeLegality,
      els.analyzeArchetypes, els.analyzeManaBase]
       .forEach((el) => el.replaceChildren(placeholderText("Aucun deck à analyser.")));
     els.analyzeComposition.replaceChildren();
-    [els.analyzeCurveInfo, els.analyzeSubtypesInfo, els.analyzeTokensInfo,
-     els.analyzeSuggestionsInfo, els.analyzeThemesInfo,
+    [els.analyzeCurveInfo, els.analyzeTypesInfo, els.analyzeSubtypesInfo,
+     els.analyzeTokensInfo, els.analyzeSuggestionsInfo, els.analyzeThemesInfo,
      els.analyzeArchetypesInfo, els.analyzeManaBaseInfo]
       .forEach((el) => { el.textContent = ""; });
     return;
@@ -52,7 +104,6 @@ function renderAnalyzeView() {
   renderThemesPanel(fullDeck);
   renderManaCurveChart(fullDeck);
   renderTypeChart(fullDeck);
-  renderManaSourcesPanel(fullDeck);
   renderManaBasePanel(fullDeck);
   renderSubtypesPanel(fullDeck);
   renderTokensPanel(fullDeck);
@@ -115,22 +166,17 @@ function renderManaBasePanel(deck) {
       r.title = `${row.sources} source${row.sources > 1 ? "s" : ""} ${row.color} sans sort de cette couleur.`;
     }
 
-    const pip = document.createElement("span");
-    pip.className = `pip ${row.color}`;
     const dot = document.createElement("span");
-    dot.className = "dot";
-    pip.appendChild(dot);
-    pip.append(` ${row.color}`);
-    r.appendChild(pip);
+    dot.className = `pip-dot dot-${row.color.toLowerCase()}`;
+    r.appendChild(dot);
 
     const bar = document.createElement("div");
     bar.className = "mana-base-bar";
     const fill = document.createElement("div");
-    fill.className = "mana-base-bar-fill";
+    fill.className = `mana-base-bar-fill f-${row.color.toLowerCase()}`;
     // Cap the visual at 100 % — over-sourced isn't a failure mode.
     const ratio = row.needed > 0 ? Math.min(100, (row.sources / row.needed) * 100) : 100;
     fill.style.width = `${Math.round(ratio)}%`;
-    fill.style.background = COLOR_HEX[row.color] || "var(--accent)";
     bar.appendChild(fill);
     r.appendChild(bar);
 
@@ -151,6 +197,11 @@ function renderManaBasePanel(deck) {
     list.appendChild(r);
   }
   els.analyzeManaBase.appendChild(list);
+
+  const note = document.createElement("p");
+  note.className = "mana-base-note";
+  note.textContent = "Pour chaque couleur, on vérifie si le deck a assez de terrains pour caster ses sorts au bon moment. Une barre ambre signale qu'il manque des sources.";
+  els.analyzeManaBase.appendChild(note);
 }
 
 function renderArchetypesPanel(resolved) {
@@ -460,9 +511,7 @@ function renderLegalityPanel(resolved) {
     row.className = `legality-row legality-${r.severity}`;
     const icon = document.createElement("span");
     icon.className = "legality-icon";
-    icon.textContent = r.severity === "ok" ? "✓"
-      : r.severity === "warning" ? "⚠"
-      : "✕";
+    icon.textContent = r.severity === "ok" ? "✓" : "⚠";
     row.appendChild(icon);
     const body = document.createElement("div");
     body.className = "legality-body";
@@ -635,6 +684,7 @@ function renderManaCurveChart(deck) {
 function renderTypeChart(deck) {
   const counts = cardTypeBreakdown(deck);
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+  els.analyzeTypesInfo.textContent = pluralFr(total, "carte");
 
   els.analyzeTypes.replaceChildren();
 
@@ -646,7 +696,7 @@ function renderTypeChart(deck) {
     seg.className = "type-chart-segment";
     seg.style.flex = `${counts[t]} 0 0`;
     seg.style.background = TYPE_COLORS[t];
-    seg.title = `${t} : ${counts[t]} (${Math.round((counts[t] / total) * 100)} %)`;
+    seg.title = `${(TYPE_LABELS_FR[t] || t)} : ${counts[t]} (${Math.round((counts[t] / total) * 100)} %)`;
     bar.appendChild(seg);
   }
   els.analyzeTypes.appendChild(bar);
@@ -663,7 +713,7 @@ function renderTypeChart(deck) {
     row.appendChild(sw);
     const name = document.createElement("span");
     name.className = "name";
-    name.textContent = t;
+    name.textContent = (TYPE_LABELS_FR[t] || t);
     row.appendChild(name);
     const num = document.createElement("span");
     num.className = "num";
@@ -672,30 +722,6 @@ function renderTypeChart(deck) {
     legend.appendChild(row);
   }
   els.analyzeTypes.appendChild(legend);
-}
-
-function renderManaSourcesPanel(deck) {
-  const sources = manaSources(deck);
-  els.analyzeSources.replaceChildren();
-  const colors = COLOR_ORDER.filter((c) => sources[c] > 0);
-  if (colors.length === 0 && sources.C === 0) {
-    els.analyzeSources.appendChild(placeholderText("Aucune source de mana détectée."));
-    return;
-  }
-  const list = colors.length > 0 ? [...colors, ...(sources.C > 0 ? ["C"] : [])] : ["C"];
-  for (const c of list) {
-    const pip = document.createElement("span");
-    pip.className = `pip ${c}`;
-    pip.title = c === "C" ? "Incolore" : COLOR_NAMES[c];
-    const dot = document.createElement("span");
-    dot.className = "dot";
-    pip.appendChild(dot);
-    pip.append(` ${c} `);
-    const strong = document.createElement("strong");
-    strong.textContent = String(sources[c]);
-    pip.appendChild(strong);
-    els.analyzeSources.appendChild(pip);
-  }
 }
 
 function renderSubtypesPanel(deck) {
@@ -711,7 +737,7 @@ function renderSubtypesPanel(deck) {
   for (const { subtype, count } of subs) {
     const pill = document.createElement("span");
     pill.className = "subtype-pill";
-    pill.append(subtype + " ");
+    pill.append(labelForSubtype(subtype) + " ");
     const num = document.createElement("span");
     num.className = "count";
     num.textContent = count;
@@ -775,24 +801,43 @@ async function renderTokensPanel(deck) {
     els.analyzeTokens.appendChild(placeholderText("Jetons introuvables sur Scryfall."));
     return;
   }
-  for (const t of tokens) {
-    const tile = document.createElement("button");
-    tile.type = "button";
-    tile.className = "token-tile";
-    tile.title = t.name;
-    tile.addEventListener("click", () => showModal(t, []));
-    const src = cardImage(t, "normal");
-    if (src) {
-      const img = document.createElement("img");
-      img.src = src;
-      img.alt = t.name;
-      img.loading = "lazy";
-      tile.appendChild(img);
+  /* Pull French names from the shared translations cache (same Scryfall
+   * `lang:fr` pipeline as the manage view's EN/FR switch). Async fetch
+   * resolves names not yet cached; we render with whatever's available
+   * now and re-render once translations land. */
+  const tokenNames = tokens.map((t) => t.name);
+  const renderTokens = () => {
+    const tr = bulkTranslationLookup();
+    els.analyzeTokens.replaceChildren();
+    for (const t of tokens) {
+      const frName = tr(t.name) || t.name;
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "token-tile";
+      tile.title = frName;
+      tile.addEventListener("click", () => showModal(t, []));
+      const src = cardImage(t, "normal");
+      if (src) {
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = frName;
+        img.loading = "lazy";
+        tile.appendChild(img);
+      }
+      const cap = document.createElement("span");
+      cap.className = "token-tile-cap";
+      cap.textContent = frName;
+      tile.appendChild(cap);
+      els.analyzeTokens.appendChild(tile);
     }
-    const cap = document.createElement("span");
-    cap.className = "token-tile-cap";
-    cap.textContent = t.name;
-    tile.appendChild(cap);
-    els.analyzeTokens.appendChild(tile);
-  }
+  };
+  renderTokens();
+  fetchFrenchNames(tokenNames).then(() => {
+    /* Only re-render if the user is still on this deck — avoids
+     * clobbering a render kicked off by a deck switch that landed
+     * while we were waiting on Scryfall. */
+    if (els.analyzeTokens.firstChild && els.analyzeTokens.firstChild.classList?.contains("token-tile")) {
+      renderTokens();
+    }
+  });
 }

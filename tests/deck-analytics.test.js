@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   manaCurve, cardTypeBreakdown, primaryTypeOf, isLandCard,
-  manaSources, creatureSubtypes, subtypesOf,
+  creatureSubtypes, subtypesOf,
   extractTokenIds, dedupeByOracle, gameChangers, bracketEstimate,
   detectThemes,
 } from "../js/deck-analytics.js";
@@ -75,28 +75,6 @@ describe("cardTypeBreakdown", () => {
     expect(out.Sorcery).toBe(1);
     expect(out.Land).toBe(3);
     expect(out.Enchantment).toBe(0);
-  });
-});
-
-describe("manaSources", () => {
-  it("counts producers per colour, deduplicating same-card multi-symbols", () => {
-    const deck = [
-      card({ produced_mana: ["G"] }),                     // Forest
-      card({ produced_mana: ["W", "U"] }),                // Hallowed Fountain
-      card({ produced_mana: ["W", "U", "B", "R", "G"] }), // Command Tower
-      card({ produced_mana: ["C"] }),                     // Sol Ring
-    ];
-    expect(manaSources(deck)).toEqual({
-      W: 2, U: 2, B: 1, R: 1, G: 2, C: 1,
-    });
-  });
-  it("ignores cards with no produced_mana", () => {
-    expect(manaSources([card({ produced_mana: [] }), card({})]))
-      .toEqual({ W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 });
-  });
-  it("ignores unknown mana symbols (S for snow, X, etc.)", () => {
-    expect(manaSources([card({ produced_mana: ["S", "X", "G"] })]))
-      .toMatchObject({ G: 1, W: 0 });
   });
 });
 

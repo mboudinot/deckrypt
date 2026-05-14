@@ -554,79 +554,79 @@
         <div class="bracket-panel" id="analyze-bracket"></div>
       </section>
 
-      <section>
-        <div class="section-title">
-          <span>Conformité au format</span>
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Conformité au format</h3>
         </div>
         <div class="legality-composition" id="analyze-composition"></div>
         <div class="legality-list" id="analyze-legality"></div>
       </section>
 
-      <section>
-        <div class="section-title">
-          <span>Orientation du deck</span>
-          <strong id="analyze-archetypes-info"></strong>
-        </div>
-        <div class="archetypes-list" id="analyze-archetypes"></div>
-      </section>
-
-      <section>
-        <div class="section-title">
-          <span>Améliorations possibles</span>
-          <strong id="analyze-suggestions-info"></strong>
-        </div>
-        <div class="suggestions-list" id="analyze-suggestions"></div>
-      </section>
-
-      <section>
-        <div class="section-title">
-          <span>Thèmes détectés</span>
-          <strong id="analyze-themes-info"></strong>
-        </div>
-        <div class="themes-list" id="analyze-themes"></div>
-      </section>
-
-      <section>
-        <div class="section-title">
-          <span>Courbe de mana</span>
-          <strong id="analyze-curve-info">—</strong>
-        </div>
-        <div class="mana-curve" id="analyze-curve"></div>
-      </section>
-
       <div class="analyze-row">
-        <section>
-          <div class="section-title"><span>Types de cartes</span></div>
-          <div class="type-chart" id="analyze-types"></div>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Courbe de mana</h3>
+            <span class="panel-meta" id="analyze-curve-info">—</span>
+          </div>
+          <div class="mana-curve" id="analyze-curve"></div>
         </section>
-        <section>
-          <div class="section-title"><span>Sources de mana</span></div>
-          <div class="pip-row" id="analyze-sources"></div>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Base de mana</h3>
+            <span class="panel-meta" id="analyze-mana-base-info"></span>
+          </div>
+          <div class="mana-base-panel" id="analyze-mana-base"></div>
         </section>
       </div>
 
-      <section>
-        <div class="section-title">
-          <span>Base de mana</span>
-          <strong id="analyze-mana-base-info"></strong>
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Composition par type</h3>
+          <span class="panel-meta" id="analyze-types-info"></span>
         </div>
-        <div class="mana-base-panel" id="analyze-mana-base"></div>
+        <div class="type-chart" id="analyze-types"></div>
       </section>
 
-      <section>
-        <div class="section-title">
-          <span>Sous-types de créatures</span>
-          <strong id="analyze-subtypes-info">—</strong>
-        </div>
-        <div class="subtype-list" id="analyze-subtypes"></div>
-      </section>
+      <div class="analyze-row">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Orientation du deck</h3>
+            <span class="panel-meta" id="analyze-archetypes-info"></span>
+          </div>
+          <div class="archetypes-list" id="analyze-archetypes"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Thèmes détectés</h3>
+            <span class="panel-meta" id="analyze-themes-info"></span>
+          </div>
+          <div id="analyze-themes"></div>
+        </section>
+      </div>
 
-      <section>
-        <div class="section-title">
-          <span>Jetons produits</span>
-          <strong id="analyze-tokens-info">—</strong>
+      <div class="analyze-row">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Sous-types de créatures</h3>
+            <span class="panel-meta" id="analyze-subtypes-info">—</span>
+          </div>
+          <div class="subtype-list" id="analyze-subtypes"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Jetons produits</h3>
+            <span class="panel-meta" id="analyze-tokens-info">—</span>
+          </div>
+          <div class="token-grid" id="analyze-tokens"></div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Améliorations possibles</h3>
+          <span class="panel-meta" id="analyze-suggestions-info"></span>
         </div>
-        <div class="token-grid" id="analyze-tokens"></div>
+        <div class="suggestions-list" id="analyze-suggestions"></div>
       </section>
     </div>
 

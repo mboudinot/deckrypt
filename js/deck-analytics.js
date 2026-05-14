@@ -63,23 +63,6 @@ function isLandCard(card) {
   return primaryTypeOf(card) === "Land";
 }
 
-/* Per-color counts of *cards that produce* mana of that colour. A card
- * producing two colours is counted under both. C = colourless. */
-function manaSources(deck) {
-  const counts = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
-  for (const c of deck) {
-    const produced = Array.isArray(c.produced_mana) ? c.produced_mana : [];
-    const seen = new Set();
-    for (const sym of produced) {
-      if (counts.hasOwnProperty(sym) && !seen.has(sym)) {
-        counts[sym]++;
-        seen.add(sym);
-      }
-    }
-  }
-  return counts;
-}
-
 /* Top-N creature subtypes ("Human", "Wizard", "Goblin", …). Returns
  * an ordered list [{ subtype, count }] sorted by count desc, name asc
  * on ties. The tail is collapsed into a single "Autres" bucket so the
@@ -409,7 +392,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PRIMARY_TYPES,
     manaCurve, cardTypeBreakdown, primaryTypeOf, isLandCard,
-    manaSources, creatureSubtypes, subtypesOf,
+    creatureSubtypes, subtypesOf,
     extractTokenIds, dedupeByOracle, gameChangers, bracketEstimate,
     detectThemes, THEME_RULES,
   };
