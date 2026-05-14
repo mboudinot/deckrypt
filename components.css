@@ -222,6 +222,14 @@ html.auth-locked #login-overlay[hidden] { display: block; }
   max-width: 320px;
   color: var(--text);
   font-family: inherit;
+  /* Promote to its own compositor layer so the global `button:active`
+   * translateY(1px) is interpolated by the GPU rather than re-rasterised
+   * by software. Without this, the sub-pixel positions during the
+   * 100ms transition re-rasterise the circular pip dots and the SVG
+   * chevron with slightly different anti-aliasing per frame, giving
+   * the illusion that those pieces move opposite to the parent. Text
+   * glyphs have font hinting and don't show the artefact. */
+  will-change: transform;
 }
 .deck-pill:hover:not(:disabled) {
   background: var(--surface);
