@@ -353,7 +353,11 @@ function showModal(card, actions) {
   for (const action of actions) {
     const btn = document.createElement("button");
     btn.type = "button";
-    if (action.primary) btn.className = "primary";
+    /* Same class set as the game-state bar's #btn-draw / #btn-new /
+     * #btn-next-turn so the hover/active states are literally
+     * identical — one source of truth for action buttons in the
+     * play view. */
+    btn.className = "btn btn-sm" + (action.primary ? " primary" : "");
     btn.textContent = action.label;
     btn.addEventListener("click", () => {
       action.fn();
@@ -523,7 +527,7 @@ function emptyDeckCta() {
   sub.textContent = "Importe ta première deck-liste pour commencer.";
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "btn btn-primary empty-deck-cta-btn";
+  btn.className = "btn primary empty-deck-cta-btn";
   btn.textContent = "Importer ton premier deck";
   btn.addEventListener("click", () => openImportPanel());
   wrap.appendChild(title);

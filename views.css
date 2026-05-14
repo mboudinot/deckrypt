@@ -991,7 +991,12 @@
 }
 .graveyard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  /* Fixed track width + auto-fit lets empty tracks collapse, so
+   * `justify-content: center` actually centers the remaining tiles
+   * horizontally — with `auto-fill` + `1fr` the empty tracks would
+   * stretch and the visible tiles would pin to the left. */
+  grid-template-columns: repeat(auto-fit, 180px);
+  justify-content: center;
   gap: 14px;
   max-height: 78vh;
   overflow-y: auto;
@@ -1013,15 +1018,15 @@
 }
 .graveyard-tile-actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   padding: 6px;
 }
-.graveyard-tile-actions button {
+/* Two-action row inside a 180px tile — let the .btn rules drive the
+ * hover/padding/typography, but share the row width so the buttons
+ * don't shrink to their text and leave dead space. */
+.graveyard-tile-actions .btn {
   flex: 1;
-  padding: 6px 8px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  white-space: nowrap;
+  justify-content: center;
 }
 
 /* Printing picker — a wider grid in the existing modal. The wrapper's
@@ -1334,24 +1339,36 @@
 }
 .modal-actions:empty { display: none; }
 
-/* Tapped (engaged) cards: dimmed + "TAP" corner badge — matches
-   the MTG community convention used in the design. A 90° rotation
-   would break the flex-row layout, so we keep an in-place cue. */
-.card.tapped { filter: brightness(0.55) saturate(0.7); }
+/* Tapped (engaged) cards: dimmed + diagonal "ENGAGÉ" banner.
+   A 90° rotation would break the flex-row layout, so we overlay a
+   sticker-style ribbon instead. The card's overflow:hidden clips the
+   banner to the card silhouette so the ribbon ends sit flush with
+   the edges.
+
+   Filter is applied to the direct children (`> *`) rather than the
+   `.card.tapped` element itself. That keeps the dimming visible on
+   the image + GC pin + skeleton, while leaving the `::after` banner
+   untouched (pseudo-elements aren't matched by `> *`, so it escapes
+   the dim). The card reads "in shadow with a vivid label on top". */
+.card.tapped > * { filter: brightness(0.55) saturate(0.7); }
 .card.tapped::after {
-  content: "TAP";
+  content: "ENGAGÉ";
   position: absolute;
-  top: 6px;
-  right: 6px;
-  background: rgba(0, 0, 0, 0.85);
-  color: var(--accent);
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 9px;
+  top: 28%;
+  left: -14%;
+  right: -14%;
+  text-align: center;
+  background: var(--accent);
+  color: var(--accent-text);
+  padding: 5px 0;
+  font-family: var(--font-display);
+  font-size: 12px;
   font-weight: 800;
-  font-family: var(--font-mono);
-  letter-spacing: 0.08em;
-  z-index: 1;
+  letter-spacing: 0.18em;
+  transform: rotate(-22deg);
+  transform-origin: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  z-index: 2;
   pointer-events: none;
 }
 
@@ -1878,7 +1895,15 @@ select.is-invalid:focus {
   to   { opacity: 1; }
 }
 
-[data-direction="editorial"] .modal-backdrop {
+[data-direction="editorial"] .modal-backdrop,
+[data-direction="editorial"] .modal,
+[data-direction="editorial"] .ie-modal,
+[data-direction="editorial"] .confirm-modal {
+  /* Lighter backdrop in editorial (light theme) so the modal sits on
+   * a paper-tone overlay instead of a harsh dark scrim. Without this,
+   * the beige .btn:hover bg reads differently against the dark scrim
+   * than against the game-state bar — same pixel value, different
+   * perceived shade (Hunt effect). */
   background: rgba(26, 24, 20, 0.4);
 }
 

@@ -62,7 +62,7 @@ function makeTrashIcon(size = 14) {
 /* Build a card DOM node. Generic — same builder for commanders and
  * game instances; the caller supplies tap state, aria text, and the
  * activation callback (clicking or pressing Enter/Space). */
-function makeCardEl(card, { tapped = false, ariaLabel, onActivate, instanceId, sourceZone }) {
+function makeCardEl(card, { tapped = false, ariaLabel, onActivate, onContextMenu, instanceId, sourceZone }) {
   const el = document.createElement("div");
   el.className = "card" + (tapped ? " tapped" : "");
   el.tabIndex = 0;
@@ -73,6 +73,12 @@ function makeCardEl(card, { tapped = false, ariaLabel, onActivate, instanceId, s
     el.dataset.instanceId = instanceId;
     el.addEventListener("dragstart", (e) => onCardDragStart(e, instanceId, sourceZone));
     el.addEventListener("dragend", onCardDragEnd);
+  }
+  if (onContextMenu) {
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      onContextMenu(e);
+    });
   }
 
   const skel = document.createElement("div");
@@ -173,6 +179,7 @@ function renderCommanders() {
       els.commanderZone.appendChild(makeCardEl(inst.card, {
         ariaLabel: `${inst.card.name}, actions`,
         onActivate: () => openInstanceModal(inst),
+        onContextMenu: (e) => openInstanceContextMenu(inst, e.clientX, e.clientY),
         instanceId: inst.instanceId,
         sourceZone: "command",
       }));
@@ -195,6 +202,7 @@ function renderInstanceZone(elem, instances, emptyText, sourceZone) {
       tapped: inst.tapped,
       ariaLabel: `${inst.card.name}${inst.tapped ? " (engagé)" : ""}, actions`,
       onActivate: () => openInstanceModal(inst),
+      onContextMenu: (e) => openInstanceContextMenu(inst, e.clientX, e.clientY),
       instanceId: inst.instanceId,
       sourceZone,
     }));
@@ -286,6 +294,7 @@ function renderGraveyard() {
     tapped: top.tapped,
     ariaLabel,
     onActivate: openGraveyardModal,
+    onContextMenu: (e) => openInstanceContextMenu(top, e.clientX, e.clientY),
     instanceId: top.instanceId,
     sourceZone: "graveyard",
   });
@@ -523,10 +532,14 @@ function openCommanderModal(card) {
   showModal(card, []); // commanders are read-only
 }
 
-function openInstanceModal(instance) {
-  if (!state.game) return;
+/* Build the action list for an instance based on its current zone.
+ * Shared between the click-to-open modal and the right-click context
+ * menu so both surfaces stay in sync. Returns [] if the instance is
+ * no longer in the game (concurrent drag, stale ref). */
+function getInstanceActions(instance) {
+  if (!state.game) return [];
   const found = findInstance(state.game, instance.instanceId);
-  if (!found) return;
+  if (!found) return [];
   const id = instance.instanceId;
   const actions = [];
   if (found.zone === "hand") {
@@ -546,7 +559,94 @@ function openInstanceModal(instance) {
   } else if (found.zone === "command") {
     actions.push({ label: "Jouer", primary: true, fn: () => moveInstanceTo(id, "battlefield") });
   }
+  return actions;
+}
+
+function openInstanceModal(instance) {
+  const actions = getInstanceActions(instance);
+  if (actions.length === 0) return;
   showModal(instance.card, actions);
+}
+
+function openInstanceContextMenu(instance, x, y) {
+  const actions = getInstanceActions(instance);
+  if (actions.length === 0) return;
+  openCardContextMenu(actions, x, y);
+}
+
+// ============================================================
+// Right-click context menu for play-view cards
+// ============================================================
+/* Single live menu at a time. The previous one is torn down before
+ * opening a new one so right-clicking different cards in succession
+ * just "moves" the menu. Listeners are attached on the next tick to
+ * avoid the synthetic mousedown that opened the menu also closing
+ * it. Capture phase on the close handlers so the menu disappears
+ * before any underlying click would fire on a sibling. */
+let cardContextMenuEl = null;
+
+function closeCardContextMenu() {
+  if (!cardContextMenuEl) return;
+  cardContextMenuEl.remove();
+  cardContextMenuEl = null;
+  document.removeEventListener("mousedown", onCardCtxOutside, true);
+  document.removeEventListener("contextmenu", onCardCtxOutside, true);
+  document.removeEventListener("keydown", onCardCtxKey, true);
+  window.removeEventListener("scroll", closeCardContextMenu, true);
+  window.removeEventListener("resize", closeCardContextMenu);
+}
+
+function onCardCtxOutside(e) {
+  if (cardContextMenuEl && !cardContextMenuEl.contains(e.target)) closeCardContextMenu();
+}
+
+function onCardCtxKey(e) {
+  if (e.key === "Escape") closeCardContextMenu();
+}
+
+function openCardContextMenu(actions, x, y) {
+  closeCardContextMenu();
+  const menu = document.createElement("div");
+  menu.className = "dropdown-menu ctx-menu";
+  menu.setAttribute("role", "menu");
+
+  for (const a of actions) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "dropdown-item" + (a.primary ? " ctx-primary" : "");
+    item.setAttribute("role", "menuitem");
+    item.textContent = a.label;
+    item.addEventListener("click", () => {
+      a.fn();
+      closeCardContextMenu();
+    });
+    menu.appendChild(item);
+  }
+
+  /* Append off-screen first so we can measure, then clamp to viewport. */
+  menu.style.position = "fixed";
+  menu.style.left = "-9999px";
+  menu.style.top = "-9999px";
+  document.body.appendChild(menu);
+  const rect = menu.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const left = Math.max(8, Math.min(x, vw - rect.width - 8));
+  const top = Math.max(8, Math.min(y, vh - rect.height - 8));
+  menu.style.left = left + "px";
+  menu.style.top = top + "px";
+
+  cardContextMenuEl = menu;
+  setTimeout(() => {
+    document.addEventListener("mousedown", onCardCtxOutside, true);
+    document.addEventListener("contextmenu", onCardCtxOutside, true);
+    document.addEventListener("keydown", onCardCtxKey, true);
+    window.addEventListener("scroll", closeCardContextMenu, true);
+    window.addEventListener("resize", closeCardContextMenu);
+  }, 0);
+
+  const first = menu.querySelector("button");
+  if (first) first.focus();
 }
 
 /* Graveyard "open the pile" modal. Renders all graveyard cards as a
@@ -604,11 +704,12 @@ function makeGraveyardTile(inst) {
   actions.className = "graveyard-tile-actions";
   const toHand = document.createElement("button");
   toHand.type = "button";
-  toHand.className = "primary";
+  toHand.className = "btn btn-sm primary";
   toHand.textContent = "→ Main";
   toHand.addEventListener("click", () => moveFromGraveyard(inst.instanceId, "hand"));
   const toBattlefield = document.createElement("button");
   toBattlefield.type = "button";
+  toBattlefield.className = "btn btn-sm";
   toBattlefield.textContent = "→ Champ";
   toBattlefield.addEventListener("click", () => moveFromGraveyard(inst.instanceId, "battlefield"));
   actions.append(toHand, toBattlefield);

@@ -402,6 +402,23 @@ html.auth-locked #login-overlay[hidden] { display: block; }
   font-size: 11px;
 }
 
+/* Right-click context menu (play-view cards). Reuses .dropdown-menu
+ * styling but is positioned at click coordinates (inline `position:
+ * fixed` + computed left/top from JS) instead of anchored to a
+ * trigger. The .ctx-primary item gets accent foreground to mirror
+ * the modal's primary button. */
+.ctx-menu {
+  min-width: 180px;
+  max-width: 280px;
+  /* Above the modal backdrop (z-index 100) so right-clicking a card
+   * in an open graveyard modal still works if we ever wire it in. */
+  z-index: 120;
+}
+.ctx-menu .dropdown-item.ctx-primary {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Single-column outer layout. The old globally-shared sidebar (with
    commander zone + hand stats + game state) was play-specific, so it
    showed stale game data on Manage/Analyze. Each view now owns its
@@ -759,11 +776,28 @@ button.icon-only svg { display: block; }
 
 /* ============================================================
 
-   .btn class system — ported from claude.design's app.css. Used
-   by the login submit button and (eventually) the rest of the
-   rebuilt UI. Coexists with the older `button.primary` selector
-   (which uses an element selector, not the `.btn.primary` combo)
-   until step 6 unifies them.
+   .btn — the two-style action-button system.
+
+   EXACTLY two visual styles, in both themes:
+     1. `.btn`         secondary / "white"  — surface bg, beige hover
+     2. `.btn.primary` primary / accent     — accent bg, accent-2 hover
+
+   Both share the same shape (padding, radius, transition, font).
+   Hover MUST be identical across surfaces (game-state bar, modal
+   actions, graveyard tiles…) — that's the contract the locked-in
+   parity spec (`tests/e2e/btn-hover-parity.spec.js`) enforces. If you
+   need a new variant, add a modifier class (`.btn.ghost`,
+   `.btn.danger`) on top of one of the two — do NOT introduce a
+   third base style or theme-specific hover overrides.
+
+   Sizing modifiers: `.btn-lg` (login submit). `.btn-sm` is referenced
+   in markup as future-proofing; it's currently a no-op alias for
+   `.btn` so adding a real `.btn-sm` rule later only affects buttons
+   that opt in.
+
+   Coexists with the older bare `button` styling (still in use for
+   `.segmented`, `.lang-switch`, and a handful of unclassed buttons).
+   The bare rule is the fallback; `.btn` wins on specificity.
    ============================================================ */
 .btn {
   display: inline-flex;

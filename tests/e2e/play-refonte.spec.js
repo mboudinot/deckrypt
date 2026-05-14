@@ -157,26 +157,31 @@ test("graveyard stays aligned with play-main right edge regardless of hand size 
   expect(Math.abs((playMain.x + playMain.width) - (graveBox.x + graveBox.width))).toBeLessThanOrEqual(2);
 });
 
-test("tapped card shows a 'TAP' badge via ::after", async ({ page }) => {
-  /* Wait until the hand has cards then tap the first one via the
-   * modal action. The card moves to battlefield untapped; tapping
-   * is a separate Z key or modal action — but for the visual
-   * check, we can synthesize a tapped state by hitting the card's
-   * own action. Easier: directly toggle the .tapped class via
-   * the same path renderInstanceZone uses. */
+test("tapped card shows an 'ENGAGÉ' banner via ::after", async ({ page }) => {
+  /* Wait until the hand has cards then synthesize a tapped state on
+   * any visible card so we can inspect the ::after content. The
+   * diagonal "ENGAGÉ" banner is the in-place cue (a 90° rotation
+   * would break the flex-row layout). */
   await page.evaluate(() => {
-    /* Add .tapped to the first battlefield card if any; otherwise
-     * fall back to faking it on a hand card just to assert the
-     * ::after content. */
     const target = document.querySelector("#battlefield .card, #hand .card");
     if (target) target.classList.add("tapped");
   });
-  const tapAfter = await page.evaluate(() => {
+  const probe = await page.evaluate(() => {
     const target = document.querySelector(".card.tapped");
     if (!target) return null;
-    return getComputedStyle(target, "::after").content;
+    const img = target.querySelector("img");
+    return {
+      bannerContent: getComputedStyle(target, "::after").content,
+      /* The dim must hit the image, NOT the banner. Filter on the
+       * pseudo-element should resolve to "none" (no inherited
+       * brightness(...)) — see views.css `.card.tapped > *`. */
+      imgFilter: img ? getComputedStyle(img).filter : null,
+      bannerFilter: getComputedStyle(target, "::after").filter,
+    };
   });
-  expect(tapAfter).toContain("TAP");
+  expect(probe.bannerContent).toContain("ENGAG");
+  expect(probe.imgFilter).toContain("brightness");
+  expect(probe.bannerFilter).toBe("none");
 });
 
 test("Game Changer pin renders on game_changer cards (Sol Ring) and only on those", async ({ page }) => {
