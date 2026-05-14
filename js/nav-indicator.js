@@ -55,40 +55,31 @@ function setupNavIndicator() {
   /* Re-sync when .active moves (clicks, keyboard, switchView, etc).
    * Skip while the pointer is inside the nav so the indicator stays
    * on the hover target instead of snapping back. */
-  const observer = new MutationObserver(() => {
+  /* Active-class flips (click, keyboard, programmatic switchView)
+   * don't necessarily resize the nav, so ResizeObserver wouldn't
+   * catch them — we still need a MutationObserver on the tabs. */
+  const classObserver = new MutationObserver(() => {
     if (!nav.matches(":hover")) positionOnActive();
   });
   for (const tab of tabs) {
-    observer.observe(tab, { attributes: true, attributeFilter: ["class"] });
+    classObserver.observe(tab, { attributes: true, attributeFilter: ["class"] });
   }
 
-  /* Theme switch changes .nav padding/gap and .nav-tab padding, so
-   * tab widths and offsets shift. The pixel-pinned indicator otherwise
-   * straddles two tabs until the next hover repositions it.
+  /* ResizeObserver covers every reflow that shifts tab geometry:
+   *   - theme switch (Studio ↔ Editorial change .nav padding/gap and
+   *     .nav-tab padding/font-size);
+   *   - web-font load completion (Fraunces in Editorial swaps in from
+   *     the Georgia fallback after Google Fonts arrives, changing
+   *     text metrics and therefore tab widths — caught by CI as a
+   *     theme-switch flake before this observer was wired in);
+   *   - viewport resize that reflows nav contents.
    *
-   * Double-rAF: the first frame lets the browser apply the theme CSS
-   * change, the second runs after the resulting layout pass so our
-   * getBoundingClientRect reads reflect the new geometry. A single
-   * rAF can fire before the layout pass on slower runners (caught by
-   * CI as a 7px miss vs the 2px tolerance), leaving the indicator
-   * pinned to the old measurement with nothing to retrigger it. */
-  const themeObserver = new MutationObserver(() => {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const hovered = nav.querySelector(".nav-tab:hover");
-      positionOn(hovered || nav.querySelector(".nav-tab.active"));
-    }));
+   * ResizeObserver fires AFTER the layout pass by contract, so no
+   * rAF dance is needed — the measurements we read inside the
+   * callback are guaranteed up-to-date. */
+  const sizeObserver = new ResizeObserver(() => {
+    const hovered = nav.querySelector(".nav-tab:hover");
+    positionOn(hovered || nav.querySelector(".nav-tab.active"));
   });
-  themeObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["data-direction"],
-  });
-
-  let resizeRaf = 0;
-  window.addEventListener("resize", () => {
-    if (resizeRaf) return;
-    resizeRaf = requestAnimationFrame(() => {
-      resizeRaf = 0;
-      if (!nav.matches(":hover")) positionOnActive();
-    });
-  });
+  sizeObserver.observe(nav);
 }
