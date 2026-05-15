@@ -2261,6 +2261,18 @@ select.is-invalid:focus {
   line-height: 1.5;
   margin: 0;
 }
+/* Discreet legal links in the disclaimer: match the .app-footer
+ * pattern (sémantiquement les mêmes liens — mentions / privacy)
+ * rather than the louder .login-foot accent style above. Token-driven
+ * so les deux thèmes (studio/editorial) suivent automatiquement. */
+.login-terms a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+.login-terms a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
 /* ============================================================
    Settings modal styles
    ============================================================ */
