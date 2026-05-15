@@ -3,3 +3,8 @@ test-results/
 playwright-report/
 .DS_Store
 *.log
+
+# Local tooling notes — kept on disk so Claude Code's CLAUDE.md
+# discovery finds it, but never deployed (GH Pages serves the
+# repo as-is) and never pushed to the public GitHub mirror.
+CLAUDE.md
