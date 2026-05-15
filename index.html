@@ -9,8 +9,10 @@
      non-Scryfall/non-Firebase server (preventing data exfiltration).
      Firebase additions:
        script-src + gstatic.com  - Firebase SDK loaded via ESM CDN
+       script-src + apis.google.com - gapi OAuth client (Google sign-in)
        connect-src + googleapis  - Firestore reads/writes + Auth REST
-       frame-src                 - Google sign-in popup
+       frame-src + accounts.google.com + apis.google.com - Google
+         sign-in popup + the gapi iframe it creates under the hood
        img-src + googleusercontent - user avatar from Google login
      Typefaces are now self-hosted (see fonts.css + assets/fonts/) —
        no fonts.googleapis.com / fonts.gstatic.com entries in style-src
@@ -33,7 +35,7 @@
      <meta>. Static GitHub Pages can't set custom headers, so true
      clickjacking protection would require a server in front. Left
      out to keep the console clean. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src 'self' https://api.scryfall.com https://www.gstatic.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src 'self' https://api.scryfall.com https://www.gstatic.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com https://apis.google.com; form-action 'none'; base-uri 'none';">
 <meta name="referrer" content="no-referrer">
 <title>Deckrypt</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
