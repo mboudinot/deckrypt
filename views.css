@@ -1832,10 +1832,22 @@ html:has(.modal-backdrop:not([hidden])) {
 
 /* Narrow-viewport tweaks. Each view (play, manage) handles its own
    2-col → 1-col collapse via its dedicated layout class. Here we
-   shrink the global affordances. */
+   shrink les affordances globales en deux paliers :
+   - ≤760 px : carte rétrécit à 110 px (au lieu de 146 desktop) ET le
+     padding des panels passe de 18/22 → 14/16 — sinon les commanders
+     côte-à-côte dans le sidebar étaient visuellement collés aux bords
+     du panel, donnant l'impression que les cartes étaient tronquées
+     (les commanders borderless n'ont pas de marge blanche, donc le
+     titre touche presque l'edge ⇒ "kkima" au lieu de "Ukkima").
+   - ≤600 px : body 8 px (au lieu de 16) + section 10 px pour les
+     très petits téléphones où chaque pixel compte. */
+@media (max-width: 760px) {
+  .card { width: 110px; }
+  .panel { padding: 14px; }
+  [data-direction="editorial"] .panel { padding: 16px; }
+}
 @media (max-width: 600px) {
   body { padding: 8px; }
-  .card { width: 110px; }
   section { padding: 10px; }
 }
 
