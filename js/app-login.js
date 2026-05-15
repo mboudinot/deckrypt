@@ -41,6 +41,24 @@
     let mode = "signin";
     let openerForFocusReturn = null;
 
+    /* Strength meter — only relevant in signup mode (no point rating
+     * the password when the user is just signing in to an existing
+     * account). Mounted once next to the hint, refreshed on every
+     * keystroke + email change. The meter manages its own
+     * visibility for empty input; we additionally force-hide it in
+     * signin mode via `refreshPwdMeter`. */
+    const pwdMeter = buildPasswordMeter();
+    pwdHint.after(pwdMeter.root);
+    function refreshPwdMeter() {
+      if (mode === "signup") {
+        pwdMeter.update(pwdInput.value, { email: emailInput.value });
+      } else {
+        pwdMeter.update("", {});
+      }
+    }
+    pwdInput.addEventListener("input", refreshPwdMeter);
+    emailInput.addEventListener("input", refreshPwdMeter);
+
     function applyMode() {
       if (mode === "signin") {
         title.textContent = "Connexion";
@@ -63,6 +81,7 @@
         modePrefix.textContent = "Déjà inscrit ?";
         modeToggleLink.textContent = "Se connecter";
       }
+      refreshPwdMeter();
       clearError();
     }
 

@@ -63,6 +63,73 @@ test("password show/hide toggle flips the input type", async ({ page }) => {
   await expect(pwd).toHaveAttribute("type", "password");
 });
 
+test(".pwd-toggle hit target stretches the full input height in both themes", async ({ page }) => {
+  /* Regression for the old `padding: 4px 8px` + `translateY(-50%)`
+   * chip — its ~44×19 click zone forced a centered click. Stretching
+   * top/bottom: 2px gives a ~36 px tall target and pushes the
+   * sensitive area to the input's right edge.
+   *
+   * Verified in BOTH themes so a future editorial-only override
+   * that shrinks the toggle back to a chip wouldn't slip past
+   * studio's test coverage. */
+  await page.goto("/index.html");
+  const toggle = page.locator("#login-pwd-toggle");
+  const pwd = page.locator("#login-pwd");
+
+  for (const theme of ["studio", "editorial"]) {
+    await page.evaluate((t) => {
+      document.documentElement.setAttribute("data-direction", t);
+    }, theme);
+    const box = await toggle.boundingBox();
+    /* Minimum touch target on web is ~24 px (Material). Anything
+     * below and we're back to the chip. */
+    expect(box.height, `hit-target height in ${theme}`).toBeGreaterThanOrEqual(24);
+    /* Click 2 px from the top edge — used to miss the chip entirely. */
+    const startType = await pwd.getAttribute("type");
+    await page.mouse.click(box.x + box.width / 2, box.y + 2);
+    const flipped = startType === "password" ? "text" : "password";
+    await expect(pwd).toHaveAttribute("type", flipped);
+  }
+});
+
+test("strength meter is hidden in signin mode + when password is empty in signup mode", async ({ page }) => {
+  await page.goto("/index.html");
+  const meter = page.locator("#login-form .pwd-meter");
+  /* Signin mode by default — meter must stay hidden regardless of
+   * whether the user typed something (we're authenticating against
+   * an existing password, no point rating it). */
+  await page.locator("#login-pwd").fill("anything");
+  await expect(meter).toBeHidden();
+  /* Switch to signup; empty password still keeps the meter hidden. */
+  await page.locator("#login-pwd").fill("");
+  await page.click("#login-mode-toggle");
+  await expect(meter).toBeHidden();
+});
+
+test("strength meter activates on signup with weak password (score 0 + non-blocking note)", async ({ page }) => {
+  await page.goto("/index.html");
+  await page.click("#login-mode-toggle");
+  const meter = page.locator("#login-form .pwd-meter");
+  await page.locator("#login-pwd").fill("password");
+  await expect(meter).toBeVisible();
+  await expect(meter).toHaveAttribute("data-score", "0");
+  await expect(meter.locator(".pwd-meter-note")).toBeVisible();
+  /* Stronger password drops the disclaimer. */
+  await page.locator("#login-pwd").fill("MyD3ckRulez!");
+  await expect(meter).not.toHaveAttribute("data-score", "0");
+  await expect(meter.locator(".pwd-meter-note")).toBeHidden();
+});
+
+test("switching from signup → signin hides the meter even with input present", async ({ page }) => {
+  await page.goto("/index.html");
+  await page.click("#login-mode-toggle"); // signup
+  await page.locator("#login-pwd").fill("anyweakpwd");
+  const meter = page.locator("#login-form .pwd-meter");
+  await expect(meter).toBeVisible();
+  await page.click("#login-mode-toggle"); // back to signin
+  await expect(meter).toBeHidden();
+});
+
 test("mode toggle swaps the title, submit label, and password autocomplete", async ({ page }) => {
   await page.goto("/index.html");
 

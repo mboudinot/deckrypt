@@ -56,6 +56,8 @@
 <script defer src="js/storage.js"></script>
 <script defer src="js/sync-queue.js"></script>
 <script defer src="js/form-validate.js"></script>
+<script defer src="js/password-strength.js"></script>
+<script defer src="js/password-meter.js"></script>
 <script defer src="js/card-cache.js"></script>
 <script defer src="js/translations.js"></script>
 <script defer src="js/deck-edit.js"></script>
@@ -915,7 +917,7 @@
             <input id="login-pwd" type="password" placeholder="•••••••••••" autocomplete="current-password" required>
             <button type="button" class="pwd-toggle" id="login-pwd-toggle" aria-pressed="false">Voir</button>
           </div>
-          <span class="hint" id="login-pwd-hint" hidden>Minimum 8 caractères avec au moins 1 chiffre.</span>
+          <span class="hint" id="login-pwd-hint" hidden>8 caractères minimum. Plus c'est long, mieux c'est.</span>
         </div>
         <div class="field-row" id="login-signin-only">
           <label class="remember-me"><input type="checkbox" id="login-remember"> Se souvenir de moi</label>

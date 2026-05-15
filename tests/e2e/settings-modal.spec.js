@@ -172,6 +172,54 @@ test("Mismatching new + confirm passwords shows an inline mismatch error", async
   await expect(form.locator(".account-edit-msg.error")).toContainText("ne correspondent pas");
 });
 
+test("Strength meter is attached to the 'next' field only (not current, not confirm)", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="password"]');
+  /* Each .field with the meter has it as a direct child; the others don't. */
+  await expect(page.locator("#settings-pwd-next ~ .pwd-meter, #settings-pwd-next + .pwd-meter")).toHaveCount(0); // sanity: meter is below the wrap, not the input
+  /* Scope the count via the parent field instead — the meter is the last child of the next-field. */
+  const fields = page.locator("#settings-password-form .field");
+  await expect(fields).toHaveCount(3);
+  await expect(fields.nth(0).locator(".pwd-meter")).toHaveCount(0);
+  await expect(fields.nth(1).locator(".pwd-meter")).toHaveCount(1);
+  await expect(fields.nth(2).locator(".pwd-meter")).toHaveCount(0);
+});
+
+test("Strength meter stays hidden for empty input, surfaces score + non-blocking note for weak passwords", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="password"]');
+  const meter = page.locator("#settings-password-form .pwd-meter");
+  await expect(meter).toBeHidden();
+  /* Common-list password → score 0 → "Très faible" + disclaimer. */
+  await page.locator("#settings-pwd-next").fill("password123");
+  await expect(meter).toBeVisible();
+  await expect(meter).toHaveAttribute("data-score", "0");
+  await expect(meter.locator(".pwd-meter-label")).toHaveText("Très faible");
+  await expect(meter.locator(".pwd-meter-note")).toBeVisible();
+  /* Strong password → score ≥ 3 → no disclaimer. */
+  await page.locator("#settings-pwd-next").fill("MyD3ckRulez!");
+  await expect(meter).not.toHaveAttribute("data-score", "0");
+  await expect(meter.locator(".pwd-meter-note")).toBeHidden();
+});
+
+test("Weak password does NOT block submit (philosophy: warn, don't gate)", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="password"]');
+  const form = page.locator("#settings-password-form");
+  /* `password123` is in the common list — meter scores it 0/4 but
+   * the form must still accept the submission (TEST_MODE makes
+   * sync.changePassword a no-op, so a green "Mot de passe mis à
+   * jour" is the success signal). */
+  await form.locator("input[name='current']").fill("oldoldoldold");
+  await form.locator("input[name='next']").fill("password123");
+  await form.locator("input[name='confirm']").fill("password123");
+  await form.locator("button[type='submit']").click();
+  await expect(form.locator(".account-edit-msg.success")).toContainText("Mot de passe mis à jour");
+});
+
 test("Password change is disabled for Google-authed users (provider gate)", async ({ page }) => {
   /* The default mockAuth user is a password user; layer a Google-only
    * override on top, then reload so sync.js picks up the new seam at

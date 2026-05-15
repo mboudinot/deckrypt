@@ -319,8 +319,9 @@
     }
 
     /* Reusable password input + Voir/Cacher toggle, matching the
-     * login form's `.pwd-wrap` pattern. Returns the wrapper so the
-     * caller can append it to a field. */
+     * login form's `.pwd-wrap` pattern. Returns `{ field, input }`
+     * so the caller can wire extras (a strength meter on the
+     * "Nouveau mot de passe" field, for instance). */
     function buildPasswordField({ id, name, autocomplete, label }) {
       const field = document.createElement("div");
       field.className = "field";
@@ -355,7 +356,7 @@
       });
       wrap.append(input, toggle);
       field.append(lbl, wrap);
-      return field;
+      return { field, input };
     }
 
     function buildPseudoEditor(user) {
@@ -452,12 +453,28 @@
         ["next", "Nouveau mot de passe", "new-password"],
         ["confirm", "Confirmer le nouveau mot de passe", "new-password"],
       ]) {
-        form.appendChild(buildPasswordField({
+        const { field, input } = buildPasswordField({
           id: `settings-pwd-${name}`,
           name,
           autocomplete,
           label,
-        }));
+        });
+        form.appendChild(field);
+        /* Strength meter on the "new" field only — no point rating
+         * the current password (the user is replacing it) or the
+         * confirm field (same value, no extra signal). Context lets
+         * the scorer flag passwords that contain the user's email
+         * local-part or pseudo. */
+        if (name === "next") {
+          const meter = buildPasswordMeter();
+          field.appendChild(meter.root);
+          input.addEventListener("input", () => {
+            meter.update(input.value, {
+              email: user.email || "",
+              displayName: user.displayName || "",
+            });
+          });
+        }
       }
       const actions = document.createElement("div");
       actions.className = "account-edit-actions";

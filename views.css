@@ -2083,22 +2083,89 @@ select.is-invalid:focus {
 }
 .pwd-wrap { position: relative; }
 .pwd-wrap input { padding-right: 70px; }
+
+/* Password strength meter — 5-segment bar + label + hints + a
+ * non-blocking disclaimer when the password is weak. Visual hierarchy
+ * mirrors `.field` typography so the meter feels native to forms.
+ * Score is exposed via `[data-score="0..4"]` on the root and drives
+ * the segment / label colour through a single set of rules below. */
+.pwd-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.pwd-meter[hidden] { display: none; }
+.pwd-meter-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  height: 4px;
+}
+.pwd-meter-seg {
+  background: var(--surface-2);
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+.pwd-meter[data-score="0"] .pwd-meter-seg.is-on { background: var(--error); }
+.pwd-meter[data-score="1"] .pwd-meter-seg.is-on { background: var(--warning); }
+.pwd-meter[data-score="2"] .pwd-meter-seg.is-on { background: var(--accent); }
+.pwd-meter[data-score="3"] .pwd-meter-seg.is-on,
+.pwd-meter[data-score="4"] .pwd-meter-seg.is-on { background: var(--success); }
+.pwd-meter-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+}
+.pwd-meter[data-score="0"] .pwd-meter-label { color: var(--error); }
+.pwd-meter[data-score="1"] .pwd-meter-label { color: var(--warning); }
+.pwd-meter[data-score="3"] .pwd-meter-label,
+.pwd-meter[data-score="4"] .pwd-meter-label { color: var(--success); }
+.pwd-meter-hints {
+  margin: 2px 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.pwd-meter-hints[hidden] { display: none; }
+.pwd-meter-hints li { margin: 0; }
+.pwd-meter-note {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+.pwd-meter-note[hidden] { display: none; }
+/* Voir/Cacher hit area = the whole right strip of the .pwd-wrap.
+ * Was a small chip (~44×19 with `padding: 4px 8px` + translateY),
+ * which forced the user to aim for the center to land a click —
+ * stretching vertically (top/bottom: 2px) gives a ~36 px tall target
+ * and pushes the cursor-detection zone all the way to the input's
+ * right edge, so any click in the trailing strip works. */
 .pwd-toggle {
   position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: 2px;
+  top: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
   background: transparent;
   border: 0;
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
-  padding: 4px 8px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
+  border-radius: var(--radius);
 }
-.pwd-toggle:hover { color: var(--text-2); }
+.pwd-toggle:hover {
+  color: var(--text-2);
+  background: var(--surface);
+}
 
 .field-row {
   display: flex;
