@@ -79,19 +79,13 @@ const labelForSubtype = (s) => SUBTYPE_LABELS_FR[s] || s;
 
 function renderAnalyzeView() {
   const resolved = state.resolved;
-  if (!resolved || (resolved.commanders.length === 0 && resolved.deck.length === 0)) {
-    [els.analyzeBracket, els.analyzeCurve, els.analyzeTypes,
-     els.analyzeSubtypes, els.analyzeTokens,
-     els.analyzeSuggestions, els.analyzeThemes, els.analyzeLegality,
-     els.analyzeArchetypes, els.analyzeManaBase]
-      .forEach((el) => el.replaceChildren(placeholderText("Aucun deck à analyser.")));
-    els.analyzeComposition.replaceChildren();
-    [els.analyzeCurveInfo, els.analyzeTypesInfo, els.analyzeSubtypesInfo,
-     els.analyzeTokensInfo, els.analyzeSuggestionsInfo, els.analyzeThemesInfo,
-     els.analyzeArchetypesInfo, els.analyzeManaBaseInfo]
-      .forEach((el) => { el.textContent = ""; });
-    return;
-  }
+  const isEmpty = !resolved
+    || (resolved.commanders.length === 0 && resolved.deck.length === 0);
+  /* Whole view flips to the shared `.view-empty-state` CTA — the
+   * per-panel placeholders disappear because their parent `.panel`
+   * is a hidden direct child of `.view-empty`. */
+  els.viewAnalyze.classList.toggle("view-empty", isEmpty);
+  if (isEmpty) return;
   // The deck for analysis = main cards + commanders. Commanders count
   // toward CMC curve, type breakdown, and bracket evaluation.
   const fullDeck = [...resolved.commanders, ...resolved.deck];

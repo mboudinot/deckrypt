@@ -183,6 +183,21 @@
   <main class="layout">
 
     <div id="view-play" role="tabpanel" aria-labelledby="tab-play">
+      <!-- Shared empty-state pattern — see `.view-empty` in views.css.
+           When the parent view gets `.view-empty`, this block is the
+           only direct child that stays visible (CSS hides every other
+           sibling). Same content in all four views so a fresh account
+           sees a coherent CTA wherever they land. -->
+      <div class="view-empty-state empty-deck-cta">
+        <svg class="empty-deck-cta-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
+        <div class="empty-deck-cta-sub">Importe ta première deck-liste pour commencer à analyser, gérer et tester tes mains.</div>
+        <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer ton premier deck</button>
+      </div>
       <div class="play-layout">
 
         <aside class="play-sidebar">
@@ -310,6 +325,16 @@
     </div>
 
     <div class="manage-area" id="view-manage" role="tabpanel" aria-labelledby="tab-manage" hidden>
+      <div class="view-empty-state empty-deck-cta">
+        <svg class="empty-deck-cta-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
+        <div class="empty-deck-cta-sub">Importe ta première deck-liste pour commencer à analyser, gérer et tester tes mains.</div>
+        <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer ton premier deck</button>
+      </div>
       <div class="manage-layout">
         <main class="manage-main">
 
@@ -531,6 +556,16 @@
     </div>
 
     <div class="analyze-area" id="view-analyze" role="tabpanel" aria-labelledby="tab-analyze" hidden>
+      <div class="view-empty-state empty-deck-cta">
+        <svg class="empty-deck-cta-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
+        <div class="empty-deck-cta-sub">Importe ta première deck-liste pour commencer à analyser, gérer et tester tes mains.</div>
+        <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer ton premier deck</button>
+      </div>
       <section class="panel">
         <div class="panel-head">
           <h3>Bracket estimé</h3>
@@ -615,6 +650,16 @@
     </div>
 
     <div class="gallery-area" id="view-gallery" role="tabpanel" aria-labelledby="tab-gallery" hidden>
+      <div class="view-empty-state empty-deck-cta">
+        <svg class="empty-deck-cta-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
+        <div class="empty-deck-cta-sub">Importe ta première deck-liste pour commencer à analyser, gérer et tester tes mains.</div>
+        <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer ton premier deck</button>
+      </div>
       <div id="gallery-content"></div>
     </div>
 

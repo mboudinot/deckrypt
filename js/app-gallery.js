@@ -15,10 +15,9 @@
  * fresh lookups otherwise. */
 function renderGalleryView(ctx = null) {
   const def = ctx?.def || findDeck(state.currentDeckId);
-  if (!def || !state.resolved) {
-    els.galleryContent.replaceChildren(placeholderText("Aucun deck à afficher."));
-    return;
-  }
+  const isEmpty = !def || !state.resolved;
+  els.viewGallery.classList.toggle("view-empty", isEmpty);
+  if (isEmpty) return;
 
   /* Per-entry card-data lookup, identical contract to the manage view:
    *   1. card-cache hit by (set, cn) for entries with an explicit

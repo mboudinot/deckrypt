@@ -256,24 +256,26 @@ test("Submitting the delete form (password user) closes the modal and re-locks t
   await expect(page.locator("#login-overlay")).toBeVisible();
 });
 
-test("Account deletion clears the pre-rendered manage view DOM (cross-user leak guard)", async ({ page }) => {
+test("Account deletion clears the pre-rendered manage view (cross-user leak guard)", async ({ page }) => {
   /* Reproduces what the user hit on their first manual test: after
    * deleting their account and re-signing-in, the Manage tab still
-   * showed the previous deck because clearActiveView only reset
-   * the Play view. The Manage / Analyze / Gallery panels are
-   * pre-rendered for instant tab switching, so their DOM survives
-   * unless we explicitly re-render them in the "no deck" state. */
+   * showed the previous deck because clearActiveView only reset the
+   * Play view. The Manage / Analyze / Gallery panels are pre-rendered
+   * for instant tab switching, so their DOM survives unless we
+   * explicitly re-render them. New contract: each renderer toggles
+   * `.view-empty` on its container, which the CSS uses to hide the
+   * pre-rendered layout and show the shared CTA — checking the class
+   * is the right invariant (the textContent of `#manage-deck-name`
+   * is now an implementation detail of the hidden subtree). */
   await page.click("#tab-manage");
-  await expect(page.locator("#manage-deck-name")).not.toHaveText("—");
+  await expect(page.locator("#view-manage")).not.toHaveClass(/view-empty/);
   await page.keyboard.press("Control+,");
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="delete"]');
   await page.locator("#settings-delete-pwd").fill("anyvalue");
   await page.locator("#settings-delete-form button[type='submit']").click();
-  /* Shell is locked behind the overlay but the manage DOM still
-   * lives in the page — verify it was reset to the placeholder. */
   await expect(page.locator("html")).toHaveClass(/auth-locked/);
-  await expect(page.locator("#manage-deck-name")).toHaveText("—");
+  await expect(page.locator("#view-manage")).toHaveClass(/view-empty/);
 });
 
 test("Delete-account form switches to a Google-reauth note for Google-only users (no password input)", async ({ page }) => {

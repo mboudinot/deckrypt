@@ -368,17 +368,13 @@ function _buildCardRowRemove(entry, kind) {
  * toggles) fall through to fresh lookups. */
 function renderManageView(ctx = null) {
   const def = ctx?.def || findDeck(state.currentDeckId);
-  if (!def) {
-    els.manageDeckName.textContent = "—";
-    els.manageMeta.textContent = "Aucun deck sélectionné.";
-    els.manageCommanders.replaceChildren(placeholderText("—"));
-    els.manageCards.replaceChildren(placeholderText("—"));
-    els.manageCardsCount.textContent = "";
-    renderDeckSummary(null);
-    renderSideComposition();
-    renderSideBracket();
-    return;
-  }
+  /* `.view-empty` flips the whole tab to the shared CTA — see
+   * `.view-empty` rule in views.css. No need to reset the deck-name
+   * h1 / meta / count: their parents are hidden by the class so the
+   * text content is non-observable until a deck loads (and then the
+   * happy path below repopulates it). */
+  els.viewManage.classList.toggle("view-empty", !def);
+  if (!def) return;
   els.manageDeckName.textContent = def.name;
   const totalCards = def.cards.reduce((n, c) => n + c.qty, 0);
   els.manageMeta.textContent =

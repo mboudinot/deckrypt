@@ -538,48 +538,24 @@ function removeFlash(node) {
 function clearActiveView() {
   state.resolved = null;
   state.game = null;
-  els.commanderZone.replaceChildren(emptyDeckCta());
-  for (const el of [els.hand, els.battlefield, els.lands, els.graveyard]) {
-    el.replaceChildren(placeholderText("Aucun deck chargé."));
-  }
+  /* Toggle `.view-empty` on the play view so its `.view-empty-state`
+   * block takes over — every other direct child gets hidden by CSS,
+   * so we don't need to fill the play zones with placeholder text
+   * anymore. setStatus + renderGameBar + updateButtons still run so
+   * the offscreen counters / button states are coherent (they don't
+   * paint anything visible while the view is empty). */
+  els.viewPlay.classList.add("view-empty");
   setStatus("Aucun deck. Importez-en un pour commencer.");
   renderGameBar();
   updateButtons();
   /* The manage / analyze / gallery views are pre-rendered for instant
    * tab switching, so their DOM holds whatever the previous deck
-   * looked like. When the deck context goes away (deletion, sign-out,
-   * account deletion → re-login as a different user, …) those panels
-   * would otherwise stay stuck on the previous data — a real
-   * cross-user leak after the login-obligatoire pivot. Each renderer
-   * has a "no-deck" placeholder path triggered by state.resolved /
-   * findDeck() returning null. */
+   * looked like. Calling their renderers here flips them into
+   * `.view-empty` too — same cross-user leak guard as before, just
+   * via the class-based mechanism. */
   if (typeof renderManageView === "function") renderManageView();
   if (typeof renderAnalyzeView === "function") renderAnalyzeView();
   if (typeof renderGalleryView === "function") renderGalleryView();
-}
-
-/* Built once per call so the click handler captures the latest
- * openImportPanel. Used both by clearActiveView and the dropdown
- * helpers — the message stays the same, the visual treatment is
- * driven entirely by .empty-deck-cta in views.css. */
-function emptyDeckCta() {
-  const wrap = document.createElement("div");
-  wrap.className = "empty-deck-cta";
-  const title = document.createElement("div");
-  title.className = "empty-deck-cta-title";
-  title.textContent = "Aucun deck pour le moment";
-  const sub = document.createElement("div");
-  sub.className = "empty-deck-cta-sub";
-  sub.textContent = "Importe ta première deck-liste pour commencer.";
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "btn primary empty-deck-cta-btn";
-  btn.textContent = "Importer ton premier deck";
-  btn.addEventListener("click", () => openImportPanel());
-  wrap.appendChild(title);
-  wrap.appendChild(sub);
-  wrap.appendChild(btn);
-  return wrap;
 }
 
 async function switchDeck(deckId) {
@@ -593,6 +569,10 @@ async function switchDeck(deckId) {
   refreshDeckDropdownActive();
   const def = findDeck(deckId);
   if (!def) return;
+  /* A deck context is now live — drop the empty-state CTA on play
+   * (manage / analyze / gallery toggle their own class via their
+   * renderers below). */
+  els.viewPlay.classList.remove("view-empty");
 
   state.resolved = null;
   state.game = null;
@@ -1096,6 +1076,16 @@ function bindEvents() {
   els.btnDeleteDeck.addEventListener("click", deleteCurrentDeck);
   els.btnDuplicateDeck.addEventListener("click", duplicateCurrentDeck);
   els.btnImportToggle.addEventListener("click", openImportPanel);
+  /* Single delegated handler for the four empty-state CTA buttons —
+   * one per view (`#view-play / view-manage / view-analyze /
+   * view-gallery`). All carry `data-action="open-import"`; the
+   * dropdown's "Importer une liste" entry has its own listener above
+   * because it lives inside a dropdown menu (autoclose semantics
+   * differ). */
+  document.addEventListener("click", (e) => {
+    const trigger = e.target.closest('[data-action="open-import"]');
+    if (trigger) openImportPanel();
+  });
   els.btnExport.addEventListener("click", () => openIeModal("export"));
   els.ieModalClose.addEventListener("click", closeIeModal);
   els.exportFormat.addEventListener("change", refreshExportOutput);
