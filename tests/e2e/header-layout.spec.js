@@ -60,6 +60,39 @@ test("clicking a nav tab toggles its .active class + aria-selected", async ({ pa
   await expect(page.locator("#tab-play")).toHaveAttribute("aria-selected", "false");
 });
 
+test("authed account-name slot stays a fixed width across short and long labels (no header CLS)", async ({ page }) => {
+  /* Regression: the .account-name had max-width but no min-width, so
+   * the slot grew/shrank depending on displayName length and produced
+   * a header shift between boot-theme's skeleton (100 px reservation)
+   * and the real authed label. Fix : `width: 140px` locks both states
+   * to the same slot. */
+  await page.locator("#btn-account.account-authed").waitFor();
+  const labelLocator = page.locator(".account-authed .account-name");
+
+  /* mockAuth seeds displayName="Test User" → measure first. */
+  const initial = (await labelLocator.boundingBox()).width;
+  expect(initial).toBeGreaterThanOrEqual(138);
+  expect(initial).toBeLessThanOrEqual(142);
+
+  /* Swap the label to an extreme long string in-place; width must
+   * not change. This is the precise regression scenario — replacing
+   * an account's displayName with a long email used to grow the
+   * button. */
+  await page.evaluate(() => {
+    document.getElementById("account-label").textContent = "matthieu.boudinot.long@verylongdomain.example";
+  });
+  const longLabel = (await labelLocator.boundingBox()).width;
+  expect(longLabel).toBe(initial);
+
+  /* And the symmetric case: a single-char label still occupies the
+   * full 140 px slot, so the button doesn't rétrécir either. */
+  await page.evaluate(() => {
+    document.getElementById("account-label").textContent = "M";
+  });
+  const shortLabel = (await labelLocator.boundingBox()).width;
+  expect(shortLabel).toBe(initial);
+});
+
 test("deck pill shows the active deck name + a non-zero cards count", async ({ page }) => {
   const name = await page.locator("#deck-pill-name").textContent();
   expect(name.length).toBeGreaterThan(0);

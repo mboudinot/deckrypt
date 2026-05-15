@@ -319,12 +319,23 @@ html.has-session-hint .account.account-anon::before {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   flex-shrink: 0;
 }
+/* Reserve the chevron slot too — without this, the button grows by
+ * ~11 px the moment refreshAccountButton appends the real .account-chev,
+ * which is the second half of the perceived header shift. */
+html.has-session-hint .account.account-anon::after {
+  content: "";
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
 html.has-session-hint .account.account-anon .account-name {
+  /* Width (140px) is set by the joint .account-authed/.has-session-hint
+   * rule below — same value on both sides so the slot doesn't shift
+   * when refreshAccountButton swaps the placeholder for the real
+   * label. We just hide the literal "Connexion" text here so it
+   * doesn't peek through during the skeleton phase. */
   visibility: hidden;
-  /* Reserve a name-shaped slot so the button geometry doesn't shift
-   * when the real label lands. 100 px ≈ a typical first name + last
-   * initial; the max-width on `.account-name` clamps overflow. */
-  min-width: 100px;
 }
 .account-avatar {
   width: 26px; height: 26px;
@@ -346,6 +357,19 @@ html.has-session-hint .account.account-anon .account-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Authed + skeleton states: lock the name slot to a fixed width so
+ * the header doesn't shift when refreshAccountButton swaps the
+ * skeleton out for the real label. Without this, the slot rétrécit
+ * pour un displayName court ("Matthieu", ~55 px) puis s'élargit pour
+ * un email long (~155 px) au prochain refresh. 140 px loge confort-
+ * ablement un "prénom + initiale" et ellipsise les emails longs (la
+ * version complète reste visible dans le menu déroulant). Scope
+ * explicit : NOT applied to the pure anon state (no session hint, no
+ * user) so the "Connexion" CTA garde sa largeur naturelle. */
+.account-authed .account-name,
+html.has-session-hint .account.account-anon .account-name {
+  width: 140px;
 }
 .account-chev {
   color: var(--text-muted);
