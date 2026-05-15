@@ -918,6 +918,31 @@ button.icon-btn svg { display: block; }
 }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* `.is-loading` — async action in flight. The button reste `disabled`
+ * pour bloquer les clics multiples, mais on neutralise le fade
+ * `:disabled` pour que la couleur (accent en .primary, surface en
+ * secondaire) reste lisible — l'utilisateur doit voir que le bouton
+ * "travaille", pas qu'il est inactif. Le spinner est un `::before`
+ * qui hérite de `currentColor` → fonctionne tel quel en primary
+ * (accent-text blanc) comme en secondaire (text). Réutilise le
+ * keyframe `lang-spin` partagé avec les autres loaders du projet. */
+.btn.is-loading {
+  opacity: 1;
+  cursor: progress;
+}
+.btn.is-loading::before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in oklch, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: lang-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-loading::before { animation: none; }
+}
 .btn.primary {
   background: var(--accent);
   color: var(--accent-text);

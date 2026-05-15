@@ -687,6 +687,7 @@ function openImportPanel() {
    * disabled state. The user gets immediate inline feedback on
    * click instead of wondering why the button is gray. */
   els.importConfirm.disabled = false;
+  els.importConfirm.classList.remove("is-loading");
   /* Clear any leftover invalid flags from a prior failed attempt
    * and wire the auto-clear listeners (idempotent — first call
    * registers, later calls are no-ops via dataset guard). */
@@ -863,12 +864,14 @@ async function confirmImport() {
   };
 
   els.importConfirm.disabled = true;
+  els.importConfirm.classList.add("is-loading");
   setStatus("Vérification du deck via Scryfall…");
   try {
     await resolveDeck(def);
   } catch (err) {
     setStatus("Erreur Scryfall : " + err.message, "error");
     els.importConfirm.disabled = false;
+    els.importConfirm.classList.remove("is-loading");
     return;
   }
 
