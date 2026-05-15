@@ -78,7 +78,10 @@ test("theme-card check badge is only visible on the active theme", async ({ page
 
 test("modal frame keeps the same height across tab switches (no reflow on rubric change)", async ({ page }) => {
   await page.keyboard.press("Control+,");
-  const modal = page.locator(".settings-modal");
+  /* Scope to #settings-modal — the .settings-modal shell is also
+   * reused by the legal modal, which would make this an ambiguous
+   * match. */
+  const modal = page.locator("#settings-modal .settings-modal");
   /* The 0.25s modal-in animation scales the box; wait for it to
    * settle before sampling so the first measurement isn't taken
    * mid-transform. */

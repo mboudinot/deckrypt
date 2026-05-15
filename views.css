@@ -2385,11 +2385,14 @@ select.is-invalid:focus {
   cursor: pointer;
   white-space: nowrap;
 }
-.settings-nav-item:hover:not(:disabled) {
+.settings-nav-item:hover:not(:disabled):not(.active) {
   background: var(--surface-2);
   color: var(--text);
   border-color: transparent;
 }
+/* Active tab keeps its accent bg/color on hover — without :not(.active)
+ * above, the surface-2 hover would override the accent and the active
+ * tab "flashes" out of selection when the cursor passes over it. */
 .settings-nav-item.active {
   background: var(--accent);
   color: var(--accent-text);
@@ -3621,3 +3624,73 @@ select.is-invalid:focus {
   padding: 0 8px;
   font-size: 13px;
 }
+
+/* ============================================================
+   Legal footer + legal modal
+   ============================================================ */
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px 24px;
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.app-footer a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+.app-footer a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+.app-footer-brand { font-weight: 500; }
+.app-footer-sep { color: var(--text-muted); opacity: 0.6; }
+/* Inside the login overlay, the footer would be hidden behind the
+ * fullscreen overlay (z-index 1000). Keep it out of the way to avoid
+ * any layout shift when the overlay closes. */
+html.auth-locked .app-footer { display: none; }
+
+/* Legal modal: same .settings-modal shell, just bumped above the
+ * login overlay (z-index 1000) so the "conditions / confidentialité"
+ * links work pre-authentication. */
+.legal-modal-backdrop { z-index: 1100; }
+
+/* Legal panel typography — slightly looser than the settings panels
+ * because the content is prose, not controls. */
+.legal-panel p {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.legal-panel p:last-child { margin-bottom: 0; }
+.legal-panel a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.legal-panel a:hover { text-decoration: underline; }
+.legal-panel strong { color: var(--text); font-weight: 600; }
+.legal-panel code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 1px 5px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.legal-list {
+  margin: 4px 0 12px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.legal-list li::marker { color: var(--text-muted); }

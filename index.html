@@ -12,9 +12,11 @@
        connect-src + googleapis  - Firestore reads/writes + Auth REST
        frame-src                 - Google sign-in popup
        img-src + googleusercontent - user avatar from Google login
-     Google Fonts additions:
-       style-src + fonts.googleapis.com - CSS for Inter, Fraunces, JetBrains Mono
-       font-src  + fonts.gstatic.com    - the woff2 files themselves
+     Typefaces are now self-hosted (see fonts.css + assets/fonts/) —
+       no fonts.googleapis.com / fonts.gstatic.com entries in style-src
+       or font-src. This avoids leaking the user's IP to Google for
+       every page load (CJUE / LG München 2022 ruled the third-party
+       Google Fonts CDN load violates the GDPR without consent).
      img-src + data: — inline SVG chevrons in CSS background-image
        (select fields, dropdown triggers). Without this the browser
        blocks the data: URI and the chevron disappears silently.
@@ -31,18 +33,22 @@
      <meta>. Static GitHub Pages can't set custom headers, so true
      clickjacking protection would require a server in front. Left
      out to keep the console clean. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src 'self' https://api.scryfall.com https://www.gstatic.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src 'self' https://api.scryfall.com https://www.gstatic.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com; form-action 'none'; base-uri 'none';">
 <meta name="referrer" content="no-referrer">
 <title>Deckrypt</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Preload the variable Inter — the most-used face, applied to body
+     and every UI control — so the browser starts the woff2 fetch in
+     parallel with the stylesheet parse. Fraunces (editorial display)
+     and JetBrains Mono (numeric callouts) are smaller and rarer, no
+     preload needed. -->
+<link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <!-- Apply the saved theme BEFORE any stylesheet evaluates, otherwise
      a user with "editorial" saved would flash studio on every load.
      Non-defer on purpose; the script is ~10 lines + a single
      localStorage read. -->
 <script src="js/boot-theme.js"></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="fonts.css">
 <!-- Load order matters: theme.css defines the tokens, components.css
      pulls them via var() to build the reusable widgets (buttons,
      dropdowns, cards, modals, header chrome, etc.), views.css layers
@@ -76,6 +82,7 @@
 <script defer src="js/app-gallery.js"></script>
 <script defer src="js/app-login.js"></script>
 <script defer src="js/app-settings.js"></script>
+<script defer src="js/app-legal.js"></script>
 <script defer src="js/confirm-dialog.js"></script>
 <script defer src="js/app-header.js"></script>
 <script defer src="js/nav-indicator.js"></script>
@@ -664,6 +671,21 @@
     </div>
 
   </main>
+
+  <!-- Legal footer — always visible in the authenticated app shell.
+       Links open the #legal-modal (controller in js/app-legal.js).
+       Hidden behind the login overlay (z-index 1000) when auth-locked;
+       the login overlay carries its own .login-terms line with the
+       same links so users can reach the policies before signing in. -->
+  <footer class="app-footer" aria-label="Pieds de page">
+    <span class="app-footer-brand">© <span id="app-footer-year"></span> Deckrypt</span>
+    <span class="app-footer-sep" aria-hidden="true">·</span>
+    <a href="#legal-mentions" data-legal-open="mentions">Mentions légales</a>
+    <span class="app-footer-sep" aria-hidden="true">·</span>
+    <a href="#legal-privacy" data-legal-open="privacy">Confidentialité</a>
+    <span class="app-footer-sep" aria-hidden="true">·</span>
+    <a href="#legal-credits" data-legal-open="credits">Crédits</a>
+  </footer>
 </div>
 
 <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Carte" tabindex="-1">
@@ -901,6 +923,274 @@
   </div>
 </div>
 
+<!-- Legal modal — Mentions légales, Politique de confidentialité,
+     Crédits. Higher z-index than the login overlay (CSS: 1100 vs 1000)
+     so it stacks above when the user clicks "conditions / confidentialité"
+     before signing in. Controller in js/app-legal.js. -->
+<div id="legal-modal" class="modal-backdrop legal-modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="legal-title">
+  <div class="settings-modal" role="document">
+    <header class="settings-head">
+      <div>
+        <h2 id="legal-title">Informations légales</h2>
+        <p>Mentions légales, confidentialité et crédits.</p>
+      </div>
+      <button type="button" id="btn-legal-close" class="icon-btn" aria-label="Fermer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </header>
+    <div class="settings-body">
+      <nav class="settings-nav" role="tablist" aria-label="Sections légales">
+        <button type="button" class="settings-nav-item active" role="tab" aria-selected="true" data-legal-tab="mentions">Mentions légales</button>
+        <button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-legal-tab="privacy">Confidentialité</button>
+        <button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-legal-tab="credits">Crédits</button>
+      </nav>
+
+      <div class="settings-content">
+        <!-- ===== Mentions légales ===== -->
+        <div class="settings-panel legal-panel" data-legal-panel="mentions">
+          <div class="settings-section-wrap">
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Éditeur du site</h3>
+              </div>
+              <p>
+                Deckrypt est édité à titre personnel et non commercial par
+                <strong>Matthieu Boudinot</strong>,
+                basé en <strong>France</strong>.
+              </p>
+              <p>
+                Contact : <a href="mailto:deckrypt.mtg@gmail.com">deckrypt.mtg@gmail.com</a>.
+              </p>
+              <p>
+                L'éditeur est également le directeur de la publication au sens
+                de la loi pour la confiance dans l'économie numérique (LCEN,
+                article 6).
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Hébergeur</h3>
+              </div>
+              <p>
+                Le site est hébergé par <strong>GitHub, Inc.</strong>,
+                88 Colin P Kelly Jr Street, San Francisco, CA 94107, États-Unis
+                (<a href="https://github.com" target="_blank" rel="noopener noreferrer">github.com</a>),
+                via le service GitHub Pages.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Propriété intellectuelle</h3>
+              </div>
+              <p>
+                Le code source, l'interface et les contenus rédactionnels du
+                site sont la propriété de l'éditeur, sauf mention contraire.
+                Les images et données de cartes <em>Magic: The Gathering</em>
+                sont fournies par Scryfall et restent la propriété de
+                Wizards of the Coast LLC — voir l'onglet <a href="#legal-credits" data-legal-open="credits">Crédits</a>.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Responsabilité</h3>
+              </div>
+              <p>
+                Deckrypt est un outil fourni « tel quel », sans garantie d'aucune
+                sorte. L'éditeur fait ses meilleurs efforts pour assurer
+                l'exactitude des analyses (courbe de mana, bracket, suggestions,
+                etc.) mais ne saurait être tenu responsable d'éventuelles
+                imprécisions ni d'une interruption de service.
+              </p>
+            </section>
+          </div>
+        </div>
+
+        <!-- ===== Confidentialité ===== -->
+        <div class="settings-panel legal-panel" data-legal-panel="privacy" hidden>
+          <div class="settings-section-wrap">
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Responsable du traitement</h3>
+              </div>
+              <p>
+                Le responsable du traitement des données personnelles est
+                <strong>Matthieu Boudinot</strong>,
+                joignable à l'adresse <a href="mailto:deckrypt.mtg@gmail.com">deckrypt.mtg@gmail.com</a>.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Données collectées</h3>
+                <p>Deckrypt ne collecte que les données strictement nécessaires à son fonctionnement.</p>
+              </div>
+              <ul class="legal-list">
+                <li><strong>Compte</strong> — adresse email et mot de passe (le mot de passe est haché par Firebase Auth, l'éditeur n'y a jamais accès). Si tu te connectes via Google, ton nom d'affichage et ton avatar Google sont également récupérés.</li>
+                <li><strong>Contenu utilisateur</strong> — tes decks (nom, description, liste de cartes, format) et tes préférences (thème, langue, vue par défaut).</li>
+                <li><strong>Données techniques</strong> — adresse IP, horodatage et type de navigateur sont enregistrés temporairement par nos sous-traitants (Firebase, Scryfall, GitHub Pages) pour assurer la sécurité et le bon fonctionnement du service.</li>
+              </ul>
+              <p>
+                <strong>Aucun cookie ni traceur publicitaire n'est utilisé.</strong>
+                Le site utilise uniquement le stockage local du navigateur
+                (<em>localStorage</em>) pour mémoriser ta session, tes
+                préférences et un cache des cartes — tous ces usages sont
+                strictement nécessaires au service et exemptés de consentement
+                en application de l'article 82 de la loi Informatique et
+                Libertés.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Finalités et base légale</h3>
+              </div>
+              <ul class="legal-list">
+                <li>Création et gestion de ton compte, synchronisation de tes decks entre appareils — base légale : <em>exécution du contrat</em> (RGPD art. 6.1.b).</li>
+                <li>Sécurité du service (prévention des abus, journaux d'authentification) — base légale : <em>intérêt légitime</em> (RGPD art. 6.1.f).</li>
+                <li>Récupération des données de cartes auprès de Scryfall — base légale : <em>exécution du contrat</em> pour t'afficher les analyses demandées.</li>
+              </ul>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Sous-traitants et transferts hors UE</h3>
+              </div>
+              <ul class="legal-list">
+                <li><strong>Google (Firebase Authentication &amp; Firestore)</strong> — stockage des comptes et des decks. Les données sont hébergées dans la région <em>europe-west9</em> (Paris). Google LLC est une société américaine ; les transferts éventuels hors UE sont encadrés par les clauses contractuelles types de la Commission européenne et le <em>Data Privacy Framework</em>.</li>
+                <li><strong>GitHub, Inc.</strong> — hébergement statique du site (GitHub Pages). Société américaine, mêmes garanties.</li>
+                <li><strong>Scryfall, LLC</strong> — fournisseur des données et images de cartes <em>Magic: The Gathering</em>. Le navigateur contacte directement <code>api.scryfall.com</code> au chargement des cartes.</li>
+              </ul>
+              <p>
+                Aucune donnée n'est revendue ni transmise à des tiers à des
+                fins commerciales ou publicitaires.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Durée de conservation</h3>
+              </div>
+              <p>
+                Tes données sont conservées tant que ton compte existe. Tu peux
+                supprimer ton compte à tout moment depuis
+                <em>Paramètres → Compte → Zone à risque</em> — la suppression
+                est immédiate et irréversible : decks, préférences et compte
+                d'authentification sont effacés des serveurs.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Tes droits</h3>
+                <p>Conformément au RGPD (articles 15 à 22) et à la loi Informatique et Libertés, tu disposes des droits suivants :</p>
+              </div>
+              <ul class="legal-list">
+                <li><strong>Accès et portabilité</strong> — tu peux à tout moment exporter tes decks au format texte (MTGA, Moxfield, JSON) depuis le menu <em>Exporter</em> de chaque deck.</li>
+                <li><strong>Rectification</strong> — pseudo, mot de passe et contenu de tes decks sont modifiables depuis l'app.</li>
+                <li><strong>Effacement (« droit à l'oubli »)</strong> — bouton <em>Supprimer mon compte</em> dans <em>Paramètres → Compte → Zone à risque</em>.</li>
+                <li><strong>Opposition, limitation, retrait du consentement</strong> — par email à <a href="mailto:deckrypt.mtg@gmail.com">deckrypt.mtg@gmail.com</a>.</li>
+                <li><strong>Réclamation</strong> — tu peux introduire une réclamation auprès de la Commission Nationale de l'Informatique et des Libertés (<a href="https://www.cnil.fr/fr/plaintes" target="_blank" rel="noopener noreferrer">cnil.fr/fr/plaintes</a>) si tu estimes que le traitement de tes données ne respecte pas la réglementation.</li>
+              </ul>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Âge minimum</h3>
+              </div>
+              <p>
+                Conformément à l'article 7-1 de la loi Informatique et Libertés,
+                Deckrypt s'adresse aux personnes âgées d'au moins
+                <strong>15 ans</strong>. En dessous de cet âge, l'inscription
+                doit être effectuée avec l'accord d'un titulaire de l'autorité
+                parentale.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Mise à jour de cette politique</h3>
+              </div>
+              <p>
+                Cette politique peut être mise à jour pour refléter des
+                évolutions du service ou de la réglementation. Dernière mise à
+                jour&nbsp;: <strong>15 mai 2026</strong>.
+              </p>
+            </section>
+          </div>
+        </div>
+
+        <!-- ===== Crédits ===== -->
+        <div class="settings-panel legal-panel" data-legal-panel="credits" hidden>
+          <div class="settings-section-wrap">
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Magic: The Gathering</h3>
+              </div>
+              <p>
+                <em>Magic: The Gathering</em>, le logo MTG, les noms de cartes
+                et les illustrations sont la propriété de
+                <strong>Wizards of the Coast LLC</strong>, une filiale de
+                Hasbro, Inc. Deckrypt n'est ni produit ni approuvé par Wizards
+                of the Coast.
+              </p>
+              <p>
+                Ce site est un projet de fan, distribué à titre non commercial,
+                conforme à la
+                <a href="https://company.wizards.com/fancontentpolicy" target="_blank" rel="noopener noreferrer">Fan Content Policy</a>
+                de Wizards of the Coast.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Scryfall</h3>
+              </div>
+              <p>
+                Les données et images de cartes sont fournies par
+                <strong>Scryfall, LLC</strong> via leur API publique
+                (<a href="https://scryfall.com" target="_blank" rel="noopener noreferrer">scryfall.com</a>).
+                Deckrypt n'est pas affilié à Scryfall, qui n'endosse ni ne
+                certifie ce site.
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Logiciels et services tiers</h3>
+              </div>
+              <ul class="legal-list">
+                <li><strong>Firebase</strong> (Google) — authentification et base de données Firestore.</li>
+                <li><strong>GitHub Pages</strong> — hébergement statique.</li>
+                <li>Typographies <strong>Inter</strong>, <strong>Fraunces</strong> et <strong>JetBrains Mono</strong>, distribuées sous licence SIL Open Font et auto-hébergées par Deckrypt (aucun appel réseau à un CDN tiers).</li>
+              </ul>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-head">
+                <h3>Code source</h3>
+              </div>
+              <p>
+                Le code source de Deckrypt est public et disponible sur
+                <a href="https://github.com/mboudinot" target="_blank" rel="noopener noreferrer">GitHub</a>.
+                Projet personnel : les pull requests ne sont pas activement
+                examinées, mais les retours et signalements de bugs peuvent
+                être envoyés à <a href="mailto:deckrypt.mtg@gmail.com">deckrypt.mtg@gmail.com</a>.
+              </p>
+            </section>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Login overlay — full-viewport split-screen, hidden until the user
      clicks "Connexion". Markup ported from the claude.design bundle's
      view-login.jsx. Auth is wired by js/app-login.js. Will become a
@@ -976,7 +1266,12 @@
           <span id="login-mode-prefix">Pas encore de compte ?</span>
           <a href="#" id="login-mode-toggle">S'inscrire</a>
         </div>
-        <p class="login-terms">En continuant tu acceptes les conditions d'utilisation et la politique de confidentialité.</p>
+        <p class="login-terms">
+          En continuant tu acceptes les
+          <a href="#legal-mentions" data-legal-open="mentions">mentions légales</a>
+          et la
+          <a href="#legal-privacy" data-legal-open="privacy">politique de confidentialité</a>.
+        </p>
       </form>
     </main>
   </div>

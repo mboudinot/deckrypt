@@ -1,0 +1,45 @@
+/* Self-hosted typefaces — Inter, Fraunces, JetBrains Mono.
+ *
+ * The same .woff2 files Google Fonts serves, downloaded once and
+ * shipped with the app. Trade-off: zero IP leak to Google (CJUE
+ * Munich 2022 ruled that serving Google Fonts from the CDN without
+ * consent breaches the GDPR), one less DNS+TLS handshake at boot,
+ * the files cache forever (immutable hashes baked in by Google).
+ *
+ * Each typeface is a *variable* font (one .woff2 with a continuous
+ * `wght` axis), so a single @font-face block covers the 400–700
+ * range the rest of the theme references via var(--font-display) /
+ * --font-body / --font-mono.
+ *
+ * Subset: `latin` only (U+0000-00FF plus Œ/œ and a few typographic
+ * marks). Covers French + English card names. If a user types a glyph
+ * outside this range, the browser falls back to the system stack
+ * declared in theme.css alongside each token.
+ */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("assets/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("assets/fonts/fraunces-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
