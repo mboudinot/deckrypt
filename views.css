@@ -1947,7 +1947,20 @@ html.auth-locked .login-close { display: none; }
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, transparent 30%, var(--bg) 95%);
+  /* Theme-aware readability scrim: `var(--bg)` at varying alphas
+   * across the panel width. Strong on the left (where brand,
+   * tagline and stats sit on top of unpredictable card art) and
+   * fades to the right so the cards still feel present near the
+   * edge. `color-mix` adapts to studio (dark --bg → darkening
+   * scrim, contrast against light --text) and editorial (light
+   * --bg → lightening scrim, contrast against dark --text) without
+   * a per-theme override. */
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--bg) 80%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 65%, transparent) 50%,
+    color-mix(in srgb, var(--bg) 30%, transparent) 90%
+  );
   pointer-events: none;
 }
 .login-visual-brand {
