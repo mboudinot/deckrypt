@@ -30,6 +30,8 @@ import {
   updateProfile,
   updatePassword as fbUpdatePassword,
   reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  deleteUser as fbDeleteUser,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore,
@@ -243,6 +245,85 @@ async function savePreference(key, value) {
   await setDoc(preferencesRef(cachedUser.uid), { [key]: value }, { merge: true });
 }
 
+/* RGPD art. 17 — right to erasure. Hard-deletes the user's data
+ * AND identity. Reauth first (Firebase refuses a stale-session
+ * deleteUser with `auth/requires-recent-login`); deletion order
+ * matters: Firestore subtree FIRST so a mid-flight failure doesn't
+ * leave us with an orphaned auth account but no way to retry the
+ * data wipe (the user could log back in to clean up). Auth account
+ * LAST because once it's gone there's no `request.auth.uid` to
+ * authorise further Firestore writes. */
+async function deleteAccount({ currentPassword } = {}) {
+  if (TEST_MODE) {
+    /* Mirror what onAuthStateChanged(null) would do in production:
+     * wipe the local cache + queue, drop the cached user, fan out
+     * the null transition to subscribers. Tests use this to assert
+     * the post-deletion UI without touching Firebase. */
+    const uid = cachedUser?.uid;
+    try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
+    if (uid && window.syncQueue?.queueKeyForUid) {
+      try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uid)); } catch (e) {}
+    }
+    setSessionHint(false);
+    cachedUser = null;
+    for (const cb of authSubscribers) {
+      try { cb(null); } catch (e) { console.error("auth subscriber threw:", e); }
+    }
+    return;
+  }
+  const fbUser = auth.currentUser;
+  if (!fbUser) throw new Error("not signed in");
+
+  /* Reauth path depends on the provider — password users re-enter
+   * their password, OAuth users go back through their provider's
+   * popup. Other providers (Apple, GitHub, …) aren't enabled in
+   * Firebase Console yet so we don't handle them. */
+  const providerIds = (fbUser.providerData || []).map((p) => p.providerId);
+  if (providerIds.includes("password")) {
+    if (!currentPassword) throw new Error("auth/missing-password");
+    if (!fbUser.email) throw new Error("auth/no-email");
+    const cred = EmailAuthProvider.credential(fbUser.email, currentPassword);
+    await reauthenticateWithCredential(fbUser, cred);
+  } else if (providerIds.includes("google.com")) {
+    await reauthenticateWithPopup(fbUser, new GoogleAuthProvider());
+  } else {
+    throw new Error("auth/unsupported-provider");
+  }
+
+  const uid = fbUser.uid;
+
+  /* Firestore wipe — enumerate and delete every doc under the
+   * user's tree. Today that's decks + meta/preferences; if more
+   * collections land later, list them here. Sequential awaits keep
+   * the order deterministic for tests and bound concurrent writes. */
+  const decksSnap = await getDocs(decksCollection(uid));
+  for (const d of decksSnap.docs) {
+    await deleteDoc(doc(db, "users", uid, "decks", d.id));
+  }
+  try {
+    await deleteDoc(preferencesRef(uid));
+  } catch (e) {
+    /* Not-found is fine — the user may never have changed a
+     * preference. Anything else, we still want to fall through to
+     * the Auth deletion so the user isn't stuck with an account
+     * that can't be removed. */
+    console.warn("preferences delete failed (ignored):", e?.message || e);
+  }
+
+  /* Wipe local cache + per-uid queue. onAuthStateChanged would do
+   * it after the auth delete fires, but we beat it so the next
+   * deleteUser-triggered subscriber call sees an empty cache. */
+  try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
+  if (window.syncQueue?.queueKeyForUid) {
+    try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uid)); } catch (e) {}
+  }
+
+  await fbDeleteUser(fbUser);
+  /* No manual cleanup needed past this point — onAuthStateChanged
+   * fires with null, the subscriber in app.js re-locks the shell
+   * and re-opens the login overlay. */
+}
+
 async function signOut() {
   /* Wipe the local deck cache + queue BEFORE firing Firebase signOut.
    * Login-obligatoire model: anonymous users must NEVER see another
@@ -427,6 +508,7 @@ window.sync = {
   /* Profile */
   updateDisplayName,
   changePassword,
+  deleteAccount,
   /* Per-user preferences (theme, …) */
   loadPreferences,
   savePreference,

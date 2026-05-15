@@ -545,6 +545,17 @@ function clearActiveView() {
   setStatus("Aucun deck. Importez-en un pour commencer.");
   renderGameBar();
   updateButtons();
+  /* The manage / analyze / gallery views are pre-rendered for instant
+   * tab switching, so their DOM holds whatever the previous deck
+   * looked like. When the deck context goes away (deletion, sign-out,
+   * account deletion → re-login as a different user, …) those panels
+   * would otherwise stay stuck on the previous data — a real
+   * cross-user leak after the login-obligatoire pivot. Each renderer
+   * has a "no-deck" placeholder path triggered by state.resolved /
+   * findDeck() returning null. */
+  if (typeof renderManageView === "function") renderManageView();
+  if (typeof renderAnalyzeView === "function") renderAnalyzeView();
+  if (typeof renderGalleryView === "function") renderGalleryView();
 }
 
 /* Built once per call so the click handler captures the latest

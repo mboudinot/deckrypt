@@ -220,6 +220,83 @@ test("Weak password does NOT block submit (philosophy: warn, don't gate)", async
   await expect(form.locator(".account-edit-msg.success")).toContainText("Mot de passe mis à jour");
 });
 
+test("Zone à risque exposes an enabled 'Supprimer' trigger (no more À venir placeholder)", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  const trigger = page.locator('[data-edit-open="delete"]');
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toBeEnabled();
+  await expect(trigger).toHaveText("Supprimer");
+  /* Zone à risque section no longer carries the (À venir) placeholder. */
+  await expect(page.locator(".danger-zone .settings-section-head")).not.toContainText("À venir");
+});
+
+test("Delete-account form expands with a warning + current-password field for password users", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await expect(page.locator("#settings-delete-form")).toBeHidden();
+  await page.click('[data-edit-open="delete"]');
+  const form = page.locator("#settings-delete-form");
+  await expect(form).toBeVisible();
+  await expect(form.locator(".account-edit-warning")).toContainText("définitive");
+  await expect(form.locator("#settings-delete-pwd")).toBeVisible();
+  await expect(form.locator("button[type='submit']")).toHaveText("Supprimer définitivement");
+});
+
+test("Submitting the delete form (password user) closes the modal and re-locks the shell", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="delete"]');
+  await page.locator("#settings-delete-pwd").fill("anyvalue");
+  await page.locator("#settings-delete-form button[type='submit']").click();
+  /* TEST_MODE's deleteAccount fans out auth-null synchronously, so
+   * the auth subscriber re-locks the shell + reopens the overlay. */
+  await expect(page.locator("#settings-modal")).toBeHidden();
+  await expect(page.locator("html")).toHaveClass(/auth-locked/);
+  await expect(page.locator("#login-overlay")).toBeVisible();
+});
+
+test("Account deletion clears the pre-rendered manage view DOM (cross-user leak guard)", async ({ page }) => {
+  /* Reproduces what the user hit on their first manual test: after
+   * deleting their account and re-signing-in, the Manage tab still
+   * showed the previous deck because clearActiveView only reset
+   * the Play view. The Manage / Analyze / Gallery panels are
+   * pre-rendered for instant tab switching, so their DOM survives
+   * unless we explicitly re-render them in the "no deck" state. */
+  await page.click("#tab-manage");
+  await expect(page.locator("#manage-deck-name")).not.toHaveText("—");
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="delete"]');
+  await page.locator("#settings-delete-pwd").fill("anyvalue");
+  await page.locator("#settings-delete-form button[type='submit']").click();
+  /* Shell is locked behind the overlay but the manage DOM still
+   * lives in the page — verify it was reset to the placeholder. */
+  await expect(page.locator("html")).toHaveClass(/auth-locked/);
+  await expect(page.locator("#manage-deck-name")).toHaveText("—");
+});
+
+test("Delete-account form switches to a Google-reauth note for Google-only users (no password input)", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__deckryptTestUser = {
+      uid: "test-uid-google",
+      email: "google@example.com",
+      displayName: "Google User",
+      photoURL: null,
+      providers: ["google.com"],
+    };
+  });
+  await page.reload();
+  await page.locator("#commander-zone .card").first().waitFor();
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="delete"]');
+  const form = page.locator("#settings-delete-form");
+  await expect(form.locator("#settings-delete-pwd")).toHaveCount(0);
+  await expect(form.locator(".account-edit-note")).toContainText("Google");
+  await expect(form.locator("button[type='submit']")).toHaveText("Continuer avec Google");
+});
+
 test("Password change is disabled for Google-authed users (provider gate)", async ({ page }) => {
   /* The default mockAuth user is a password user; layer a Google-only
    * override on top, then reload so sync.js picks up the new seam at

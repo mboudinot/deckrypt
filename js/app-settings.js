@@ -26,6 +26,7 @@
     const panels = modal.querySelectorAll(".settings-panel");
     const themeCards = modal.querySelectorAll(".theme-card");
     const accountCard = document.getElementById("settings-account-card");
+    const accountDanger = document.getElementById("settings-account-danger");
 
     let restoreFocusTo = null;
 
@@ -181,6 +182,10 @@
       accountCard.appendChild(buildAccountCard(user));
       accountCard.appendChild(buildPseudoEditor(user));
       accountCard.appendChild(buildPasswordEditor(user));
+      if (accountDanger) {
+        accountDanger.replaceChildren();
+        accountDanger.appendChild(buildDeleteAccountEditor(user));
+      }
     }
 
     function userInitials(user) {
@@ -314,6 +319,12 @@
       }
       if (code === "auth/requires-recent-login") {
         return "Reconnecte-toi puis réessaie.";
+      }
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        return "Confirmation Google annulée.";
+      }
+      if (code === "auth/popup-blocked") {
+        return "Popup Google bloquée — autorise-la puis réessaie.";
       }
       return (err && err.message) || "Échec — réessaie.";
     }
@@ -523,6 +534,95 @@
           }
           await window.sync.changePassword(current, next);
           return { success: "Mot de passe mis à jour." };
+        },
+      });
+    }
+
+    /* RGPD-driven "delete my account" editor. Same inline pattern
+     * as the pseudo/password editors, with two provider variants:
+     * password users re-enter their password to reauth, Google
+     * users go back through the OAuth popup. The hard work (Firestore
+     * wipe + Auth deletion) lives in `window.sync.deleteAccount`. */
+    function buildDeleteAccountEditor(user) {
+      const row = document.createElement("div");
+      row.className = "account-edit-row";
+      const left = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = "Supprimer mon compte";
+      const desc = document.createElement("p");
+      desc.textContent = "Tes decks, préférences et identité sont effacés définitivement.";
+      left.append(title, desc);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-sm danger";
+      btn.dataset.editOpen = "delete";
+      btn.textContent = "Supprimer";
+      row.append(left, btn);
+
+      const isPasswordUser = Array.isArray(user.providers) && user.providers.includes("password");
+      const isGoogleUser = Array.isArray(user.providers) && user.providers.includes("google.com");
+
+      const form = document.createElement("form");
+      form.className = "account-edit-form";
+      form.id = "settings-delete-form";
+
+      const warning = document.createElement("p");
+      warning.className = "account-edit-warning";
+      warning.textContent = "⚠ Cette action est définitive. Tes decks, préférences et compte sont supprimés et ne peuvent pas être restaurés.";
+      form.appendChild(warning);
+
+      let passwordInput = null;
+      if (isPasswordUser) {
+        const { field, input } = buildPasswordField({
+          id: "settings-delete-pwd",
+          name: "current",
+          autocomplete: "current-password",
+          label: "Mot de passe actuel",
+        });
+        form.appendChild(field);
+        passwordInput = input;
+      } else if (isGoogleUser) {
+        const note = document.createElement("p");
+        note.className = "account-edit-note";
+        note.textContent = "Tu seras redirigé vers Google pour confirmer ton identité avant la suppression.";
+        form.appendChild(note);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "account-edit-actions";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "btn btn-sm";
+      cancel.dataset.editCancel = "true";
+      cancel.textContent = "Annuler";
+      const submit = document.createElement("button");
+      submit.type = "submit";
+      submit.className = "btn btn-sm danger";
+      submit.textContent = isGoogleUser && !isPasswordUser
+        ? "Continuer avec Google"
+        : "Supprimer définitivement";
+      actions.append(cancel, submit);
+      const msg = document.createElement("p");
+      msg.className = "account-edit-msg";
+      msg.hidden = true;
+      form.append(actions, msg);
+
+      return attachInlineEditor({
+        row,
+        form,
+        onSubmit: async () => {
+          const args = passwordInput
+            ? { currentPassword: passwordInput.value }
+            : {};
+          await window.sync.deleteAccount(args);
+          /* Close the settings modal explicitly: the auth subscriber
+           * will reopen the login overlay, but until then the open
+           * modal would briefly cover the locked shell — visually
+           * confusing. The success message would also flash for ~700ms
+           * inside attachInlineEditor's success path, which is
+           * irrelevant once the account is gone. */
+          closeModal();
+          return null;
         },
       });
     }
