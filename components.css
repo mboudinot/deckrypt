@@ -751,6 +751,32 @@ button.icon-only {
 }
 button.icon-only svg { display: block; }
 
+/* Ghost icon button — currently the settings-modal close (×).
+ * Square, transparent, centered SVG. Distinct from .icon-only so the
+ * settings X doesn't inherit .icon-only's surface-2 fill.
+ *
+ * The fixed 32×32 frame + centered grid is what keeps the cross
+ * optically centered — leaving the cascade default
+ * (padding 10px 18px from the base `button` rule) produced a
+ * lozenge-shaped hit area with the X drifting upward. */
+button.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  border-radius: var(--radius);
+}
+button.icon-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 0;
+}
+button.icon-btn svg { display: block; }
+
 /* ============================================================
 
    Flash messages: bottom-right transient toasts. The container is

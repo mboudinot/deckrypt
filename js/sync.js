@@ -21,17 +21,22 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import {
   getAuth,
   GoogleAuthProvider,
+  EmailAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as fbSignOut,
   onAuthStateChanged,
+  updateProfile,
+  updatePassword as fbUpdatePassword,
+  reauthenticateWithCredential,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore,
   doc,
   collection,
   setDoc,
+  getDoc,
   getDocs,
   deleteDoc,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -49,7 +54,11 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* Neutral user shape — never expose Firebase's User object. */
+/* Neutral user shape — never expose Firebase's User object.
+ * `providers` is a flat list of provider IDs ("password", "google.com")
+ * so callers can branch on auth-type without importing the SDK
+ * (used by the settings UI to gate "change password" when the user
+ * signed in with Google). */
 function toUser(fbUser) {
   if (!fbUser) return null;
   return {
@@ -57,6 +66,7 @@ function toUser(fbUser) {
     email: fbUser.email || null,
     displayName: fbUser.displayName || null,
     photoURL: fbUser.photoURL || null,
+    providers: (fbUser.providerData || []).map((p) => p.providerId),
   };
 }
 
@@ -168,6 +178,69 @@ async function signInWithEmail(email, password) {
 async function signUpWithEmail(email, password) {
   const result = await createUserWithEmailAndPassword(auth, email, password);
   return toUser(result.user);
+}
+
+/* Update the user's display name (rendered as "Pseudo" in the
+ * settings UI). Pushes the cached snapshot and notifies auth
+ * subscribers so the rest of the app refreshes. */
+async function updateDisplayName(name) {
+  if (TEST_MODE) {
+    if (cachedUser) cachedUser = { ...cachedUser, displayName: name || null };
+    for (const cb of authSubscribers) {
+      try { cb(cachedUser); } catch (e) { console.error("auth subscriber threw:", e); }
+    }
+    return;
+  }
+  const fbUser = auth.currentUser;
+  if (!fbUser) throw new Error("not signed in");
+  await updateProfile(fbUser, { displayName: name || "" });
+  cachedUser = toUser(fbUser);
+  for (const cb of authSubscribers) {
+    try { cb(cachedUser); } catch (e) { console.error("auth subscriber threw:", e); }
+  }
+}
+
+/* Change the user's password. Firebase requires a recent sign-in for
+ * password updates, so we re-auth with the user's current password
+ * first — that turns "stale session" 401s into a clean
+ * `auth/wrong-password` the caller can show inline. Throws if the
+ * provider isn't email/password (Google users have no password to
+ * change here — they manage it on their Google account). */
+async function changePassword(currentPassword, newPassword) {
+  if (TEST_MODE) return;
+  const fbUser = auth.currentUser;
+  if (!fbUser) throw new Error("not signed in");
+  if (!fbUser.email) throw new Error("auth/no-email");
+  const cred = EmailAuthProvider.credential(fbUser.email, currentPassword);
+  await reauthenticateWithCredential(fbUser, cred);
+  await fbUpdatePassword(fbUser, newPassword);
+}
+
+/* Per-user preferences. Single doc at /users/{uid}/meta/preferences,
+ * fields are merged (setDoc(..., { merge: true })). Falls back to {}
+ * on read errors / missing doc / TEST_MODE. */
+function preferencesRef(uid) {
+  return doc(db, "users", uid, "meta", "preferences");
+}
+
+async function loadPreferences() {
+  if (TEST_MODE) return {};
+  if (!cachedUser) return {};
+  try {
+    const snap = await getDoc(preferencesRef(cachedUser.uid));
+    return snap.exists() ? snap.data() : {};
+  } catch (e) {
+    /* Best-effort: offline or rules glitch shouldn't crash the boot
+     * path — the local cache is enough to keep the app usable. */
+    console.warn("loadPreferences failed:", e?.message || e);
+    return {};
+  }
+}
+
+async function savePreference(key, value) {
+  if (TEST_MODE) return;
+  if (!cachedUser) return;
+  await setDoc(preferencesRef(cachedUser.uid), { [key]: value }, { merge: true });
 }
 
 async function signOut() {
@@ -351,6 +424,12 @@ window.sync = {
   signInWithEmail,
   signUpWithEmail,
   signOut,
+  /* Profile */
+  updateDisplayName,
+  changePassword,
+  /* Per-user preferences (theme, …) */
+  loadPreferences,
+  savePreference,
   /* Low-level CRUD (advanced / tests) */
   loadDecks,
   saveDeck,

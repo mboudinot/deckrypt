@@ -53,8 +53,144 @@ test("clicking each tab switches which panel is visible", async ({ page }) => {
   await page.click('[data-settings-tab="preferences"]');
   await expect(page.locator('[data-settings-panel="preferences"]')).toBeVisible();
   await expect(page.locator('[data-settings-panel="appearance"]')).toBeHidden();
-  await page.click('[data-settings-tab="shortcuts"]');
-  await expect(page.locator('[data-settings-panel="shortcuts"]')).toBeVisible();
+  await page.click('[data-settings-tab="account"]');
+  await expect(page.locator('[data-settings-panel="account"]')).toBeVisible();
+});
+
+test("Raccourcis tab no longer exists (removed from the modal)", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await expect(page.locator('[data-settings-tab="shortcuts"]')).toHaveCount(0);
+  await expect(page.locator('[data-settings-panel="shortcuts"]')).toHaveCount(0);
+});
+
+test("theme-card check badge is only visible on the active theme", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  const studioCheck = page.locator('[data-theme="studio"] .theme-card-check');
+  const editorialCheck = page.locator('[data-theme="editorial"] .theme-card-check');
+  const opacity = (loc) => loc.evaluate((el) => parseFloat(getComputedStyle(el).opacity));
+  /* Poll past the 0.15s opacity transition. */
+  await expect.poll(() => opacity(studioCheck)).toBe(1);
+  await expect.poll(() => opacity(editorialCheck)).toBe(0);
+  await page.click('[data-theme="editorial"]');
+  await expect.poll(() => opacity(studioCheck)).toBe(0);
+  await expect.poll(() => opacity(editorialCheck)).toBe(1);
+});
+
+test("modal frame keeps the same height across tab switches (no reflow on rubric change)", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  const modal = page.locator(".settings-modal");
+  /* The 0.25s modal-in animation scales the box; wait for it to
+   * settle before sampling so the first measurement isn't taken
+   * mid-transform. */
+  await page.waitForTimeout(300);
+  const h1 = (await modal.boundingBox()).height;
+  await page.click('[data-settings-tab="preferences"]');
+  const h2 = (await modal.boundingBox()).height;
+  await page.click('[data-settings-tab="account"]');
+  const h3 = (await modal.boundingBox()).height;
+  expect(h2).toBe(h1);
+  expect(h3).toBe(h1);
+});
+
+test("Compte tab shows Pseudo + Email, hides UID, and exposes both editor rows", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  const panel = page.locator('[data-settings-panel="account"]');
+  await expect(panel).toContainText("Pseudo");
+  await expect(panel).toContainText("Email");
+  await expect(panel).not.toContainText("UID");
+  await expect(panel.locator('[data-edit-open="pseudo"]')).toBeVisible();
+  await expect(panel.locator('[data-edit-open="password"]')).toBeVisible();
+});
+
+test("Pseudo + Mot de passe forms are collapsed by default (only the trigger row is visible)", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await expect(page.locator("#settings-pseudo-form")).toBeHidden();
+  await expect(page.locator("#settings-password-form")).toBeHidden();
+  await page.click('[data-edit-open="pseudo"]');
+  await expect(page.locator("#settings-pseudo-form")).toBeVisible();
+  /* Clicking the trigger again collapses it. */
+  await page.click('[data-edit-open="pseudo"]');
+  await expect(page.locator("#settings-pseudo-form")).toBeHidden();
+});
+
+test("Pseudo edit form opens, submits, and the displayed pseudo updates", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="pseudo"]');
+  const form = page.locator("#settings-pseudo-form");
+  await expect(form).toBeVisible();
+  await form.locator("input[name='pseudo']").fill("Nouveau Pseudo");
+  await form.locator("button[type='submit']").click();
+  await expect(page.locator('[data-settings-panel="account"]')).toContainText("Nouveau Pseudo");
+});
+
+test("Voir/Cacher toggle swaps each password input between password and text type", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="password"]');
+  const input = page.locator("#settings-pwd-current");
+  const toggle = input.locator("xpath=../button[contains(@class, 'pwd-toggle')]");
+  await expect(input).toHaveAttribute("type", "password");
+  await expect(toggle).toHaveText("Voir");
+  await toggle.click();
+  await expect(input).toHaveAttribute("type", "text");
+  await expect(toggle).toHaveText("Cacher");
+  await toggle.click();
+  await expect(input).toHaveAttribute("type", "password");
+});
+
+test("New password shorter than 8 chars shows an inline length error (no Firebase round-trip)", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="password"]');
+  const form = page.locator("#settings-password-form");
+  /* HTML5 minLength would also block submission with a native bubble.
+   * We need to bypass that to exercise our JS validator — set the
+   * attribute to 1 just for this test so the form submits with a
+   * short value, then assert the JS catches it. */
+  await form.locator("input[name='next'], input[name='confirm']").evaluateAll((els) => {
+    els.forEach((el) => el.setAttribute("minlength", "1"));
+  });
+  await form.locator("input[name='current']").fill("oldoldold");
+  await form.locator("input[name='next']").fill("short");
+  await form.locator("input[name='confirm']").fill("short");
+  await form.locator("button[type='submit']").click();
+  await expect(form.locator(".account-edit-msg.error")).toContainText("au moins 8");
+});
+
+test("Mismatching new + confirm passwords shows an inline mismatch error", async ({ page }) => {
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await page.click('[data-edit-open="password"]');
+  const form = page.locator("#settings-password-form");
+  await form.locator("input[name='current']").fill("oldoldold");
+  await form.locator("input[name='next']").fill("brandnewpassword");
+  await form.locator("input[name='confirm']").fill("brandnewdifferent");
+  await form.locator("button[type='submit']").click();
+  await expect(form.locator(".account-edit-msg.error")).toContainText("ne correspondent pas");
+});
+
+test("Password change is disabled for Google-authed users (provider gate)", async ({ page }) => {
+  /* The default mockAuth user is a password user; layer a Google-only
+   * override on top, then reload so sync.js picks up the new seam at
+   * init time. addInitScript ordering is registration order, so this
+   * script runs AFTER the default and wins. */
+  await page.addInitScript(() => {
+    window.__deckryptTestUser = {
+      uid: "test-uid-google",
+      email: "google@example.com",
+      displayName: "Google User",
+      photoURL: null,
+      providers: ["google.com"],
+    };
+  });
+  await page.reload();
+  await page.locator("#commander-zone .card").first().waitFor();
+  await page.keyboard.press("Control+,");
+  await page.click('[data-settings-tab="account"]');
+  await expect(page.locator('[data-edit-open="password"]')).toBeDisabled();
 });
 
 test("clicking a theme card sets html[data-direction] and persists in localStorage", async ({ page }) => {

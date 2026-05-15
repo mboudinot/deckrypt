@@ -2218,7 +2218,10 @@ select.is-invalid:focus {
 .settings-modal {
   width: 100%;
   max-width: 920px;
-  max-height: 86vh;
+  /* Lock the modal size so switching tabs scrolls the content instead
+   * of resizing the frame around the user (was `max-height: 86vh`,
+   * which let each tab pull the modal to its own content height). */
+  height: min(86vh, 640px);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -2399,6 +2402,17 @@ select.is-invalid:focus {
   color: var(--accent-text);
   display: grid;
   place-items: center;
+  /* Hidden on idle cards: the badge only appears on the selected
+   * theme, so the picker reads as a real selector instead of two
+   * always-checked options. */
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+}
+.theme-card.active .theme-card-check {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .theme-card-meta {
@@ -2607,7 +2621,14 @@ select.is-invalid:focus {
   color: var(--text-muted);
 }
 
-/* ----- Account card ----- */
+/* ----- Account card -----
+ * `.account-card-wrap` is the JS-mounted container that holds the
+ * read-only `.account-card` + the inline Pseudo / Password editors. */
+.account-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .account-card {
   display: flex;
   gap: 16px;
@@ -2638,45 +2659,56 @@ select.is-invalid:focus {
 .account-info-row .label { color: var(--text-muted); min-width: 70px; font-weight: normal; text-transform: none; letter-spacing: 0; font-size: 12px; }
 .account-info-row strong { font-weight: 500; }
 
-/* ----- Keyboard shortcut list ----- */
-.kbd-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.kbd-row {
+/* ----- Account edit rows (Pseudo / Mot de passe) -----
+ * Trigger row sits below the account-card; the inline form below
+ * expands when the user clicks Modifier. The form layout mirrors
+ * `.field` so labels + inputs stay consistent with the login form. */
+.account-edit-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 14px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 13px;
 }
-.kbd-keys {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-}
-kbd {
-  font-family: var(--font-mono);
-  font-size: 11px;
+.account-edit-row strong {
+  display: block;
+  font-size: 13.5px;
   font-weight: 600;
-  padding: 3px 7px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
+}
+.account-edit-row p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.account-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 1px 0 var(--border-strong);
-  color: var(--text);
-  min-width: 22px;
-  text-align: center;
+  margin-top: 6px;
 }
-[data-direction="editorial"] kbd {
-  background: var(--surface);
-  font-weight: 500;
-  box-shadow: 0 1px 0 var(--border-strong), inset 0 -1px 0 rgba(0,0,0,0.05);
+/* Author `display: flex` above has the same specificity as the UA
+ * `[hidden] { display: none }`, so the form would stay visible despite
+ * the attribute. Make `hidden` win explicitly — the form must collapse
+ * until the user clicks "Modifier". */
+.account-edit-form[hidden] { display: none; }
+.account-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
+.account-edit-msg {
+  margin: 0;
+  font-size: 12.5px;
+}
+.account-edit-msg.error { color: var(--error); }
+.account-edit-msg.success { color: var(--success); }
 
 /* ============================================================
 

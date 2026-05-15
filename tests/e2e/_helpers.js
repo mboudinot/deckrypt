@@ -234,6 +234,7 @@ export async function mockAuth(page, user = {
   email: "test@example.com",
   displayName: "Test User",
   photoURL: null,
+  providers: ["password"],
 }) {
   await page.addInitScript((u) => {
     window.__deckryptTestUser = u;

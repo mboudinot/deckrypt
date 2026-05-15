@@ -713,7 +713,6 @@
         <button type="button" class="settings-nav-item active" role="tab" aria-selected="true" data-settings-tab="appearance">Apparence</button>
         <button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-settings-tab="preferences">Préférences</button>
         <button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-settings-tab="account">Compte</button>
-        <button type="button" class="settings-nav-item" role="tab" aria-selected="false" data-settings-tab="shortcuts">Raccourcis</button>
       </nav>
 
       <div class="settings-content">
@@ -833,7 +832,7 @@
                 <h3>Informations</h3>
                 <p>Ton profil sur Deckrypt.</p>
               </div>
-              <div id="settings-account-card" class="account-card">
+              <div id="settings-account-card" class="account-card-wrap">
                 <!-- Filled in by the controller from window.sync.currentUser() -->
               </div>
             </section>
@@ -854,29 +853,6 @@
           </div>
         </div>
 
-        <!-- ===== Shortcuts ===== -->
-        <div class="settings-panel" data-settings-panel="shortcuts" hidden>
-          <div class="settings-section-wrap">
-            <section class="settings-section">
-              <div class="settings-section-head"><h3>Navigation</h3></div>
-              <div class="kbd-list">
-                <div class="kbd-row"><span>Vue Jouer</span><span class="kbd-keys"><kbd>1</kbd></span></div>
-                <div class="kbd-row"><span>Vue Gérer</span><span class="kbd-keys"><kbd>2</kbd></span></div>
-                <div class="kbd-row"><span>Vue Analyser</span><span class="kbd-keys"><kbd>3</kbd></span></div>
-                <div class="kbd-row"><span>Vue Galerie</span><span class="kbd-keys"><kbd>4</kbd></span></div>
-                <div class="kbd-row"><span>Ouvrir les paramètres</span><span class="kbd-keys"><kbd>⌘</kbd><span aria-hidden="true">+</span><kbd>,</kbd></span></div>
-              </div>
-            </section>
-            <section class="settings-section">
-              <div class="settings-section-head"><h3>Vue Jouer</h3></div>
-              <div class="kbd-list">
-                <div class="kbd-row"><span>Piocher</span><span class="kbd-keys"><kbd>D</kbd></span></div>
-                <div class="kbd-row"><span>Tour suivant</span><span class="kbd-keys"><kbd>T</kbd></span></div>
-                <div class="kbd-row"><span>Nouvelle main</span><span class="kbd-keys"><kbd>N</kbd></span></div>
-              </div>
-            </section>
-          </div>
-        </div>
       </div>
     </div>
   </div>
