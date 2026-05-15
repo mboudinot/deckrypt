@@ -454,6 +454,16 @@
     grid-column: 3;
     grid-row: 1;
   }
+  /* Symboles de mana plus petits sur mobile : 18 px desktop laisse la
+   * mana cost peser ~70-90 px pour 3-4 symboles, ce qui squeeze le nom
+   * et le pousse à truncate trop tôt. 14 px reste lisible et libère
+   * ~25 % de la rangée. Cible la mana cost DANS .card-row uniquement
+   * — laisse les autres usages (analyze view, suggestions panel) au
+   * size desktop. */
+  .card-row .mana-symbol {
+    width: 14px;
+    height: 14px;
+  }
   .card-row-remove {
     grid-column: 4;
     grid-row: 1;
