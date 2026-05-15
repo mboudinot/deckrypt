@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
+import { mockAuth, mockScryfall, openSettings, seedSultaiDeck } from "./_helpers.js";
 
-/* Settings modal: opening from the account dropdown, ⌘+, shortcut,
- * tab switching, theme picker persistence. Auth is mocked at the
- * window.sync level by overriding currentUser BEFORE the controller
- * reads it — keeps these tests offline. */
+/* Settings modal: opening from the account dropdown, tab switching,
+ * theme picker persistence. Auth is mocked at the window.sync level
+ * by overriding currentUser BEFORE the controller reads it — keeps
+ * these tests offline. */
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
@@ -18,20 +18,14 @@ test("settings modal is hidden by default", async ({ page }) => {
   await expect(page.locator("#settings-modal")).toBeHidden();
 });
 
-test("Ctrl+, opens the settings modal even without going through the account menu", async ({ page }) => {
-  await page.keyboard.press("Control+,");
-  await expect(page.locator("#settings-modal")).toBeVisible();
-});
-
 test("Escape closes the settings modal", async ({ page }) => {
-  await page.keyboard.press("Control+,");
-  await expect(page.locator("#settings-modal")).toBeVisible();
+  await openSettings(page);
   await page.keyboard.press("Escape");
   await expect(page.locator("#settings-modal")).toBeHidden();
 });
 
 test("clicking the backdrop closes the modal", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await expect(page.locator("#settings-modal")).toBeVisible();
   /* Click the backdrop near the edge (outside .settings-modal). */
   const box = await page.locator("#settings-modal").boundingBox();
@@ -40,13 +34,13 @@ test("clicking the backdrop closes the modal", async ({ page }) => {
 });
 
 test("clicking the X button closes the modal", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click("#btn-settings-close");
   await expect(page.locator("#settings-modal")).toBeHidden();
 });
 
 test("clicking each tab switches which panel is visible", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   /* Default = Apparence. */
   await expect(page.locator('[data-settings-panel="appearance"]')).toBeVisible();
   await expect(page.locator('[data-settings-panel="preferences"]')).toBeHidden();
@@ -58,13 +52,13 @@ test("clicking each tab switches which panel is visible", async ({ page }) => {
 });
 
 test("Raccourcis tab no longer exists (removed from the modal)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await expect(page.locator('[data-settings-tab="shortcuts"]')).toHaveCount(0);
   await expect(page.locator('[data-settings-panel="shortcuts"]')).toHaveCount(0);
 });
 
 test("theme-card check badge is only visible on the active theme", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   const studioCheck = page.locator('[data-theme="studio"] .theme-card-check');
   const editorialCheck = page.locator('[data-theme="editorial"] .theme-card-check');
   const opacity = (loc) => loc.evaluate((el) => parseFloat(getComputedStyle(el).opacity));
@@ -77,7 +71,7 @@ test("theme-card check badge is only visible on the active theme", async ({ page
 });
 
 test("modal frame keeps the same height across tab switches (no reflow on rubric change)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   /* Scope to #settings-modal — the .settings-modal shell is also
    * reused by the legal modal, which would make this an ambiguous
    * match. */
@@ -96,7 +90,7 @@ test("modal frame keeps the same height across tab switches (no reflow on rubric
 });
 
 test("Compte tab shows Pseudo + Email, hides UID, and exposes both editor rows", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   const panel = page.locator('[data-settings-panel="account"]');
   await expect(panel).toContainText("Pseudo");
@@ -107,7 +101,7 @@ test("Compte tab shows Pseudo + Email, hides UID, and exposes both editor rows",
 });
 
 test("Pseudo + Mot de passe forms are collapsed by default (only the trigger row is visible)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await expect(page.locator("#settings-pseudo-form")).toBeHidden();
   await expect(page.locator("#settings-password-form")).toBeHidden();
@@ -119,7 +113,7 @@ test("Pseudo + Mot de passe forms are collapsed by default (only the trigger row
 });
 
 test("Pseudo edit form opens, submits, and the displayed pseudo updates", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="pseudo"]');
   const form = page.locator("#settings-pseudo-form");
@@ -130,7 +124,7 @@ test("Pseudo edit form opens, submits, and the displayed pseudo updates", async 
 });
 
 test("Voir/Cacher toggle swaps each password input between password and text type", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="password"]');
   const input = page.locator("#settings-pwd-current");
@@ -145,7 +139,7 @@ test("Voir/Cacher toggle swaps each password input between password and text typ
 });
 
 test("New password shorter than 8 chars shows an inline length error (no Firebase round-trip)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="password"]');
   const form = page.locator("#settings-password-form");
@@ -164,7 +158,7 @@ test("New password shorter than 8 chars shows an inline length error (no Firebas
 });
 
 test("Mismatching new + confirm passwords shows an inline mismatch error", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="password"]');
   const form = page.locator("#settings-password-form");
@@ -176,7 +170,7 @@ test("Mismatching new + confirm passwords shows an inline mismatch error", async
 });
 
 test("Strength meter is attached to the 'next' field only (not current, not confirm)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="password"]');
   /* Each .field with the meter has it as a direct child; the others don't. */
@@ -190,7 +184,7 @@ test("Strength meter is attached to the 'next' field only (not current, not conf
 });
 
 test("Strength meter stays hidden for empty input, surfaces score + non-blocking note for weak passwords", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="password"]');
   const meter = page.locator("#settings-password-form .pwd-meter");
@@ -208,7 +202,7 @@ test("Strength meter stays hidden for empty input, surfaces score + non-blocking
 });
 
 test("Weak password does NOT block submit (philosophy: warn, don't gate)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="password"]');
   const form = page.locator("#settings-password-form");
@@ -224,7 +218,7 @@ test("Weak password does NOT block submit (philosophy: warn, don't gate)", async
 });
 
 test("Zone à risque exposes an enabled 'Supprimer' trigger (no more À venir placeholder)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   const trigger = page.locator('[data-edit-open="delete"]');
   await expect(trigger).toBeVisible();
@@ -235,7 +229,7 @@ test("Zone à risque exposes an enabled 'Supprimer' trigger (no more À venir pl
 });
 
 test("Delete-account form expands with a warning + current-password field for password users", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await expect(page.locator("#settings-delete-form")).toBeHidden();
   await page.click('[data-edit-open="delete"]');
@@ -247,7 +241,7 @@ test("Delete-account form expands with a warning + current-password field for pa
 });
 
 test("Submitting the delete form (password user) closes the modal and re-locks the shell", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="delete"]');
   await page.locator("#settings-delete-pwd").fill("anyvalue");
@@ -272,7 +266,7 @@ test("Account deletion clears the pre-rendered manage view (cross-user leak guar
    * is now an implementation detail of the hidden subtree). */
   await page.click("#tab-manage");
   await expect(page.locator("#view-manage")).not.toHaveClass(/view-empty/);
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="delete"]');
   await page.locator("#settings-delete-pwd").fill("anyvalue");
@@ -293,7 +287,7 @@ test("Delete-account form switches to a Google-reauth note for Google-only users
   });
   await page.reload();
   await page.locator("#commander-zone .card").first().waitFor();
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await page.click('[data-edit-open="delete"]');
   const form = page.locator("#settings-delete-form");
@@ -318,13 +312,13 @@ test("Password change is disabled for Google-authed users (provider gate)", asyn
   });
   await page.reload();
   await page.locator("#commander-zone .card").first().waitFor();
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="account"]');
   await expect(page.locator('[data-edit-open="password"]')).toBeDisabled();
 });
 
 test("clicking a theme card sets html[data-direction] and persists in localStorage", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   /* Studio is the default at boot. */
   await expect(page.locator("html")).toHaveAttribute("data-direction", "studio");
   await page.click('[data-theme="editorial"]');
@@ -337,7 +331,7 @@ test("clicking a theme card sets html[data-direction] and persists in localStora
 });
 
 test("reloading the page keeps the saved theme (boot-theme.js applies before CSS)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-theme="editorial"]');
   await expect(page.locator("html")).toHaveAttribute("data-direction", "editorial");
   await page.reload();
@@ -346,7 +340,7 @@ test("reloading the page keeps the saved theme (boot-theme.js applies before CSS
 });
 
 test("clicking a default-view segmented button persists the choice", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await page.click('[data-settings-tab="preferences"]');
   await page.click('.segmented[data-segmented="default-view"] [data-value="manage"]');
   const saved = await page.evaluate(() => localStorage.getItem("deckrypt-default-view"));
@@ -355,6 +349,6 @@ test("clicking a default-view segmented button persists the choice", async ({ pa
 });
 
 test("density segmented control is disabled (placeholder UI)", async ({ page }) => {
-  await page.keyboard.press("Control+,");
+  await openSettings(page);
   await expect(page.locator('.segmented[data-segmented="density"]')).toHaveAttribute("aria-disabled", "true");
 });

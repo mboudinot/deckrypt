@@ -339,6 +339,13 @@ export async function openDeckMenu(page) {
   await page.locator("#deck-dropdown-menu").waitFor({ state: "visible" });
 }
 
+/* Open the settings modal through the account dropdown. */
+export async function openSettings(page) {
+  await page.click("#btn-account");
+  await page.click("#btn-open-settings");
+  await page.locator("#settings-modal").waitFor({ state: "visible" });
+}
+
 /* Switch decks without going through the visible dropdown — useful
  * when the test cares about the post-switch state, not the picker
  * UX. Mutates the hidden #deck-select and dispatches change, which

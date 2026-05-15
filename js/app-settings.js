@@ -6,8 +6,7 @@
  * format, notifications) are visual placeholders for now — their
  * full wiring is on the backlog.
  *
- * Entry points: account dropdown "Paramètres" item, or Ctrl+, / ⌘+,
- * (only when no other modal is open and no input is focused). */
+ * Entry point: account dropdown "Paramètres" item. */
 
 (function () {
   const STORAGE_KEYS = {
@@ -52,13 +51,6 @@
       if (restoreFocusTo && typeof restoreFocusTo.focus === "function") {
         restoreFocusTo.focus();
       }
-    }
-
-    function isInputFocused() {
-      const el = document.activeElement;
-      if (!el) return false;
-      const tag = el.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
     }
 
     /* ---------------- Tab switching ---------------- */
@@ -641,16 +633,6 @@
       if (e.target === modal) closeModal();
     });
     document.addEventListener("keydown", (e) => {
-      /* Ctrl+, / Cmd+, opens the modal. Skip if any modal is open
-       * (we don't want the shortcut firing inside a modal) or if
-       * the user is typing in an input. */
-      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
-        if (isInputFocused()) return;
-        e.preventDefault();
-        if (modal.hidden) openModal();
-        else closeModal();
-        return;
-      }
       if (e.key === "Escape" && !modal.hidden) {
         e.stopPropagation();
         closeModal();

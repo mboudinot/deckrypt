@@ -918,19 +918,6 @@ button.icon-btn svg { display: block; }
 .btn-block { width: 100%; justify-content: center; }
 .btn-lg { padding: 13px 22px; font-size: 14px; }
 
-/* ============================================================
-
-   Account-dropdown shortcut hint (⌘,) — small mono label that
-   sits next to the "Paramètres" item to surface the keyboard
-   shortcut without it being clickable.
-   ============================================================ */
-.dropdown-item .kbd-hint {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
 /* Segmented control: disabled style for placeholder controls
    (density, etc.) that exist visually but aren't wired yet. */
 .segmented[aria-disabled="true"] {
