@@ -411,6 +411,64 @@
   color: var(--error);
 }
 
+/* Mobile : la grille à 6 colonnes desktop somme à >430 px (thumb 70 +
+ * nom + mana 60-100 + printing 70 + qty 75 + remove 24 + 5 gaps) — ça
+ * déborde un viewport de 390 px. On restructure en 2 rangées :
+ *   row 1 : [thumb] [nom .................. ] [remove ×]
+ *   row 2 : [thumb] [mana] [printing] [qty]
+ * Le thumb passe à 56 px et span les 2 rangées. Aucune modif du JS
+ * nécessaire — placement explicite par enfant via `grid-column` /
+ * `grid-row`. À placer APRÈS toutes les règles desktop `.card-row*`
+ * et `#manage-commanders .card-row*` pour qu'à spécificité égale,
+ * l'ordre source départage en faveur des règles mobiles. */
+@media (max-width: 760px) {
+  /* Cols : thumb 56 | mana auto (0 pour les terrains) | printing 1fr
+   * (la pill flotte à gauche via `justify-self: start`) | qty/×
+   * auto à droite. `1fr` sur la col printing absorbe l'espace libre
+   * pour que `×` s'aligne réellement contre le bord droit du panel,
+   * peu importe la largeur de la mana cost. */
+  .card-row,
+  #manage-commanders .card-row {
+    grid-template-columns: 56px auto 1fr auto;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 6px;
+  }
+  .card-row-thumb,
+  #manage-commanders .card-row-thumb {
+    width: 56px;
+    grid-column: 1;
+    grid-row: 1 / 3;
+  }
+  /* Row 1 — nom (qui span 2 cols pour absorber l'espace dispo) + qty */
+  .card-row-name {
+    grid-column: 2 / 4;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .card-row-qty {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: end;
+  }
+  /* Row 2 — mana à gauche (0 pour terrains), printing collée à gauche
+   * via `justify-self: start`, remove × aligné contre le bord droit. */
+  .card-row-mana {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .card-row-printing {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .card-row-remove {
+    grid-column: 4;
+    grid-row: 2;
+    justify-self: end;
+  }
+}
+
 /* Add-card panel */
 .add-card-block {
   display: grid;

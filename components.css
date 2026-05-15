@@ -9,6 +9,16 @@
    font/background live in theme.css (loaded first). This file owns the
    component styles — it only adds what the theme doesn't provide. */
 .modal:focus { outline: none; }
+/* Aucun écran mobile bien conçu ne scrolle horizontalement —
+ * `overflow-x: clip` empêche tout débordement résiduel de produire
+ * un scroll latéral, sans casser `position: sticky` sur les
+ * descendants (contrairement à `overflow-x: hidden` qui crée un
+ * containing block et neutralise sticky). Appliqué à <html> ET
+ * <body> parce que le scroll par défaut est géré sur <html> dans
+ * la plupart des navigateurs, et `clip` sur body seul peut ne pas
+ * remonter. À garder même après avoir corrigé tous les coupables
+ * ciblés — c'est une ceinture de sécurité, pas un masquage. */
+html, body { overflow-x: clip; }
 body { padding: 16px; }
 .container { max-width: 1500px; margin: 0 auto; }
 /* Login-obligatoire boot gate: boot-theme.js sets `html.auth-locked`
@@ -211,6 +221,68 @@ html.auth-locked #login-overlay[hidden] { display: block; }
   align-items: center;
   gap: 10px;
   justify-self: end;
+}
+
+/* Mobile header: à ≤760 px la grille desktop (brand + nav + right
+ * cluster sur une rangée) déborde du viewport — la somme dépasse
+ * facilement 430 px alors qu'un téléphone fait 360-440 px. Solution
+ * sans hamburger : on stack en 3 rangées :
+ *   row 1 = brand (gauche) + avatar compte (droite)
+ *   row 2 = deck-pill (centrée — c'est le sélecteur de contexte, pas
+ *           du chrome de fond, mérite sa propre rangée pour rester
+ *           lisible)
+ *   row 3 = nav (centrée, avec `overflow-x: auto` en filet pour les
+ *           viewports très étroits)
+ *
+ * Astuce : `display: contents` sur `.header-right` au mobile pour
+ * que ses deux enfants `#deck-dropdown` + `#account-dropdown`
+ * participent directement à la grille `app-header` — on peut alors
+ * les placer indépendamment sur des rangées différentes sans
+ * restructurer le HTML. La nav garde son `nav-indicator` JS qui
+ * re-mesure au resize, donc rien à toucher côté script. */
+@media (max-width: 760px) {
+  .app-header {
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto auto auto;
+    column-gap: 12px;
+    row-gap: 12px;
+  }
+  .brand { grid-column: 1; grid-row: 1; }
+  .header-right { display: contents; }
+  #deck-dropdown {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    /* Stretch sur toute la largeur — feels comme un context bar
+     * délibéré (le sélecteur de deck) au lieu d'un widget flottant
+     * tristounet au milieu de la rangée. */
+    justify-self: stretch;
+  }
+  #account-dropdown {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+  /* La deck-pill prend toute sa rangée — on neutralise les max-width
+   * desktop pour qu'elle s'étire vraiment. Le chevron reste à droite,
+   * le nom du deck a maintenant plein d'espace pour s'afficher en
+   * entier (plus de troncature 110-160 px). */
+  #deck-dropdown .deck-pill {
+    width: 100%;
+    max-width: none;
+    justify-content: flex-start;
+  }
+  #deck-dropdown .deck-pill-name { max-width: none; }
+  /* Chevron poussé contre l'edge droit du pill. */
+  #deck-dropdown .deck-pill-chev { margin-left: auto; }
+  .nav {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: center;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
 }
 
 .deck-pill {
