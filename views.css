@@ -2646,7 +2646,10 @@ select.is-invalid:focus {
   font-weight: 500;
   cursor: pointer;
 }
-.segmented button:hover:not(:disabled) {
+/* `:not(.active)` mirrors the .settings-nav-item rule — without it,
+ * hovering the already-selected button (Jouer / FR / etc.) zerote son
+ * fond accent et le bouton "flashe" vers la couleur de hover. */
+.segmented button:hover:not(:disabled):not(.active) {
   color: var(--text);
   background: transparent;
   border-color: transparent;
