@@ -699,17 +699,6 @@ section {
   border-radius: 999px;
   border: 1px solid var(--border);
 }
-.pip .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.pip.W .dot { background: var(--mtg-w); } .pip.W { color: var(--mtg-w); }
-.pip.U .dot { background: var(--mtg-u); } .pip.U { color: var(--mtg-u); }
-/* B uses a near-black `--mtg-b` (post-purple migration), so we keep
- * the dot in mtg-b but fall back to the neutral text colour for the
- * label — `var(--mtg-b)` as text would be invisible on the studio
- * dark surface. */
-.pip.B .dot { background: var(--mtg-b); } .pip.B { color: var(--text); }
-.pip.R .dot { background: var(--mtg-r); } .pip.R { color: var(--mtg-r); }
-.pip.G .dot { background: var(--mtg-g); } .pip.G { color: var(--mtg-g); }
-
 .actions {
   display: flex;
   flex-wrap: wrap;

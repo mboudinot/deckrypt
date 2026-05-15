@@ -112,14 +112,7 @@ function _cachePlayElements() {
   els.btnNextTurn = document.getElementById("btn-next-turn");
   els.btnNew = document.getElementById("btn-new");
   els.btnNextTurnLabel = document.getElementById("btn-next-turn-label");
-  /* Sidebar counters. */
-  els.turnCounter = document.getElementById("turn-counter");
-  els.libraryCount = document.getElementById("library-count");
-  els.graveyardCount = document.getElementById("graveyard-count");
-  els.battlefieldCount = document.getElementById("battlefield-count");
-  /* Game-state bar mirrors (top of #view-play) — same values as the
-   * sidebar counters above; we update both in renderGameBar so the
-   * user sees them wherever their eye lands. */
+  /* Game-state bar tiles at the top of #view-play. */
   els.gameStateTurn = document.getElementById("game-state-turn");
   els.gameStateLibrary = document.getElementById("game-state-library");
   els.gameStateHand = document.getElementById("game-state-hand");

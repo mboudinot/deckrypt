@@ -216,25 +216,28 @@
 
           <section class="panel">
             <div class="panel-head">
-              <h3>Partie en cours</h3>
+              <h3>Actions</h3>
             </div>
-            <div class="game-side" aria-live="polite">
-              <div class="game-side-row">
-                <span>Tour</span>
-                <strong class="num game-side-turn" id="turn-counter">—</strong>
-              </div>
-              <div class="game-side-row">
-                <span>Bibliothèque</span>
-                <strong class="num" id="library-count">—</strong>
-              </div>
-              <div class="game-side-row">
-                <span>Cimetière</span>
-                <strong class="num" id="graveyard-count">—</strong>
-              </div>
-              <div class="game-side-row">
-                <span>Champ de bataille</span>
-                <strong class="num" id="battlefield-count">—</strong>
-              </div>
+            <div class="actions-stack">
+              <button id="btn-draw" type="button" class="btn btn-sm btn-block">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Piocher
+              </button>
+              <button id="btn-next-turn" type="button" class="btn btn-sm btn-block primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                </svg>
+                <span id="btn-next-turn-label">Tour suivant</span>
+              </button>
+              <button id="btn-new" type="button" class="btn btn-sm btn-block">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <polyline points="1 4 1 10 7 10"/>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                </svg>
+                Nouvelle main
+              </button>
             </div>
           </section>
         </aside>
@@ -255,27 +258,6 @@
             <div class="game-state-tile">
               <span class="label">Main</span>
               <strong class="num" id="game-state-hand">—</strong>
-            </div>
-            <div class="game-state-actions">
-              <button id="btn-draw" type="button" class="btn btn-sm">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-                Piocher
-              </button>
-              <button id="btn-next-turn" type="button" class="btn btn-sm primary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                </svg>
-                <span id="btn-next-turn-label">Tour suivant</span>
-              </button>
-              <button id="btn-new" type="button" class="btn btn-sm">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                  <polyline points="1 4 1 10 7 10"/>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                </svg>
-                Nouvelle main
-              </button>
             </div>
           </div>
 

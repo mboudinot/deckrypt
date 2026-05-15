@@ -1123,10 +1123,12 @@
 .mana-base-bar-fill.f-b { background: var(--mtg-b); }
 .mana-base-bar-fill.f-r { background: var(--mtg-r); }
 .mana-base-bar-fill.f-g { background: var(--mtg-g); }
-/* White override scoped to mana-base : force the pale studio cream
- * for both pip and bar in BOTH themes — the editorial mtg-w (darker
+/* White override scoped to mana-themed displays (analyze mana-base
+ * rows + play view's "Sources de mana" stat) : force the pale studio
+ * cream for pip and bar in BOTH themes — the editorial mtg-w (darker
  * beige) clashed with the mana-themed look the user wanted here. */
 .mana-base-row .pip-dot.dot-w,
+.sources-row .pip-dot.dot-w,
 .mana-base-bar-fill.f-w { background: oklch(0.93 0.07 95); }
 .mana-base-row.mana-base-low .mana-base-bar { box-shadow: 0 0 0 1px rgba(245, 166, 35, 0.5); }
 .mana-base-row.mana-base-low .mana-base-meta strong { color: var(--warning); }
@@ -3237,13 +3239,6 @@ kbd {
   height: 24px;
   background: var(--border);
 }
-.game-state-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 /* Stats grid in the sidebar */
 .stats-grid {
   display: grid;
@@ -3286,24 +3281,13 @@ kbd {
   flex-wrap: wrap;
 }
 
-/* "Partie en cours" mini-rows in the sidebar (compact key/value) */
-.game-side {
+/* Sidebar "Actions" panel: vertical stack of full-width buttons
+ * (Piocher / Tour suivant / Nouvelle main). */
+.actions-stack {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
+  gap: 8px;
 }
-.game-side-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  color: var(--text-muted);
-}
-.game-side-row strong { color: var(--text); font-weight: 600; }
-/* Tour in the sidebar is the call-out value — colored accent to
- * keep the eye anchored on "where am I in the game", mirroring the
- * big game-state tile at the top. */
-.game-side-turn { color: var(--accent) !important; }
 
 /* Hand + Graveyard side by side. `min-width: 0` on the grid items
    is critical: without it, the flex children inside the hand strip

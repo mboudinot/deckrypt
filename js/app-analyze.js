@@ -751,11 +751,9 @@ function renderSubtypesPanel(deck) {
  * Failures are silent — the tile shows just the name. */
 async function renderTokensPanel(deck) {
   const ids = extractTokenIds(deck);
-  els.analyzeTokensInfo.textContent = ids.length === 0
-    ? "—"
-    : pluralFr(ids.length, "jeton") + " distinct" + (ids.length > 1 ? "s" : "");
   els.analyzeTokens.replaceChildren();
   if (ids.length === 0) {
+    els.analyzeTokensInfo.textContent = "—";
     els.analyzeTokens.appendChild(placeholderText("Aucun jeton produit."));
     return;
   }
@@ -778,12 +776,16 @@ async function renderTokensPanel(deck) {
   if (missingIds.length === 0) {
     tokens = dedupeByOracle(fromCache);
   } else {
-    // Show a placeholder grid while we fetch the missing token cards.
+    /* `ids.length` over-counts when several cards point at different
+     * printings of the same token — show a neutral placeholder until
+     * we have the post-dedupe count. */
+    els.analyzeTokensInfo.textContent = "Chargement…";
     els.analyzeTokens.appendChild(placeholderText("Chargement des jetons…"));
     let result;
     try {
       result = await fetchScryfallCards(missingIds.map((id) => ({ id })));
     } catch (err) {
+      els.analyzeTokensInfo.textContent = "—";
       els.analyzeTokens.replaceChildren(placeholderText(`Erreur Scryfall : ${err.message}`));
       return;
     }
@@ -795,6 +797,12 @@ async function renderTokensPanel(deck) {
     // — collapse so the panel shows one tile per distinct token.
     tokens = dedupeByOracle([...fromCache, ...fetched]);
   }
+
+  /* Counter follows the panel: tiles are deduped by oracle_id, so the
+   * meta count must use `tokens.length`, not `ids.length`. */
+  els.analyzeTokensInfo.textContent = tokens.length === 0
+    ? "—"
+    : pluralFr(tokens.length, "jeton") + " distinct" + (tokens.length > 1 ? "s" : "");
 
   els.analyzeTokens.replaceChildren();
   if (tokens.length === 0) {

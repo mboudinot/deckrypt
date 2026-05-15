@@ -32,14 +32,12 @@ test("game-state bar sits at the very top of the main column with Tour / Bibli. 
   await expect(page.locator("#game-state-hand")).toBeVisible();
 });
 
-test("game-state actions are reachable from the top of the view (Piocher / Tour suivant / Nouvelle main)", async ({ page }) => {
-  await expect(page.locator("#btn-draw")).toBeVisible();
-  await expect(page.locator("#btn-next-turn")).toBeVisible();
-  await expect(page.locator("#btn-new")).toBeVisible();
-  /* They sit inside the game-state, not in some bottom row. */
-  const action = await page.locator("#btn-draw").boundingBox();
-  const battlefield = await page.locator("#battlefield").boundingBox();
-  expect(action.y).toBeLessThan(battlefield.y);
+test("sidebar 'Actions' panel exposes Piocher / Tour suivant / Nouvelle main as a vertical stack", async ({ page }) => {
+  const stack = page.locator(".play-sidebar .actions-stack");
+  await expect(stack).toBeVisible();
+  await expect(stack.locator("#btn-draw")).toBeVisible();
+  await expect(stack.locator("#btn-next-turn")).toBeVisible();
+  await expect(stack.locator("#btn-new")).toBeVisible();
 });
 
 test("piocher button increments the game-state hand counter", async ({ page }) => {
@@ -58,11 +56,11 @@ test("tour suivant increments the game-state turn counter", async ({ page }) => 
   ).toBe(before + 1);
 });
 
-test("commanders + hand stats + game info live in the play-sidebar (per-view, not global)", async ({ page }) => {
+test("commanders + hand stats + actions live in the play-sidebar (per-view, not global)", async ({ page }) => {
   /* All three sidebar panels are descendants of .play-sidebar. */
   await expect(page.locator(".play-sidebar #commander-zone")).toBeVisible();
   await expect(page.locator(".play-sidebar #stat-lands")).toBeVisible();
-  await expect(page.locator(".play-sidebar #turn-counter")).toBeVisible();
+  await expect(page.locator(".play-sidebar #btn-draw")).toBeVisible();
 
   /* Switching to manage hides the play view (including its sidebar);
    * the old shared sidebar would have stayed visible across views. */
@@ -228,29 +226,6 @@ test("game-state tile values render in accent color, mono, 18px (readability fix
   expect(computed.color).toBe(accentRgb);
   expect(computed.font.toLowerCase()).toMatch(/mono/);
   expect(parseFloat(computed.size)).toBeGreaterThanOrEqual(16);
-});
-
-test("sidebar 'Partie en cours' has 4 rows (Tour, Bibliothèque, Cimetière, Champ)", async ({ page }) => {
-  const rows = page.locator(".game-side .game-side-row");
-  await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText("Tour");
-  await expect(rows.nth(1)).toContainText("Bibliothèque");
-  await expect(rows.nth(2)).toContainText("Cimetière");
-  await expect(rows.nth(3)).toContainText("Champ de bataille");
-});
-
-test("sidebar Tour value is in accent color (the eye anchor)", async ({ page }) => {
-  const turnSide = page.locator(".game-side-turn");
-  const computed = await turnSide.evaluate((el) => getComputedStyle(el).color);
-  const accentRgb = await page.evaluate(() => {
-    const probe = document.createElement("span");
-    probe.style.color = "var(--accent)";
-    document.body.appendChild(probe);
-    const c = getComputedStyle(probe).color;
-    probe.remove();
-    return c;
-  });
-  expect(computed).toBe(accentRgb);
 });
 
 test("stat-box Terrains has a sub-line 'N cartes en main'", async ({ page }) => {

@@ -272,14 +272,7 @@ function renderGraveyard() {
 }
 
 function renderGameBar() {
-  /* Single pass: the same numbers feed the sidebar's "Partie en
-   * cours" panel AND the top game-state bar, so the user sees the
-   * same truth wherever they look. */
   if (!state.game) {
-    els.turnCounter.textContent = "—";
-    els.libraryCount.textContent = "—";
-    if (els.graveyardCount) els.graveyardCount.textContent = "—";
-    if (els.battlefieldCount) els.battlefieldCount.textContent = "—";
     if (els.gameStateTurn) els.gameStateTurn.textContent = "—";
     if (els.gameStateLibrary) els.gameStateLibrary.textContent = "—";
     if (els.btnNextTurnLabel) els.btnNextTurnLabel.textContent = "Tour suivant";
@@ -287,17 +280,6 @@ function renderGameBar() {
   }
   const turn = state.game.turn;
   const lib = state.game.library.length;
-  const gy = state.game.graveyard.length;
-  /* Champ de bataille = tout ce qui est en jeu (terrains inclus —
-   * ils vivent dans battlefield, pas dans une zone séparée; la vue
-   * les filtre à l'affichage pour les afficher dans leur propre
-   * section). */
-  const bf = state.game.battlefield.length;
-
-  els.turnCounter.textContent = turn;
-  els.libraryCount.textContent = lib;
-  if (els.graveyardCount) els.graveyardCount.textContent = String(gy);
-  if (els.battlefieldCount) els.battlefieldCount.textContent = String(bf);
   if (els.gameStateTurn) els.gameStateTurn.textContent = String(turn);
   if (els.gameStateLibrary) els.gameStateLibrary.textContent = String(lib);
   /* "Tour suivant" → "Tour N+1" so the user knows where the click
@@ -340,12 +322,11 @@ function renderStats() {
   }
   for (const c of colors) {
     const pip = document.createElement("span");
-    pip.className = `pip ${c}`;
+    pip.className = "pip";
     pip.title = COLOR_NAMES[c];
     const dot = document.createElement("span");
-    dot.className = "dot";
+    dot.className = `pip-dot dot-${c.toLowerCase()}`;
     pip.appendChild(dot);
-    pip.append(` ${c} `);
     const strong = document.createElement("strong");
     strong.textContent = String(sources[c]);
     pip.appendChild(strong);
