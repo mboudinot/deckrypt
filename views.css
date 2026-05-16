@@ -269,40 +269,21 @@
   width: 100%; height: 100%;
   object-fit: cover; display: block;
 }
-/* Skeleton fill used by `_buildCardRowThumb` when no image is available
- * — same visual language as the play-view card placeholder, scaled for
- * a 70 px (100 px for commanders) thumbnail. The shimmer suggests
- * "data may still arrive"; for permanently unresolvable cards it still
- * reads as "we don't have the art" without going alarming-red. */
-.card-row-thumb .skeleton {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
-}
+/* Skeleton fill (shared with .card + .gallery-tile) — scaled down
+ * for the 70 px row thumb (100 px on the commanders panel). Base
+ * `.skeleton` + `.skeleton-label` rules live in components.css; we
+ * only tweak the label font-size + line-height for the small tile. */
 .card-row-thumb .skeleton-label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--text-muted);
   font-size: 0.6rem;
   line-height: 1.2;
   padding: 4px;
-  word-break: break-word;
-  pointer-events: none;
 }
 #manage-commanders .card-row-thumb .skeleton-label { font-size: 0.7rem; padding: 6px; }
-/* Disabled thumb (unresolved card) keeps the skeleton readable —
- * the global `.card-row-thumb:disabled { opacity: 0.6 }` would dim
- * the label too far on a small 70 px tile. Stop the shimmer too:
- * an infinite animation on a permanently unresolved row reads as
- * "still loading" forever, which is misleading. */
+/* Disabled thumb (unresolved card) keeps the skeleton readable — the
+ * global `.card-row-thumb:disabled { opacity: 0.6 }` would dim the
+ * label too far on a small 70 px tile. Shimmer keeps running for
+ * visual consistency with the play-view cards. */
 .card-row-thumb:disabled { opacity: 1; }
-.card-row-thumb:disabled .skeleton { animation: none; }
 .card-row-thumb:disabled .skeleton-label { color: var(--text-2); }
 .card-row-thumb:hover:not(:disabled) {
   background: rgba(0,0,0,0.3);
@@ -1982,17 +1963,12 @@ html:has(.modal-backdrop:not([hidden])) {
   display: block;
   object-fit: cover;
 }
-.gallery-tile-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 12px;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  width: 100%;
-  height: 100%;
-}
+/* Skeleton fill (shared with .card + .card-row-thumb) — bigger label
+ * because gallery tiles are larger than card-row thumbs. Animation
+ * keeps running on :disabled tiles for visual consistency with the
+ * play-view cards (the shimmer is the unifying signal across views,
+ * not a loading-only effect). */
+.gallery-tile .skeleton-label { font-size: 0.85rem; padding: 12px; }
 .gallery-tile-qty {
   position: absolute;
   top: 6px;
@@ -3072,21 +3048,37 @@ select.is-invalid:focus {
   flex-shrink: 0;
   position: relative;
   background: var(--surface-2);
-  /* Flex column lets multiple images (partner / partners-with decks)
-   * stack vertically and divide the panel height equally. With a
-   * single commander the lone <img> fills the whole container. */
+  /* Default layout: single commander, one <img> filling the portrait
+   * container. The 2-commander partner case switches to a landscape
+   * side-by-side layout via :has() below; 3+ commanders fall back to
+   * vertical column-stacking (rare, but supported by flex-direction
+   * column unless overridden). */
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 .deck-art img {
   width: 100%;
-  /* `flex: 1 1 0` + `min-height: 0` makes N images split the panel
-   * height evenly without overflowing the aspect-ratio'd container. */
+  /* `flex: 1 1 0` + `min-height: 0` lets N images split the panel
+   * height evenly without overflowing the aspect-ratio'd container.
+   * Combined with `object-fit: cover`, each commander's art_crop
+   * fills its slot, with the crop centered. */
   flex: 1 1 0;
   min-height: 0;
+  min-width: 0;
   object-fit: cover;
   display: block;
+}
+/* Partner deck (exactly 2 commanders): widen the container to fit two
+ * full-size portrait cards side-by-side (each ~220×307, same height
+ * as the solo-commander case). The aspect-ratio (976/680 = 2 cards
+ * wide × 1 card tall) preserves the card proportions, so each art
+ * sits in a slot matching its native portrait shape. */
+.deck-art:has(img:nth-child(2)):not(:has(img:nth-child(3))) {
+  width: 440px;
+  aspect-ratio: 976 / 680;
+  flex-direction: row;
+  gap: 4px;
 }
 .deck-art:empty { /* keep the placeholder background visible */ }
 .deck-summary-body {
@@ -3095,6 +3087,16 @@ select.is-invalid:focus {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+/* Title + description group, wrapped so the mobile 1-cmdr layout can
+ * place it next to the art via grid while pushing meta/tags/actions
+ * to a full-width row below. On desktop this is a transparent column
+ * — same visual flow as the un-wrapped block. */
+.deck-summary-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 .deck-summary-body h1 {
   margin: 0;
@@ -3345,10 +3347,10 @@ select.is-invalid:focus {
 .deck-summary { position: relative; }
 .kebab-trigger {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 32px;
-  height: 32px;
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border-radius: var(--radius);
   border: 1px solid transparent;
@@ -3359,6 +3361,13 @@ select.is-invalid:focus {
   justify-content: center;
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+/* Bump the dots from r=1.6 in a 16×16 SVG to a 20×20 viewBox to get
+ * a chunkier, easier-to-target affordance. Same hit area as before
+ * (the 40×40 button), just a more visible icon. */
+.kebab-trigger svg {
+  width: 20px;
+  height: 20px;
 }
 .kebab-trigger:hover:not(:disabled),
 .kebab-trigger[aria-expanded="true"] {
@@ -3380,8 +3389,53 @@ select.is-invalid:focus {
 .panel-head-action { margin-left: auto; }
 
 @media (max-width: 760px) {
+  /* Default mobile layout: art on top, name + meta + actions below. */
   .deck-summary { flex-direction: column; }
   .deck-art { width: 120px; }
+  /* Solo commander on mobile: hybrid grid layout — art + title/desc
+   * on row 1, then meta-row + tags + actions span the full width on
+   * row 2. Cramming the whole body next to a 120-px-wide art column
+   * left ~200 px for the title to wrap awkwardly across 3 lines;
+   * letting meta/tags/actions reclaim full width fixes that without
+   * losing the art-next-to-title pairing. `display: contents` on
+   * `.deck-summary-body` flattens its children into the grid so they
+   * can be placed individually. */
+  .deck-summary:has(.deck-art > img:only-child) {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-auto-rows: auto;
+    gap: 12px;
+    align-items: start;
+  }
+  .deck-summary:has(.deck-art > img:only-child) .deck-art {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .deck-summary:has(.deck-art > img:only-child) .deck-summary-body {
+    display: contents;
+  }
+  .deck-summary:has(.deck-art > img:only-child) .deck-summary-head {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    /* Reserve room on the right for the absolute-positioned kebab so
+     * the title doesn't run under the dots. */
+    padding-right: 44px;
+  }
+  .deck-summary:has(.deck-art > img:only-child) .deck-meta-row,
+  .deck-summary:has(.deck-art > img:only-child) .deck-summary-tags,
+  .deck-summary:has(.deck-art > img:only-child) .deck-summary-actions {
+    grid-column: 1 / -1;
+  }
+  /* Two-commander partner case: the art takes the full width of the
+   * deck-summary content area (`auto` lets the panel's inner box drive
+   * the size while the aspect-ratio keeps proportions). Reserve room
+   * on the right for the absolute-positioned kebab. */
+  .deck-art:has(img:nth-child(2)):not(:has(img:nth-child(3))) {
+    width: auto;
+    align-self: stretch;
+    margin-right: 52px;
+  }
   /* On narrow viewports, drop the right-alignment on the sync tag
    * + panel-head action so they keep their visual order without
    * wrapping awkwardly. */

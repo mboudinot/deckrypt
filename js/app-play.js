@@ -48,14 +48,7 @@ function makeCardEl(card, { tapped = false, ariaLabel, onActivate, onContextMenu
     });
   }
 
-  const skel = document.createElement("div");
-  skel.className = "skeleton";
-  el.appendChild(skel);
-
-  const label = document.createElement("div");
-  label.className = "skeleton-label";
-  label.textContent = card.name;
-  el.appendChild(label);
+  const { skel, lbl: label } = appendSkeletonFill(el, card.name);
 
   const src = cardImage(card, "small");
   if (src) {

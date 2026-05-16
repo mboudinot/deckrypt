@@ -51,3 +51,25 @@ function makeXIcon(size = 14) {
 
   return svg;
 }
+
+/* Card-shaped placeholder content: a shimmer `<div class="skeleton">`
+ * + a centered `<div class="skeleton-label">name</div>`. The two are
+ * absolute-positioned (inset: 0) so the parent must be a positioned
+ * container with a card-ish aspect-ratio (.card, .card-row-thumb,
+ * .gallery-tile, etc.). Used everywhere we render a card that hasn't
+ * resolved yet — Scryfall lookup pending, fetch errored, or the
+ * card-name simply doesn't exist (typo on import → "Inconnu" bucket).
+ *
+ * The shimmer animates by default; CSS rules tied to the parent's
+ * disabled/error state stop the animation when the unresolved state
+ * is permanent (no point pretending data might still arrive). */
+function appendSkeletonFill(parent, label) {
+  const skel = document.createElement("div");
+  skel.className = "skeleton";
+  parent.appendChild(skel);
+  const lbl = document.createElement("div");
+  lbl.className = "skeleton-label";
+  lbl.textContent = label;
+  parent.appendChild(lbl);
+  return { skel, lbl };
+}

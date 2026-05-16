@@ -19,6 +19,13 @@
 // ============================================================
 // State (single source of truth — never mutate from outside)
 // ============================================================
+/* localStorage key that remembers which deck the user had open. Read
+ * at boot before populateDeckSelect so a refresh lands on the same
+ * deck the user was looking at; written by switchDeck; cleared
+ * alongside the user-decks cache on signOut / account deletion / auth
+ * logout transitions (see sync.js). */
+const ACTIVE_DECK_ID_KEY = "mtg-hand-sim:active-deck-id:v1";
+
 const state = {
   // Set in init() once defaults are seeded; null means "no deck loaded".
   currentDeckId: null,
@@ -561,6 +568,11 @@ function clearActiveView() {
 async function switchDeck(deckId) {
   const myToken = ++state.switchToken;
   state.currentDeckId = deckId;
+  /* Remember the active deck so a page refresh restores it instead
+   * of always falling back to the first deck in the list. Cleared on
+   * signOut / logout transitions in sync.js. */
+  try { localStorage.setItem(ACTIVE_DECK_ID_KEY, deckId); }
+  catch (e) { /* localStorage blocked — ignore, refresh-restore won't work this session */ }
   updateDeleteButton();
   /* Keep the deck-pill dropdown's highlight (aria-current) in sync
    * with the active deck — otherwise the row that was current when
@@ -1224,6 +1236,14 @@ function init() {
   let hasSessionHint = false;
   try { hasSessionHint = localStorage.getItem("mtg-hand-sim:has-session-v1") === "1"; }
   catch (e) { /* localStorage blocked — fall back to non-optimistic boot */ }
+  /* Restore the last-viewed deck (set by switchDeck). populateDeckSelect
+   * below validates against the actual deck list — if the saved id no
+   * longer exists (deck deleted, signed in as another user with a
+   * cache miss, etc.) it falls back to the first deck. */
+  try {
+    const savedDeckId = localStorage.getItem(ACTIVE_DECK_ID_KEY);
+    if (savedDeckId) state.currentDeckId = savedDeckId;
+  } catch (e) { /* localStorage blocked */ }
   populateDeckSelect();
   if (hasSessionHint && state.currentDeckId) {
     switchDeck(state.currentDeckId);

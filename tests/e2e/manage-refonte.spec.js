@@ -45,23 +45,23 @@ test("deck-summary header shows the deck name + cards count + commander art", as
   expect(await imgs.first().getAttribute("src")).toBeTruthy();
 });
 
-test("partner commanders (2): deck-art stacks one <img> per commander vertically", async ({ page }) => {
+test("partner commanders (2): deck-art lays the arts side-by-side in a landscape container", async ({ page }) => {
   /* Sultai test fixture has 2 commanders (Ukkima + Cazur partner
-   * pair). The deck-art panel renders 2 stacked images, each filling
-   * 1/N of the panel height. */
+   * pair). The deck-art panel switches to a landscape container with
+   * the 2 art_crop tiles side-by-side — gives each painting a slot
+   * roughly matching its native landscape aspect, vs the half-height
+   * column-stack that crops top/bottom heavily. */
   const imgs = page.locator("#manage-deck-art img");
   await expect(imgs).toHaveCount(2);
-  /* Each img has a non-empty src (mockScryfall provides fake URLs). */
   for (let i = 0; i < 2; i++) {
     expect(await imgs.nth(i).getAttribute("src")).toBeTruthy();
   }
-  /* Layout sanity: the second image sits BELOW the first, not next
-   * to it. Vertical stacking only — partner decks shouldn't render
-   * side-by-side narrow portraits. */
+  /* Layout sanity: the second image sits to the RIGHT of the first,
+   * at roughly the same Y. */
   const first = await imgs.nth(0).boundingBox();
   const second = await imgs.nth(1).boundingBox();
-  expect(second.y).toBeGreaterThan(first.y);
-  expect(Math.abs(first.x - second.x)).toBeLessThan(2);
+  expect(second.x).toBeGreaterThan(first.x);
+  expect(Math.abs(first.y - second.y)).toBeLessThan(2);
 });
 
 test("color pips reflect the deck's commander color identity", async ({ page }) => {

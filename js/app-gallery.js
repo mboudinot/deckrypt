@@ -134,10 +134,10 @@ function makeGalleryTile(entry, card) {
     tile.appendChild(img);
     tile.addEventListener("click", () => showModal(card, []));
   } else {
-    const placeholder = document.createElement("span");
-    placeholder.className = "gallery-tile-placeholder";
-    placeholder.textContent = entry.name;
-    tile.appendChild(placeholder);
+    /* Unresolved card (typo on import, Scryfall couldn't find it).
+     * Same shared skeleton fill as the play view + manage rows so the
+     * gallery tile reads the same as those surfaces. */
+    appendSkeletonFill(tile, entry.name);
     tile.disabled = true;
   }
 

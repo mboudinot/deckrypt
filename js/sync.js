@@ -120,6 +120,7 @@ if (TEST_MODE) {
      * as signOut(), but covers paths we don't drive ourselves. */
     if (wasLoggedIn && !next) {
       try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
+      try { localStorage.removeItem("mtg-hand-sim:active-deck-id:v1"); } catch (e) {}
     }
     for (const cb of authSubscribers) {
       try { cb(next); } catch (e) { console.error("auth subscriber threw:", e); }
@@ -261,6 +262,7 @@ async function deleteAccount({ currentPassword } = {}) {
      * the post-deletion UI without touching Firebase. */
     const uid = cachedUser?.uid;
     try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
+    try { localStorage.removeItem("mtg-hand-sim:active-deck-id:v1"); } catch (e) {}
     if (uid && window.syncQueue?.queueKeyForUid) {
       try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uid)); } catch (e) {}
     }
@@ -314,6 +316,7 @@ async function deleteAccount({ currentPassword } = {}) {
    * it after the auth delete fires, but we beat it so the next
    * deleteUser-triggered subscriber call sees an empty cache. */
   try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
+  try { localStorage.removeItem("mtg-hand-sim:active-deck-id:v1"); } catch (e) {}
   if (window.syncQueue?.queueKeyForUid) {
     try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uid)); } catch (e) {}
   }
@@ -331,6 +334,7 @@ async function signOut() {
    * clean the per-uid queue entry as well. */
   const uidToCleanup = cachedUser?.uid || null;
   try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
+  try { localStorage.removeItem("mtg-hand-sim:active-deck-id:v1"); } catch (e) {}
   setSessionHint(false);
   if (uidToCleanup && window.syncQueue?.queueKeyForUid) {
     try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uidToCleanup)); } catch (e) {}

@@ -373,25 +373,34 @@
                  height via flex. -->
             <div id="manage-deck-art" class="deck-art"></div>
             <div class="deck-summary-body">
-              <h1 id="manage-deck-name">—</h1>
-              <!-- Inline rename input. Hidden by default; shown when
-                   the user picks "Renommer" in the kebab menu. Same
-                   geometry as the h1 so the swap is invisible — see
-                   the .deck-summary-name-input rule in views.css. -->
-              <input id="manage-deck-name-input" class="deck-summary-name-input" type="text" maxlength="80" autocomplete="off" hidden aria-label="Nom du deck">
-              <!-- Description: click-to-edit text under the title.
-                   Read mode = <button> with text or italic placeholder.
-                   Edit mode = textarea + Annuler / Sauvegarder. The
-                   button-as-paragraph is for a11y (proper focusable
-                   click target) — styled flat in views.css. -->
-              <button id="manage-deck-description" type="button" class="deck-description">
-                Ajoute une description (mulligan rule, win con, notes de testing…)
-              </button>
-              <div id="manage-deck-description-editor" class="deck-description-editor" hidden>
-                <textarea id="manage-deck-description-input" maxlength="2000" rows="4" aria-label="Description du deck"></textarea>
-                <div class="deck-description-actions">
-                  <button id="btn-description-cancel" type="button" class="btn btn-sm">Annuler</button>
-                  <button id="btn-description-save" type="button" class="btn btn-sm primary">Sauvegarder</button>
+              <!-- "Head" group: title + description (+ their hidden
+                   editors). Wrapping them lets the mobile 1-cmdr
+                   layout group them next to the art via grid, while
+                   the rest of the body (meta / tags / actions) drops
+                   to a full-width row below. On desktop the wrapper
+                   is just a transparent flex column — same visual
+                   as the un-wrapped flow. -->
+              <div class="deck-summary-head">
+                <h1 id="manage-deck-name">—</h1>
+                <!-- Inline rename input. Hidden by default; shown when
+                     the user picks "Renommer" in the kebab menu. Same
+                     geometry as the h1 so the swap is invisible — see
+                     the .deck-summary-name-input rule in views.css. -->
+                <input id="manage-deck-name-input" class="deck-summary-name-input" type="text" maxlength="80" autocomplete="off" hidden aria-label="Nom du deck">
+                <!-- Description: click-to-edit text under the title.
+                     Read mode = <button> with text or italic placeholder.
+                     Edit mode = textarea + Annuler / Sauvegarder. The
+                     button-as-paragraph is for a11y (proper focusable
+                     click target) — styled flat in views.css. -->
+                <button id="manage-deck-description" type="button" class="deck-description">
+                  Ajoute une description (mulligan rule, win con, notes de testing…)
+                </button>
+                <div id="manage-deck-description-editor" class="deck-description-editor" hidden>
+                  <textarea id="manage-deck-description-input" maxlength="2000" rows="4" aria-label="Description du deck"></textarea>
+                  <div class="deck-description-actions">
+                    <button id="btn-description-cancel" type="button" class="btn btn-sm">Annuler</button>
+                    <button id="btn-description-save" type="button" class="btn btn-sm primary">Sauvegarder</button>
+                  </div>
                 </div>
               </div>
 

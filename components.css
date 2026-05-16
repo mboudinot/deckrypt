@@ -270,6 +270,12 @@ html.auth-locked #login-overlay[hidden] { display: block; }
     width: 100%;
     max-width: none;
     justify-content: flex-start;
+    /* Min 44 px de hauteur pour la cible tactile (Apple HIG / WCAG
+     * 2.5.5). Le padding-vertical desktop (6 px) donnait ~32 px ce
+     * qui est trop petit pour le pouce sur mobile. */
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 14px;
   }
   #deck-dropdown .deck-pill-name { max-width: none; }
   /* Chevron poussé contre l'edge droit du pill. */
@@ -749,14 +755,19 @@ section {
   z-index: 2;
 }
 .card img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.card .skeleton {
+/* Shared skeleton fill for unresolved cards across views. The parent
+ * must be `position: relative` with a card-ish aspect-ratio (`.card`,
+ * `.card-row-thumb`, `.gallery-tile` — all set elsewhere). Built by
+ * `appendSkeletonFill(parent, name)` in dom-helpers.js. */
+.skeleton {
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
+  pointer-events: none;
 }
-.card .skeleton-label {
+.skeleton-label {
   position: absolute;
   inset: 0;
   display: flex;
@@ -767,11 +778,19 @@ section {
   font-size: 0.72rem;
   padding: 8px;
   line-height: 1.3;
+  word-break: break-word;
+  pointer-events: none;
 }
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+/* Play-view `.card` has a stronger error state — when the image
+ * URL was missing or failed to load, the shimmer is hidden and the
+ * label flips to the error color (alarm signal, distinct from the
+ * "still loading" shimmer). The other surfaces (.card-row-thumb,
+ * .gallery-tile) stop the animation on :disabled instead — see
+ * views.css per-context overrides. */
 .card.error .skeleton { display: none; }
 .card.error img { display: none; }
 .card.error .skeleton-label { color: var(--error); }

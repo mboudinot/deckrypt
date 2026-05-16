@@ -266,17 +266,11 @@ function _buildCardRowThumb(entry, resolvedCard) {
     thumb.appendChild(img);
   } else {
     // Card hasn't been resolved by Scryfall (typo on import → "Inconnu"
-    // bucket, or fetch still pending). Mirror the play-view skeleton
-    // pattern: shimmer background + card name centered, so the row's
-    // thumb identifies the missing card at a glance instead of showing
-    // an empty dark rectangle.
-    const skel = document.createElement("div");
-    skel.className = "skeleton";
-    thumb.appendChild(skel);
-    const lbl = document.createElement("div");
-    lbl.className = "skeleton-label";
-    lbl.textContent = entry.name;
-    thumb.appendChild(lbl);
+    // bucket, or fetch still pending). The shared skeleton fill shows
+    // the card name centered on a card-shaped placeholder — same look
+    // as the play view's unresolved cards and the gallery's missing
+    // tiles.
+    appendSkeletonFill(thumb, entry.name);
   }
   if (resolvedCard) {
     thumb.title = `Agrandir ${entry.name}`;
