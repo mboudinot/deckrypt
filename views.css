@@ -574,7 +574,7 @@
   padding: 12px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 .add-card-draft[hidden] { display: none; }
 .add-card-draft-name {
@@ -619,6 +619,17 @@
   width: 80px;
 }
 .add-card-draft select:disabled { opacity: 0.5; }
+/* "Carte / Commandant" segmented toggle at the top of the draft. The
+ * base .segmented styles already give us the pill background + active
+ * accent fill; we just need to span the full draft width so the
+ * affordance reads as a primary mode-picker, not a quiet option. */
+.add-card-draft-role {
+  display: flex;
+  align-self: stretch;
+}
+.add-card-draft-role[hidden] { display: none; }
+.add-card-draft-role button { flex: 1; }
+.add-card-draft label.add-card-draft-qty-label[hidden] { display: none; }
 .add-card-draft-actions {
   display: flex;
   gap: 8px;
@@ -1543,6 +1554,35 @@
   transform: scale(1.06);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
   z-index: 5;
+}
+
+/* Mobile: the 280-px-min auto-fill collapses to a single column on a
+ * 375-px viewport, blowing up each tile to ~490 px tall (one card per
+ * screen, the picker reads as fullscreen). Force 2 columns and a
+ * smaller max-height so the user sees 2 rows / 4 cards before having
+ * to scroll. Slight title shrink + left-align (with right-padding for
+ * the sticky close) so the header doesn't eat too much vertical
+ * room either. */
+@media (max-width: 600px) {
+  .printing-picker { gap: 8px; }
+  .printing-picker-title {
+    font-size: 0.92rem;
+    text-align: left;
+    padding-right: 44px;
+  }
+  .printing-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    max-height: 68vh;
+    padding: 4px 2px;
+  }
+  /* Disable hover-scale on mobile — touch devices don't have a hover
+   * intent, and a 1.06 scale on tap can clip the tile inside the
+   * 10-px gap. The :focus-visible path stays unchanged for keyboard. */
+  .printing-tile:hover:not(:disabled) {
+    transform: none;
+    box-shadow: none;
+  }
 }
 
 .modal {

@@ -171,6 +171,8 @@ function _cacheManageElements() {
   els.addCardDraftQty = document.getElementById("add-card-draft-qty");
   els.addCardDraftCancel = document.getElementById("add-card-draft-cancel");
   els.addCardDraftSubmit = document.getElementById("add-card-draft-submit");
+  els.addCardDraftRole = document.getElementById("add-card-draft-role");
+  els.addCardDraftQtyLabel = document.querySelector("label.add-card-draft-qty-label");
   els.langSwitchEn = document.getElementById("lang-switch-en");
   els.langSwitchFr = document.getElementById("lang-switch-fr");
   /* Format edit lives in the deck-summary meta-row (click on the

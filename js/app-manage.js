@@ -217,6 +217,11 @@ function setDeckFormat(format) {
   if (def.format === format) return;
   def.format = format;
   if (!commitDeckChange(def)) return;
+  /* Sync the add-card draft's "Ajouter comme commandant" toggle in
+   * case the draft is open when the user flips the format — Limited
+   * has no commander zone, so the toggle has to disappear (and any
+   * previously-checked state has to clear). */
+  refreshAddCardDraftAsCommander();
   rerenderDeckViews();
 }
 
@@ -810,6 +815,13 @@ function setupAddCardUI() {
   els.addCardDraftPrinting.addEventListener("change", () => {
     updateDraftPreview(els.addCardDraftPrinting.value);
   });
+  if (els.addCardDraftRole) {
+    els.addCardDraftRole.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-role]");
+      if (!btn) return;
+      setAddCardDraftRole(btn.dataset.role);
+    });
+  }
   // Enter in the qty field is the natural "validate" gesture.
   els.addCardDraftQty.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
@@ -894,6 +906,11 @@ function openAddCardDraft(name) {
   els.addCardInput.value = "";          // make the draft the focus
   els.addCardDraftName.textContent = name;
   els.addCardDraftQty.value = "1";
+  /* "Ajouter comme commandant" toggle: visible only for Commander-format
+   * decks (Limited / Format libre have no commander zone). Reset to
+   * unchecked on every open so the previous draft's choice doesn't
+   * carry over silently. */
+  refreshAddCardDraftAsCommander();
   els.addCardDraftPrinting.replaceChildren();
   const loading = document.createElement("option");
   loading.value = "";
@@ -1024,9 +1041,12 @@ function submitAddCardDraft() {
     flash("Sélectionne un deck avant d'ajouter une carte.", "error");
     return;
   }
+  /* The active role drives the routing. Non-commander decks never
+   * surface the "Commandant" tab so this can only be "card" there. */
+  const asCommander = def.format === "commander" && _getDraftRole() === "commander";
   const rawQty = parseInt(els.addCardDraftQty.value, 10);
   const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
-  const entry = { name: _draftName, qty };
+  const entry = { name: _draftName };
   const printingValue = els.addCardDraftPrinting.value;
   if (printingValue) {
     const sep = printingValue.indexOf(":");
@@ -1035,15 +1055,67 @@ function submitAddCardDraft() {
       entry.collector_number = printingValue.slice(sep + 1);
     }
   }
-  addCard(def, entry);
+  if (asCommander) {
+    const added = addCommander(def, entry);
+    if (!added) {
+      flash(`${getDisplayName({ name: _draftName })} est déjà commandant.`, "error");
+      return;
+    }
+  } else {
+    addCard(def, { ...entry, qty });
+  }
   if (commitDeckChange(def)) {
     const displayName = getDisplayName({ name: _draftName });
     markRecentlyAdded([_draftName]);
     cancelAddCardDraft();
     rerenderDeckViews();
-    flash(qty > 1
-      ? `+${qty} ${displayName} ajoutés au deck`
-      : `${displayName} ajouté au deck`, "success");
+    let msg;
+    if (asCommander) msg = `${displayName} ajouté comme commandant`;
+    else if (qty > 1) msg = `+${qty} ${displayName} ajoutés au deck`;
+    else msg = `${displayName} ajouté au deck`;
+    flash(msg, "success");
+  }
+}
+
+/* Read the currently-active role from the segmented control. Falls
+ * back to "card" if the toggle is hidden (non-commander decks) or
+ * malformed. */
+function _getDraftRole() {
+  const active = els.addCardDraftRole?.querySelector("button.active");
+  return active?.dataset.role === "commander" ? "commander" : "card";
+}
+
+/* Sync segmented-control visibility + Quantité field + submit label
+ * with the current deck's format. Commander decks see the segmented
+ * toggle; the rest only see "Ajouter au deck" with Quantité as the
+ * sole knob. Called on draft open and on format change. */
+function refreshAddCardDraftAsCommander() {
+  if (!els.addCardDraftRole) return;
+  const def = findDeck(state.currentDeckId);
+  const isCommanderDeck = def?.format === "commander";
+  els.addCardDraftRole.hidden = !isCommanderDeck;
+  /* Always reset to "card" on (re)open so the previous draft's
+   * choice doesn't carry over silently — commander mode is the
+   * explicit minority case. */
+  setAddCardDraftRole("card");
+}
+
+function setAddCardDraftRole(role) {
+  if (!els.addCardDraftRole) return;
+  const next = role === "commander" ? "commander" : "card";
+  for (const btn of els.addCardDraftRole.querySelectorAll("button")) {
+    const on = btn.dataset.role === next;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", String(on));
+  }
+  /* Commanders are unique — hide Quantité + force value to 1 so the
+   * submit can't accidentally pick up a leftover quantity. */
+  if (els.addCardDraftQtyLabel) els.addCardDraftQtyLabel.hidden = (next === "commander");
+  if (next === "commander" && els.addCardDraftQty) els.addCardDraftQty.value = "1";
+  if (els.addCardDraftSubmit) {
+    els.addCardDraftSubmit.textContent = (next === "commander")
+      ? "Ajouter comme commandant"
+      : "Ajouter au deck";
   }
 }
 

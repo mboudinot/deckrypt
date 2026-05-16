@@ -505,13 +505,23 @@
                 <div id="add-card-draft" class="add-card-draft" hidden>
                   <strong id="add-card-draft-name" class="add-card-draft-name"></strong>
                   <img id="add-card-draft-preview" class="add-card-draft-preview" alt="" hidden>
+                  <!-- Role toggle (segmented). Shown only when the deck's
+                       format === "commander" (Limited / Format libre
+                       have no commander zone). The active button drives:
+                       (a) which addCard*() function the submit calls,
+                       (b) the submit button's label, (c) Quantité
+                       visibility (commanders are unique → qty hidden). -->
+                  <div id="add-card-draft-role" class="segmented add-card-draft-role" role="tablist" aria-label="Type de carte" hidden>
+                    <button type="button" class="active" data-role="card" role="tab" aria-selected="true">Carte</button>
+                    <button type="button" data-role="commander" role="tab" aria-selected="false">Commandant</button>
+                  </div>
                   <label>
                     Édition
                     <select id="add-card-draft-printing">
                       <option value="">Édition par défaut</option>
                     </select>
                   </label>
-                  <label>
+                  <label class="add-card-draft-qty-label">
                     Quantité
                     <input id="add-card-draft-qty" type="number" min="1" max="999" value="1">
                   </label>
