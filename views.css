@@ -920,6 +920,26 @@
   color: var(--text-muted);
   line-height: 1.45;
 }
+/* Actionable next step — Scryfall search link, color-scoped to the
+ * deck's commander identity. Aligned under the advice line, subtle
+ * accent color + small arrow glyph so the row reads as "warn → here's
+ * where to fix it" rather than just "warn". */
+.suggestion-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+  align-self: flex-start;
+}
+.suggestion-link:hover { text-decoration: underline; }
+.suggestion-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 
 /* Archetype detection: top 1–3 strategy classifications with a
    confidence bar. The fill width is set inline (computed from the

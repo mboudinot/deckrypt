@@ -521,6 +521,51 @@ function renderLegalityPanel(resolved) {
   }
 }
 
+/* Scryfall query templates per suggestion category. The {ci} marker
+ * is replaced by the deck's commander color identity in WUBRG order
+ * (e.g. "WUB"). All queries are scoped to `f:commander` so the
+ * results stay legal in the format the panel is targeting.
+ *
+ * Oracle filters chosen to match the same heuristics deck-suggestions.js
+ * uses to COUNT — keeping the "you're missing X" message and the
+ * "click to find more X" results conceptually aligned. */
+const SCRYFALL_QUERIES = {
+  lands: 'f:commander id<={ci} t:land -t:basic',
+  ramp: 'f:commander id<={ci} cmc<=3 (o:"add {C}" or o:"add one mana" or o:"add two mana" or o:"search your library for a basic land")',
+  draw: 'f:commander id<={ci} (o:"draw two cards" or o:"draw three cards" or o:"draws a card" or o:"draw a card whenever")',
+  interaction: 'f:commander id<={ci} (o:"destroy target" or o:"exile target" or o:"counter target spell")',
+  wipes: 'f:commander id<={ci} (o:"destroy all creatures" or o:"exile all creatures" or o:"each creature deals" or o:"destroy all nonland")',
+};
+
+/* Per-category French labels for the Scryfall link — natural-reading
+ * phrasing rather than `${s.label.toLowerCase()}` which produced
+ * grammatical oddities ("Voir des accélération de mana", "Voir des
+ * pioche"). */
+const SCRYFALL_LINK_LABELS = {
+  lands: "Trouver des terrains compatibles",
+  ramp: "Trouver des sources de ramp",
+  draw: "Trouver des effets de pioche",
+  interaction: "Trouver de l'interaction ciblée",
+  wipes: "Trouver des board wipes",
+};
+
+/* Build a Scryfall search URL for a suggestion category, color-scoped
+ * to the deck's commander identity. Returns null when there's no
+ * commander (Limited / commander-less decks have no color identity to
+ * filter on) or when the category isn't actionable (avg-cmc). */
+function _scryfallSuggestionUrl(suggestionKey, commanders) {
+  const template = SCRYFALL_QUERIES[suggestionKey];
+  if (!template) return null;
+  const colors = new Set();
+  for (const c of (commanders || [])) {
+    for (const ci of (c.color_identity || [])) colors.add(ci);
+  }
+  if (colors.size === 0) return null;
+  const orderedCi = ["W", "U", "B", "R", "G"].filter((c) => colors.has(c)).join("");
+  const query = template.replace("{ci}", orderedCi);
+  return `https://scryfall.com/search?q=${encodeURIComponent(query)}`;
+}
+
 function renderSuggestionsPanel(resolved) {
   const list = suggestions(resolved);
   els.analyzeSuggestions.replaceChildren();
@@ -570,6 +615,28 @@ function renderSuggestionsPanel(resolved) {
     advice.className = "suggestion-advice";
     advice.textContent = s.advice;
     body.appendChild(advice);
+
+    /* Actionable exploration link — a Scryfall query that surfaces
+     * format-legal options matching the row's category, scoped to the
+     * deck's color identity. Shown on EVERY row (including `ok`)
+     * because the use-cases stretch beyond "fix a shortage":
+     *   - `low`  → add more cards in this category
+     *   - `high` → swap weaker cards for better effects / lower CMC
+     *   - `ok`   → upgrade individual picks even though the count is fine
+     * Skipped only when (a) there's no oracle filter for the category
+     * (avg-cmc), or (b) the deck has no commander to derive an
+     * identity from. */
+    const href = _scryfallSuggestionUrl(s.key, resolved?.commanders);
+    const linkLabel = SCRYFALL_LINK_LABELS[s.key];
+    if (href && linkLabel) {
+      const link = document.createElement("a");
+      link.className = "suggestion-link";
+      link.href = href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = `${linkLabel} ↗`;
+      body.appendChild(link);
+    }
 
     row.appendChild(body);
     els.analyzeSuggestions.appendChild(row);
