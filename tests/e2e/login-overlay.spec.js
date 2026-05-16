@@ -173,7 +173,17 @@ test("empty form submit: error names BOTH missing fields and both get the invali
 
 test("missing email only: message is tailored and only email gets the invalid border", async ({ page }) => {
   await page.goto("/index.html");
-  await page.fill("#login-pwd", "secret123");
+  /* Defensive: assert the fields' starting state BEFORE filling. CI runs
+   * have flaked here when something (browser autofill, prior session
+   * residue, etc.) leaked a value into the email field — the symptom
+   * then becomes "Format d'email invalide · Renseigne ton mot de passe."
+   * which is the exact inverse of what we're testing. Explicit fills
+   * + value checks make the flake assert here with a clear locator
+   * mismatch instead of a confusing error-text mismatch. */
+  await page.locator("#login-email").fill("");
+  await page.locator("#login-pwd").fill("secret123");
+  await expect(page.locator("#login-email")).toHaveValue("");
+  await expect(page.locator("#login-pwd")).toHaveValue("secret123");
   await page.click("#login-submit");
   await expect(page.locator("#login-error")).toHaveText("Renseigne ton email.");
   await expect(page.locator("#login-email")).toHaveClass(/is-invalid/);
