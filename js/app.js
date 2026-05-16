@@ -155,6 +155,7 @@ function _cacheManageElements() {
   els.btnDeleteDeck = document.getElementById("btn-delete-deck-summary");
   els.btnDuplicateDeck = document.getElementById("btn-duplicate-deck");
   els.btnImportToggle = document.getElementById("btn-import-toggle");
+  els.btnNewDeck = document.getElementById("btn-new-deck");
   els.manageDeckName = document.getElementById("manage-deck-name");
   els.manageMeta = document.getElementById("manage-meta");
   els.manageCommanders = document.getElementById("manage-commanders");
@@ -900,6 +901,49 @@ async function confirmImport() {
   switchDeck(id);
 }
 
+/* Create an empty deck and drop the user into Manage view with the
+ * name input focused. Backlog feature (CLAUDE.md): until now the only
+ * way to get a deck was to import — fresh accounts hit a dead-end.
+ *
+ * Zero friction by design: no modal, no required form, just an empty
+ * Commander-format deck with a unique default name. The user renames
+ * inline via the existing click-to-edit h1 in Manage (auto-focused
+ * via startRenameDeck) and changes the format via the inline meta
+ * trigger if needed. */
+function createEmptyDeck() {
+  const id = "user-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  const name = _findUniqueDeckName("Nouveau deck");
+  const def = { id, name, format: "commander", commanders: [], cards: [] };
+  const result = window.sync.commitDeck(def);
+  if (!result.ok) {
+    flash("⚠ Sauvegarde impossible — vérifie que le stockage local est dispo.", "error");
+    return;
+  }
+  populateDeckSelect();
+  els.deckSelect.value = id;
+  state.currentDeckId = id;
+  switchDeck(id);
+  switchView("manage");
+  /* startRenameDeck lives in app-manage.js and reads
+   * state.currentDeckId — by here that's the new deck. */
+  if (typeof startRenameDeck === "function") startRenameDeck();
+  flash(`${name} créé`, "success");
+}
+
+/* Find a unique deck name by suffixing "(N)" if the base is taken.
+ * Avoids the user landing on a freshly-created "Nouveau deck" only to
+ * realise they already have one. Bounded loop (1000) so a pathological
+ * dataset can't hang the call; falls back to a timestamp suffix. */
+function _findUniqueDeckName(base) {
+  const taken = new Set(allDecks().map((d) => d.name));
+  if (!taken.has(base)) return base;
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${base} (${i})`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `${base} ${Date.now()}`;
+}
+
 // ============================================================
 // View toggle (Jouer / Gérer)
 // ============================================================
@@ -1093,15 +1137,18 @@ function bindEvents() {
   els.btnDeleteDeck.addEventListener("click", deleteCurrentDeck);
   els.btnDuplicateDeck.addEventListener("click", duplicateCurrentDeck);
   els.btnImportToggle.addEventListener("click", openImportPanel);
-  /* Single delegated handler for the four empty-state CTA buttons —
-   * one per view (`#view-play / view-manage / view-analyze /
-   * view-gallery`). All carry `data-action="open-import"`; the
-   * dropdown's "Importer une liste" entry has its own listener above
-   * because it lives inside a dropdown menu (autoclose semantics
-   * differ). */
+  if (els.btnNewDeck) els.btnNewDeck.addEventListener("click", createEmptyDeck);
+  /* Single delegated handler for the empty-state CTA buttons (one
+   * pair per view — `#view-play / view-manage / view-analyze /
+   * view-gallery`). Both `[data-action="open-import"]` and
+   * `[data-action="new-deck"]` go through here. The dropdown
+   * entries have their own listeners above because they live inside
+   * a dropdown menu (autoclose semantics differ). */
   document.addEventListener("click", (e) => {
-    const trigger = e.target.closest('[data-action="open-import"]');
-    if (trigger) openImportPanel();
+    const importTrigger = e.target.closest('[data-action="open-import"]');
+    if (importTrigger) { openImportPanel(); return; }
+    const newDeckTrigger = e.target.closest('[data-action="new-deck"]');
+    if (newDeckTrigger) createEmptyDeck();
   });
   els.btnExport.addEventListener("click", () => openIeModal("export"));
   els.ieModalClose.addEventListener("click", closeIeModal);

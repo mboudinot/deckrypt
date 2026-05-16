@@ -72,7 +72,7 @@ function renderDeckDropdown(decks) {
     const empty = document.createElement("div");
     empty.className = "dropdown-item";
     empty.style.color = "var(--text-muted)";
-    empty.textContent = "Aucun deck — importe-en un.";
+    empty.textContent = "Aucun deck — crée-en un ou importe une liste.";
     els.deckDropdownList.appendChild(empty);
     return;
   }

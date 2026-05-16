@@ -637,6 +637,21 @@
   margin-top: 4px;
 }
 
+/* English-only hint shown above the paste textareas — both the
+ * import modal and the Manage view's add-card-paste block. Placed
+ * pre-textarea so the user sees the constraint BEFORE typing
+ * (placeholders vanish on first keystroke and can't carry the
+ * message past that point). */
+.paste-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.paste-hint svg { flex-shrink: 0; opacity: 0.75; }
 .add-card-paste textarea {
   width: 100%;
   background: var(--surface-2);
@@ -1923,6 +1938,21 @@ html:has(.modal-backdrop:not([hidden])) {
 }
 .empty-deck-cta-btn {
   margin-top: 4px;
+}
+/* Two-button row for the empty-state CTAs (Nouveau deck + Importer).
+ * Horizontal on desktop, stacked on mobile so the buttons stay full
+ * tappable width. Sub max-width above already keeps the row visually
+ * contained. */
+.empty-deck-cta-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+@media (max-width: 480px) {
+  .empty-deck-cta-buttons { flex-direction: column; align-items: stretch; }
+  .empty-deck-cta-buttons .btn { width: 100%; }
 }
 
 /* Narrow-viewport tweaks. Each view (play, manage) handles its own

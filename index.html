@@ -154,6 +154,12 @@
             </svg>
             Importer une liste
           </button>
+          <button type="button" id="btn-new-deck" class="dropdown-item" role="menuitem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Nouveau deck
+          </button>
         </div>
         <!-- Hidden mirror of the deck selection — kept so existing JS
              that reads/writes els.deckSelect.value keeps working
@@ -203,8 +209,11 @@
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
         <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
-        <div class="empty-deck-cta-sub">Importe ta première deck-liste pour commencer à analyser, gérer et tester tes mains.</div>
-        <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer ton premier deck</button>
+        <div class="empty-deck-cta-sub">Crée un deck vide pour partir de zéro, ou importe une liste MTGA / Moxfield existante.</div>
+        <div class="empty-deck-cta-buttons">
+          <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer une liste</button>
+          <button type="button" class="btn empty-deck-cta-btn" data-action="new-deck">+ Nouveau deck</button>
+        </div>
       </div>
       <div class="play-layout">
 
@@ -353,8 +362,11 @@
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
         <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
-        <div class="empty-deck-cta-sub">Importe ta première deck-liste pour commencer à analyser, gérer et tester tes mains.</div>
-        <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer ton premier deck</button>
+        <div class="empty-deck-cta-sub">Crée un deck vide pour partir de zéro, ou importe une liste MTGA / Moxfield existante.</div>
+        <div class="empty-deck-cta-buttons">
+          <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer une liste</button>
+          <button type="button" class="btn empty-deck-cta-btn" data-action="new-deck">+ Nouveau deck</button>
+        </div>
       </div>
       <div class="manage-layout">
         <main class="manage-main">
@@ -533,6 +545,14 @@
               </div>
               <div class="add-card-paste">
                 <label for="add-card-paste-text" class="sr-only">Coller une ligne</label>
+                <p class="paste-hint">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  Noms en anglais — sinon les cartes atterrissent dans « Inconnu ».
+                </p>
                 <textarea id="add-card-paste-text" placeholder="Ou colle une liste MTGA / Moxfield :
 1 Sol Ring (CMD) 259
 2 Forest"></textarea>
@@ -603,8 +623,11 @@
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
         <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
-        <div class="empty-deck-cta-sub">Importe ta première deck-liste pour commencer à analyser, gérer et tester tes mains.</div>
-        <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer ton premier deck</button>
+        <div class="empty-deck-cta-sub">Crée un deck vide pour partir de zéro, ou importe une liste MTGA / Moxfield existante.</div>
+        <div class="empty-deck-cta-buttons">
+          <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer une liste</button>
+          <button type="button" class="btn empty-deck-cta-btn" data-action="new-deck">+ Nouveau deck</button>
+        </div>
       </div>
       <section class="panel">
         <div class="panel-head">
@@ -697,8 +720,11 @@
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
         <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
-        <div class="empty-deck-cta-sub">Importe ta première deck-liste pour commencer à analyser, gérer et tester tes mains.</div>
-        <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer ton premier deck</button>
+        <div class="empty-deck-cta-sub">Crée un deck vide pour partir de zéro, ou importe une liste MTGA / Moxfield existante.</div>
+        <div class="empty-deck-cta-buttons">
+          <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer une liste</button>
+          <button type="button" class="btn empty-deck-cta-btn" data-action="new-deck">+ Nouveau deck</button>
+        </div>
       </div>
       <div id="gallery-content"></div>
     </div>
@@ -743,6 +769,14 @@
       <label for="import-name" class="sr-only">Nom du deck</label>
       <input id="import-name" type="text" placeholder="Nom du deck (ex: Meren EDH)">
       <label for="import-text" class="sr-only">Liste de cartes</label>
+      <p class="paste-hint">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Noms en anglais (« Sol Ring », pas « Anneau Solaire ») — Scryfall ne reconnaît pas les noms traduits.
+      </p>
       <textarea id="import-text" placeholder="Colle ta liste ici. Format MTGA / Moxfield :
 // Commanders
 1 Meren of Clan Nel Toth (C15) 49

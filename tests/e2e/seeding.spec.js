@@ -20,18 +20,40 @@ test("fresh authenticated boot with no cloud decks: empty-state CTA visible on t
   await page.goto("/index.html");
   /* Four `.empty-deck-cta` blocks live in the DOM (one per view).
    * Only the active view's is visible — scope the selector to the
-   * default Play view to keep the strict-mode locator happy. */
+   * default Play view to keep the strict-mode locator happy. The
+   * CTA pair = primary "+ Nouveau deck" + secondary "Importer une
+   * liste". */
   await expect(page.locator("#view-play")).toHaveClass(/view-empty/);
   await expect(page.locator("#view-play .empty-deck-cta")).toBeVisible();
-  await expect(page.locator("#view-play .empty-deck-cta-btn")).toHaveText("Importer ton premier deck");
+  await expect(page.locator('#view-play [data-action="new-deck"]')).toHaveText(/Nouveau deck/);
+  await expect(page.locator('#view-play [data-action="open-import"]')).toHaveText(/Importer une liste/);
   await expect(page.locator("#deck-select option")).toHaveCount(0);
 });
 
-test("clicking the empty-state CTA opens the import modal", async ({ page }) => {
+test("clicking the empty-state import CTA opens the import modal", async ({ page }) => {
   await mockAuth(page);
   await page.goto("/index.html");
-  await page.click("#view-play .empty-deck-cta-btn");
+  await page.click('#view-play [data-action="open-import"]');
   await expect(page.locator("#ie-modal")).toBeVisible();
+});
+
+test('clicking "+ Nouveau deck" creates an empty deck and lands on Manage with the name input focused', async ({ page }) => {
+  /* Zero-friction creation: no modal, just a fresh deck with a
+   * unique default name, the user dropped into Manage view ready
+   * to rename inline. */
+  await mockAuth(page);
+  await page.goto("/index.html");
+  await page.click('#view-play [data-action="new-deck"]');
+  /* View switched to Manage. */
+  await expect(page.locator("#view-manage")).toBeVisible();
+  /* Name input is the active element with the default name selected
+   * so the user can overtype directly. */
+  const input = page.locator("#manage-deck-name-input");
+  await expect(input).toBeVisible();
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("Nouveau deck");
+  /* The deck is now persisted in the hidden select. */
+  await expect(page.locator("#deck-select option")).toHaveCount(1);
 });
 
 test("empty-state CTA shows on every view (Play / Manage / Analyze / Gallery) for a fresh account", async ({ page }) => {
@@ -50,7 +72,8 @@ test("empty-state CTA shows on every view (Play / Manage / Analyze / Gallery) fo
     await page.click(tabId);
     await expect(page.locator(viewId)).toHaveClass(/view-empty/);
     await expect(page.locator(`${viewId} .empty-deck-cta`)).toBeVisible();
-    await expect(page.locator(`${viewId} .empty-deck-cta-btn`)).toHaveText("Importer ton premier deck");
+    await expect(page.locator(`${viewId} [data-action="new-deck"]`)).toBeVisible();
+    await expect(page.locator(`${viewId} [data-action="open-import"]`)).toBeVisible();
   }
 });
 
