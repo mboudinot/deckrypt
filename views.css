@@ -1963,12 +1963,20 @@ html:has(.modal-backdrop:not([hidden])) {
   display: block;
   object-fit: cover;
 }
-/* Skeleton fill (shared with .card + .card-row-thumb) — bigger label
- * because gallery tiles are larger than card-row thumbs. Animation
- * keeps running on :disabled tiles for visual consistency with the
- * play-view cards (the shimmer is the unifying signal across views,
- * not a loading-only effect). */
-.gallery-tile .skeleton-label { font-size: 0.85rem; padding: 12px; }
+/* Carte non-résolue (typo à l'import → bucket "Inconnu") : on garde le
+ * shimmer lisible. Le global `button:disabled { opacity: 0.4 }` noyait
+ * la vague — même override `:disabled { opacity: 1 }` que pour
+ * `.card-row-thumb`, pour que Gérer et Galerie partagent exactement le
+ * même signal visuel sur les Inconnues. */
+.gallery-tile:disabled { opacity: 1; cursor: default; }
+/* Label seul est tweaké ici — les tiles sont plus grandes que les row
+ * thumbs (70 px), donc un label plus gros. Le shimmer lui-même hérite
+ * de la règle globale `.skeleton` (components.css) + des tokens
+ * `--skeleton-highlight` / `--skeleton-duration` (theme.css). */
+.gallery-tile .skeleton-label {
+  font-size: 0.85rem;
+  padding: 12px;
+}
 .gallery-tile-qty {
   position: absolute;
   top: 6px;

@@ -24,6 +24,13 @@
   --mtg-b-bg: oklch(0.22 0.015 280 / 0.30);
   --mtg-r-bg: oklch(0.72 0.18 25 / 0.14);
   --mtg-g-bg: oklch(0.78 0.16 160 / 0.14);
+
+  /* Shimmer cadence — shared across themes for behavioural consistency.
+   * Bumped from 1.4s to 2.2s : 1.4s reads as agité/anxieux, 2.2s respire
+   * et reste assez vivant pour signaler "ça charge". `--skeleton-highlight`
+   * est défini par thème ci-dessous (le bon mid-stop dépend de la palette
+   * — voir les commentaires dans chaque bloc). */
+  --skeleton-duration: 2.2s;
 }
 
 /* ============================================================
@@ -54,6 +61,11 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.65);
+
+  /* Mid-stop du shimmer skeleton. border-strong (#353c4d, ~oklch 0.32) sur
+   * surface-2 (#181c27, ~oklch 0.18) — delta 0.14 oklch, une vague claire
+   * qui balaie le placeholder sans flasher. */
+  --skeleton-highlight: var(--border-strong);
 
   --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -95,6 +107,13 @@
   --shadow-sm: 0 1px 0 rgba(26, 24, 20, 0.05);
   --shadow: 0 2px 8px rgba(26, 24, 20, 0.08);
   --shadow-lg: 0 12px 36px rgba(26, 24, 20, 0.18);
+
+  /* Mid-stop du shimmer skeleton. border (#d8d2c2, ~oklch 0.86) sur
+   * surface-2 (#f0ede5, ~oklch 0.94) — delta ~0.08 oklch, une ondulation
+   * sable plus douce que --border-strong (qui flashait à 0.16 et cassait
+   * la sensation calme de l'editorial). Côté contraste perçu, on reste
+   * dans la même gamme que le shimmer studio. */
+  --skeleton-highlight: var(--border);
 
   --font-display: "Fraunces", "Georgia", "Times New Roman", serif;
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
