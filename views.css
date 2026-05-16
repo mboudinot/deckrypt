@@ -3530,7 +3530,7 @@ select.is-invalid:focus {
   .add-card-block { grid-template-columns: 1fr; }
 }
 
-/* --- Side panel: composition rows + bracket summary + activity stub --- */
+/* --- Side panel: composition rows + bracket summary --- */
 .composition-side {
   display: flex;
   flex-direction: column;

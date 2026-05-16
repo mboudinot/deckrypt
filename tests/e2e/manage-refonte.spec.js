@@ -399,6 +399,10 @@ test("Game Changer chip renders next to the name on a GC card row (Sol Ring)", a
   await expect(forestRow.locator(".gc-chip")).toHaveCount(0);
 });
 
-test("activity panel is a 'À venir' stub for now", async ({ page }) => {
-  await expect(page.locator(".manage-side .manage-side-placeholder")).toContainText("à venir");
+test("side panel holds Composition + Bracket only (Activité récente was dropped)", async ({ page }) => {
+  /* The third panel ("Activité récente") was a stub that we removed —
+   * the use-case (per-commit history feed) wasn't worth the
+   * persistence overhead vs how rarely the user would consult it.
+   * Lock the count so a future regression doesn't sneak it back. */
+  await expect(page.locator(".manage-side > .panel")).toHaveCount(2);
 });
