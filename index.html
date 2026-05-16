@@ -1297,12 +1297,12 @@
           </svg>
           Continuer avec Google
         </button>
-        <div class="divider">ou avec un email</div>
+        <div class="divider" id="login-divider">ou avec un email</div>
         <div class="field">
           <label for="login-email">Email</label>
           <input id="login-email" type="email" placeholder="jean.dupont@example.com" autocomplete="email" required>
         </div>
-        <div class="field">
+        <div class="field" id="login-pwd-field">
           <label for="login-pwd">Mot de passe</label>
           <div class="pwd-wrap">
             <input id="login-pwd" type="password" placeholder="•••••••••••" autocomplete="current-password" required>
@@ -1326,12 +1326,47 @@
           <span id="login-mode-prefix">Pas encore de compte ?</span>
           <a href="#" id="login-mode-toggle">S'inscrire</a>
         </div>
-        <p class="login-terms">
+        <p class="login-terms" id="login-terms-line">
           En continuant tu acceptes les
           <a href="#legal-mentions" data-legal-open="mentions">mentions légales</a>
           et la
           <a href="#legal-privacy" data-legal-open="privacy">politique de confidentialité</a>.
         </p>
+      </form>
+      <!-- Shown after a successful password-reset request. Neutral
+           wording avoids leaking whether an account exists for the
+           submitted address. -->
+      <div class="login-reset-success" id="login-reset-success" hidden>
+        <h1>Vérifie ta boîte mail</h1>
+        <p class="sub">Si un compte existe avec cet email, un lien de réinitialisation vient d'être envoyé. Le lien expire dans 1 heure.</p>
+        <p class="sub login-reset-success-hint">Pense à regarder dans tes spams si tu ne le vois pas arriver.</p>
+        <button type="button" class="btn primary btn-block btn-lg" id="login-reset-back">Retour à la connexion</button>
+      </div>
+      <!-- Shown when the user lands back on the app via the email
+           link (?mode=resetPassword&oobCode=…). The email is filled in
+           by Firebase's verifyPasswordResetCode response. -->
+      <form class="login-form login-reset-complete" id="login-reset-complete-form" hidden novalidate>
+        <h1>Nouveau mot de passe</h1>
+        <p class="sub">Choisis un nouveau mot de passe pour <strong id="login-reset-email-target"></strong>.</p>
+        <div class="field">
+          <label for="login-reset-new">Nouveau mot de passe</label>
+          <div class="pwd-wrap">
+            <input id="login-reset-new" type="password" placeholder="•••••••••••" autocomplete="new-password" minlength="8" required>
+            <button type="button" class="pwd-toggle" id="login-reset-new-toggle" aria-pressed="false">Voir</button>
+          </div>
+          <span class="hint">8 caractères minimum. Plus c'est long, mieux c'est.</span>
+        </div>
+        <div class="field">
+          <label for="login-reset-confirm">Confirmer le nouveau mot de passe</label>
+          <div class="pwd-wrap">
+            <input id="login-reset-confirm" type="password" placeholder="•••••••••••" autocomplete="new-password" required>
+            <button type="button" class="pwd-toggle" id="login-reset-confirm-toggle" aria-pressed="false">Voir</button>
+          </div>
+        </div>
+        <div class="login-error" id="login-reset-complete-error" role="alert" hidden></div>
+        <button type="submit" class="btn primary btn-block btn-lg" id="login-reset-complete-submit">
+          <span>Définir le nouveau mot de passe</span>
+        </button>
       </form>
     </main>
   </div>

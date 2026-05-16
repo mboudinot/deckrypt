@@ -32,6 +32,9 @@ import {
   reauthenticateWithCredential,
   reauthenticateWithPopup,
   deleteUser as fbDeleteUser,
+  sendPasswordResetEmail as fbSendPasswordResetEmail,
+  verifyPasswordResetCode as fbVerifyPasswordResetCode,
+  confirmPasswordReset as fbConfirmPasswordReset,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore,
@@ -54,6 +57,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+/* Firebase Auth sends transactional emails (verification, password
+ * reset) in English by default. Force French so the password-reset
+ * email lands in the user's language. The Console template language
+ * can still override this per template, but this covers the case
+ * where the FR template isn't configured. */
+auth.languageCode = "fr";
 const db = getFirestore(app);
 
 /* Neutral user shape — never expose Firebase's User object.
@@ -181,6 +190,52 @@ async function signInWithEmail(email, password) {
 async function signUpWithEmail(email, password) {
   const result = await createUserWithEmailAndPassword(auth, email, password);
   return toUser(result.user);
+}
+
+/* Password-reset flow. Three façade functions for the three steps:
+ *
+ *   1. sendPasswordReset(email)         — UI: user clicks "Mot de
+ *      passe oublié" on the login overlay, Firebase emails a reset
+ *      link with an `oobCode` query param. We pass an `actionCodeSettings`
+ *      so Firebase's hosted action page hands control back to our app
+ *      (mode=resetPassword&oobCode=… on index.html) instead of using
+ *      Firebase's generic page.
+ *
+ *   2. verifyPasswordResetCode(oobCode) — UI: user lands back on
+ *      index.html with ?mode=resetPassword&oobCode=…, we call this
+ *      before showing the new-password form to (a) reject bad/expired
+ *      codes early and (b) display the target email so the user sees
+ *      whose password they're resetting. Returns the email on success.
+ *
+ *   3. confirmPasswordReset(oobCode, newPassword) — UI: user submits
+ *      the new password. Firebase atomically validates the code and
+ *      sets the new password; on success we redirect the user to the
+ *      signin form with a success message.
+ *
+ * TEST_MODE short-circuits to keep e2e tests off the network — the
+ * test harness owns the auth state via window.__deckryptTestUser. */
+async function sendPasswordReset(email) {
+  if (TEST_MODE) return;
+  const actionCodeSettings = {
+    /* Where Firebase's action page redirects after a successful reset
+     * (we override the whole action page below, but ContinueUrl is a
+     * required field for the in-app handler flow). Must be on an
+     * authorized domain — `window.location.origin` always is by
+     * construction since the app loaded from it. */
+    url: window.location.origin + window.location.pathname,
+    handleCodeInApp: true,
+  };
+  await fbSendPasswordResetEmail(auth, email, actionCodeSettings);
+}
+
+async function verifyPasswordResetCode(oobCode) {
+  if (TEST_MODE) return "test@example.com";
+  return await fbVerifyPasswordResetCode(auth, oobCode);
+}
+
+async function confirmPasswordReset(oobCode, newPassword) {
+  if (TEST_MODE) return;
+  await fbConfirmPasswordReset(auth, oobCode, newPassword);
 }
 
 /* Update the user's display name (rendered as "Pseudo" in the
@@ -509,6 +564,9 @@ window.sync = {
   signInWithEmail,
   signUpWithEmail,
   signOut,
+  sendPasswordReset,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
   /* Profile */
   updateDisplayName,
   changePassword,

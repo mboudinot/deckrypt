@@ -2280,6 +2280,11 @@ html.auth-locked .login-close { display: none; }
   flex-direction: column;
   gap: 20px;
 }
+/* `.login-form-wrap` swaps which child is visible via the `hidden`
+ * attribute (login form, reset-success card, reset-complete form).
+ * Each child has its own `display:` value, so we need explicit
+ * overrides. */
+.login-form-wrap > [hidden] { display: none; }
 .login-form h1 {
   font-family: var(--font-display);
   font-size: 28px;
@@ -2447,6 +2452,16 @@ select.is-invalid:focus {
   color: var(--text-muted);
 }
 .field-row[hidden] { display: none; }
+/* The login form toggles entire pieces (.field, .divider, .google-btn,
+ * .login-terms) via the `hidden` attribute when switching between
+ * signin / signup / reset-request modes. Each of those has its own
+ * `display:` set elsewhere in this file, which wins over the UA
+ * stylesheet's `[hidden]` rule on specificity — so we need explicit
+ * `[hidden]` overrides at component level. */
+.login-form .field[hidden],
+.login-form .divider[hidden],
+.login-form .google-btn[hidden],
+.login-form .login-terms[hidden] { display: none; }
 .field-row a { color: var(--accent); text-decoration: none; }
 .field-row a:hover { text-decoration: underline; }
 .remember-me { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -2499,6 +2514,27 @@ select.is-invalid:focus {
   border-radius: var(--radius);
   font-size: 13px;
 }
+/* Same alert box reused as a one-shot success banner after a
+ * successful password reset (right after the user lands on signin
+ * with a fresh password). Same shape, success palette instead of
+ * error — the .login-success modifier wins over the base. */
+.login-error.login-success {
+  background: color-mix(in oklch, var(--success) 12%, transparent);
+  border-color: color-mix(in oklch, var(--success) 40%, transparent);
+  color: var(--success);
+}
+/* Reset-success card — replaces the form after a successful
+ * password-reset request. Layout matches the login form (vertical
+ * stack, centered text), with a single primary button to return. */
+.login-reset-success {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+.login-reset-success h1 { margin: 0; }
+.login-reset-success .sub { margin: 0; }
+.login-reset-success-hint { color: var(--text-muted); font-size: 13px; }
 
 .login-foot {
   text-align: center;
