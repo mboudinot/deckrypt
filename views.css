@@ -261,11 +261,49 @@
   border: 1px solid var(--border);
   cursor: zoom-in;
   flex-shrink: 0;
+  /* Anchor for the .skeleton / .skeleton-label children rendered when
+   * Scryfall didn't return a card for this row (typo on import etc.). */
+  position: relative;
 }
 .card-row-thumb img {
   width: 100%; height: 100%;
   object-fit: cover; display: block;
 }
+/* Skeleton fill used by `_buildCardRowThumb` when no image is available
+ * — same visual language as the play-view card placeholder, scaled for
+ * a 70 px (100 px for commanders) thumbnail. The shimmer suggests
+ * "data may still arrive"; for permanently unresolvable cards it still
+ * reads as "we don't have the art" without going alarming-red. */
+.card-row-thumb .skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.card-row-thumb .skeleton-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  line-height: 1.2;
+  padding: 4px;
+  word-break: break-word;
+  pointer-events: none;
+}
+#manage-commanders .card-row-thumb .skeleton-label { font-size: 0.7rem; padding: 6px; }
+/* Disabled thumb (unresolved card) keeps the skeleton readable —
+ * the global `.card-row-thumb:disabled { opacity: 0.6 }` would dim
+ * the label too far on a small 70 px tile. Stop the shimmer too:
+ * an infinite animation on a permanently unresolved row reads as
+ * "still loading" forever, which is misleading. */
+.card-row-thumb:disabled { opacity: 1; }
+.card-row-thumb:disabled .skeleton { animation: none; }
+.card-row-thumb:disabled .skeleton-label { color: var(--text-2); }
 .card-row-thumb:hover:not(:disabled) {
   background: rgba(0,0,0,0.3);
   color: var(--text);
@@ -645,11 +683,42 @@
   .analyze-row { grid-template-columns: 1fr; }
 }
 
-/* Bracket panel: big number + label + tooltip-style note. */
+/* Bracket panel.
+ *
+ *   Desktop  → flex row exactly like before, with the bracket-circle
+ *              pinned to the top of the panel instead of vertically
+ *              centred (`align-items: flex-start`). The accordion
+ *              stays inside .bracket-meta between title and note,
+ *              same layout as the original.
+ *   ≤ 720 px → switch to a 2-column grid and unwrap .bracket-meta via
+ *              `display: contents` so its children participate as
+ *              direct grid items. The accordion (or empty-state span)
+ *              then gets its own full-width row 3 below the
+ *              circle+title+note block, instead of being squeezed
+ *              into the column to the right of the circle. */
 .bracket-panel {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 24px;
+}
+.gc-count-empty { color: var(--text-muted); font-size: 0.85rem; }
+@media (max-width: 720px) {
+  .bracket-panel {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 14px;
+    align-items: start;
+  }
+  .bracket-panel > .bracket-meta { display: contents; }
+  .bracket-panel > .bracket-circle { grid-column: 1; grid-row: 1; }
+  .bracket-panel > .bracket-meta > .bracket-info-title { grid-column: 2; grid-row: 1; }
+  .bracket-panel > .bracket-meta > .note { grid-column: 2; grid-row: 2; }
+  .bracket-panel > .bracket-meta > .gc-details,
+  .bracket-panel > .bracket-meta > .gc-count-empty {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 4px;
+  }
 }
 /* Analyze view's bracket — large 88×88 circle anchoring the bracket
  * panel. Mirrors the mockup `.bracket-large` class; we kept the name
@@ -660,12 +729,12 @@
 .bracket-circle {
   position: relative;
   flex: 0 0 auto;
-  width: 88px; height: 88px;
+  width: 72px; height: 72px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 800;
   background: var(--surface-2);
   border: 3px solid var(--accent);
@@ -706,7 +775,6 @@
   font-size: 28px;
   font-weight: 400;
 }
-.bracket-meta .gc-count { color: var(--text-muted); font-size: 0.85rem; }
 .bracket-meta .note { color: var(--text-muted); font-size: 0.8rem; line-height: 1.4; }
 
 /* Game-changer accordion. Native <summary> bullet replaced by a
@@ -1122,7 +1190,11 @@
   color: var(--text);
 }
 
-/* Subtype list: pills with count badges, sorted by frequency. */
+/* Subtype list: read-only data tags, sorted by frequency. Visually
+ * flatter than the .theme-pill button right above this panel — no
+ * border, recessed bg, square shape and a non-accent count — so the
+ * user can tell at a glance which pills are clickable (themes) and
+ * which are pure metadata (subtypes). */
 .subtype-list {
   display: flex;
   flex-wrap: wrap;
@@ -1133,14 +1205,16 @@
   align-items: center;
   gap: 6px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.85rem;
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+  cursor: default;
 }
 .subtype-pill .count {
   font-weight: 600;
-  color: var(--accent);
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3413,13 +3487,97 @@ select.is-invalid:focus {
    ============================================================ */
 .play-layout {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 280px minmax(0, 1fr) 260px;
   gap: 16px;
   align-items: start;
 }
 @media (max-width: 960px) {
-  .play-layout { grid-template-columns: 1fr; }
+  .play-layout {
+    grid-template-columns: 1fr;
+    /* Room for the fixed action dock so the last block (hand /
+     * graveyard / commanders depending on scroll) doesn't sit
+     * under the dock. The exact value matches the dock's
+     * compact height + safe-area-inset (env() handled below). */
+    padding-bottom: 168px;
+  }
   .play-sidebar { position: static !important; }
+
+  /* On mobile, unwrap the right sidebar so its children (Actions +
+   * game-state) become direct grid items. Then reorder them so
+   * the game-state appears at the TOP of the mobile flow (between
+   * left sidebar and play-main) instead of being buried after the
+   * Hand. The .panel-game-state keeps its default .panel chrome
+   * (surface bg + border + radius + padding) so it reads as a
+   * sibling of the Commandants / Stats panels above it. */
+  .play-sidebar-right { display: contents; }
+  .play-sidebar  { order: -2; }
+  .panel-game-state { order: -1; }
+  .play-main { order: 0; }
+  /* Inner .game-state redesigned as a 3-tile grid on the panel's
+   * surface — same visual language as the .stat-box tiles inside
+   * the Stats panel just above. */
+  .panel-game-state .game-state {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+  .panel-game-state .game-state .game-state-tile {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+  }
+  .panel-game-state .game-state .game-state-tile .label { font-size: 10px; }
+  .panel-game-state .game-state .game-state-tile strong { font-size: 18px; }
+  .panel-game-state .game-state .game-state-sep { display: none; }
+
+  /* On mobile, pull the combined Actions panel out of the sidebar
+   * flow and pin it to the bottom of the viewport so the user can
+   * scroll the hand / battlefield freely while keeping every action
+   * one thumb-tap away. The buttons reflow horizontally to fit the
+   * narrow strip. */
+  .play-actions {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 50;
+    margin: 0;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    border: 0;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    background: color-mix(in oklch, var(--surface) 92%, transparent);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
+  }
+  /* Title row hidden in the dock — content is self-explanatory and
+   * we need every vertical pixel. */
+  .play-actions > .panel-head,
+  .play-actions .play-actions-sub-head,
+  .play-actions .play-actions-sep { display: none; }
+  /* Stack-to-row: 3 turn buttons share the strip width. */
+  .play-actions .actions-stack {
+    flex-direction: row;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .play-actions .actions-stack > .btn { flex: 1; min-width: 0; }
+  /* Basic lands flow on a single row with even spacing; if they
+   * don't all fit, they wrap to a 2nd line — the dock height grows
+   * accordingly and the .play-layout padding-bottom above keeps the
+   * last block clear (the variance is bounded: at most 2 rows). */
+  .play-actions .basic-lands {
+    justify-content: space-between;
+    gap: 6px;
+  }
 }
 .play-sidebar {
   display: flex;
@@ -3432,6 +3590,11 @@ select.is-invalid:focus {
 }
 .play-sidebar::-webkit-scrollbar { width: 6px; }
 .play-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* Right sidebar (Actions panel only). Sticky-pinned at the top of the
+ * viewport like the left sidebar so the user reaches the action
+ * buttons without scrolling. Doesn't get its own scroll bar since
+ * the single panel inside is typically short enough to fit. */
+.play-sidebar-right { overflow-y: visible; }
 .play-main {
   display: flex;
   flex-direction: column;
@@ -3439,7 +3602,10 @@ select.is-invalid:focus {
   min-width: 0;
 }
 
-/* Top game-state bar with Tour / Bibli. / Main tiles + action buttons */
+/* Game-state tiles (Tour / Bibli. / Main). Used standalone in the
+ * mobile flow at the top of play-main, AND inside the .panel-game-state
+ * panel in the desktop right sidebar (where it's restyled as a
+ * vertical list — see below). The base rules here cover the bar form. */
 .game-state {
   display: flex;
   align-items: center;
@@ -3449,6 +3615,34 @@ select.is-invalid:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   flex-wrap: wrap;
+}
+
+/* Desktop only: inside the right-sidebar panel the bar reads as a
+ * vertical list — label on the left, mono numeric value on the
+ * right, separators become 1 px borders between rows. Trims a lot
+ * of horizontal noise in the 224 px-wide inner panel. Mobile keeps
+ * the original horizontal bar form (see @media block below). */
+@media (min-width: 961px) {
+  .panel-game-state { padding: 12px; }
+  .panel-game-state .panel-head { margin-bottom: 8px; }
+  .panel-game-state .game-state {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .panel-game-state .game-state .game-state-tile {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+  }
+  .panel-game-state .game-state .game-state-tile:first-child { border-top: 0; padding-top: 0; }
+  .panel-game-state .game-state .game-state-sep { display: none; }
 }
 /* Tiles read at a glance: label on the left, big mono accent value
  * on the right, both on the same baseline. Match the design exactly
@@ -3528,21 +3722,63 @@ select.is-invalid:focus {
   gap: 8px;
 }
 
-/* Hand + Graveyard side by side. `min-width: 0` on the grid items
-   is critical: without it, the flex children inside the hand strip
-   refuse to shrink below their content width, and a 7-card opening
-   hand blows the 1fr column wide enough to push the graveyard off
-   the right edge of play-main. */
-.hand-row {
-  display: grid;
-  grid-template-columns: 1fr 200px;
-  gap: 14px;
-  align-items: start;
+/* Combined Actions panel — turn-level buttons + the basic-land grid
+ * live in one panel. On desktop it sits in the play-sidebar. On
+ * mobile, .play-actions pins itself to the bottom of the viewport
+ * (see @media block at the end of this section). */
+.play-actions-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0 12px;
 }
-.hand-row > section { min-width: 0; }
-@media (max-width: 720px) {
-  .hand-row { grid-template-columns: 1fr; }
+.play-actions-sub-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
 }
+.play-actions-sub-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--text-2);
+}
+[data-direction="editorial"] .play-actions-sub-title {
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.play-actions-sub-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Inside the combined panel, the basic-lands grid wraps to 2 rows
+ * in the 300px sidebar. justify-content: flex-start by default —
+ * keep it but let it wrap cleanly. */
+.play-actions .basic-lands { gap: 6px; }
+
+/* Commander zone: 2 commanders (partner) wouldn't fit side-by-side
+ * with the default `.card { width: 146px; }` in a 300px sidebar
+ * (2×146 + gap > inner panel width), so they stack to a column.
+ * Let cards shrink to share the row when there are multiple, capped
+ * at the natural 146px width when alone. */
+#commander-zone > .card {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 146px;
+}
+
+/* Main + Graveyard used to share a 2-col grid (`.hand-row`). Now
+ * stacked as siblings in `.play-main` so the play-main is one column
+ * top-to-bottom, freeing the 200 px on the right for the new right
+ * sidebar (Actions panel). The graveyard zone is full-width, with the
+ * stack left-aligned (see `.cards.graveyard-zone` further down). */
 
 /* Land buttons: small touch of motion on hover (translateY) */
 .land-btn:hover:not(:disabled) {
@@ -3605,9 +3841,16 @@ select.is-invalid:focus {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 14px;
-  min-height: 220px;
+  padding: 12px;
+  min-height: 170px;
 }
+/* Cards in the battlefield + lands zones shrink vs the default 146 px
+ * — the user needs to see what's in play but doesn't need each card
+ * at full readability size (the hand strip below still uses 146 px so
+ * the cards you're about to play stay scannable). Lets twice as many
+ * permanents fit per row and reduces vertical pressure when the zone
+ * has just a few cards. */
+.cards.play-zone > .card { width: 116px; }
 
 /* Hand strip: free-floating row(s) of cards, no bordered box.
    Cards wrap to a new line when they don't fit on a single row —
@@ -3624,7 +3867,7 @@ select.is-invalid:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: flex-start;
+  justify-content: center;
   min-height: 0;
   min-width: 0;
 }
@@ -3632,22 +3875,31 @@ select.is-invalid:focus {
 .cards.hand-strip::-webkit-scrollbar { height: 8px; }
 .cards.hand-strip::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
 
-/* Graveyard zone: narrow column showing a real pile — top card on
-   top, up to two backing cards rotated and dimmed behind it. Like
-   the hand strip next to it, the design intentionally drops the
-   bordered surface here so the pile sits directly on the page and
-   the two zones share the same visual baseline. */
+/* Graveyard zone: pile preview (top card + up to two backing cards
+ * rotated/dimmed behind it). Lives in the left sidebar's compact
+ * `.panel-graveyard` panel — see below. The transparent background
+ * lets the surrounding panel's surface bleed through. */
 .cards.graveyard-zone {
   background: transparent;
   border: 0;
   border-radius: 0;
-  padding: 4px 0 12px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   min-height: 0;
 }
+
+/* Compact graveyard panel — the stack only needs to show one card at
+ * a glance, so we shrink the default 146 px down to 110 px and trim
+ * the panel padding so the empty whitespace doesn't dominate the
+ * left sidebar column. The aspect-ratio on .graveyard-stack keeps
+ * the card proportions automatic. */
+.panel-graveyard { padding: 12px; }
+.panel-graveyard .panel-head { margin-bottom: 8px; }
+.panel-graveyard .graveyard-stack,
+.panel-graveyard .graveyard-empty-slot { width: 110px; }
 .graveyard-stack {
   position: relative;
   width: 146px;

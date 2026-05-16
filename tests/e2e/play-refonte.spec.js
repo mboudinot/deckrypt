@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { mockAuth, mockScryfall, seedSultaiDeck } from "./_helpers.js";
 
-/* Play view refonte: 2-column .play-layout (sidebar + main),
- * top .game-state bar with Tour / Bibli. / Main tiles + 3 action
- * buttons, .panel sections, basic lands rendered as .land-btn
- * pills inside a bottom panel. */
+/* Play view: 3-column .play-layout (left sidebar | play-main |
+ * right sidebar). Left holds commanders + hand stats + graveyard
+ * preview; play-main holds battlefield + lands + hand; right
+ * holds the Actions panel (turn buttons + basic lands) and the
+ * game-state tiles. */
 
 test.beforeEach(async ({ page }) => {
   await mockScryfall(page);
@@ -14,16 +15,19 @@ test.beforeEach(async ({ page }) => {
   await page.locator("#commander-zone .card").first().waitFor();
 });
 
-test("2-column layout: play-sidebar on the left, play-main on the right", async ({ page }) => {
-  const sidebar = await page.locator(".play-sidebar").boundingBox();
+test("3-column layout: left sidebar | play-main | right sidebar", async ({ page }) => {
+  const left = await page.locator(".play-sidebar:not(.play-sidebar-right)").boundingBox();
   const main = await page.locator(".play-main").boundingBox();
-  expect(sidebar).not.toBeNull();
+  const right = await page.locator(".play-sidebar-right").boundingBox();
+  expect(left).not.toBeNull();
   expect(main).not.toBeNull();
-  expect(sidebar.x).toBeLessThan(main.x);
+  expect(right).not.toBeNull();
+  expect(left.x).toBeLessThan(main.x);
+  expect(main.x).toBeLessThan(right.x);
 });
 
-test("game-state bar sits at the very top of the main column with Tour / Bibli. / Main tiles", async ({ page }) => {
-  const gameState = page.locator(".game-state");
+test("game-state tiles (Tour / Bibli. / Main) render in the right sidebar", async ({ page }) => {
+  const gameState = page.locator(".panel-game-state .game-state");
   await expect(gameState).toBeVisible();
   /* Three tiles, each with a numeric strong. */
   await expect(gameState.locator(".game-state-tile")).toHaveCount(3);
@@ -56,16 +60,20 @@ test("tour suivant increments the game-state turn counter", async ({ page }) => 
   ).toBe(before + 1);
 });
 
-test("commanders + hand stats + actions live in the play-sidebar (per-view, not global)", async ({ page }) => {
-  /* All three sidebar panels are descendants of .play-sidebar. */
-  await expect(page.locator(".play-sidebar #commander-zone")).toBeVisible();
-  await expect(page.locator(".play-sidebar #stat-lands")).toBeVisible();
-  await expect(page.locator(".play-sidebar #btn-draw")).toBeVisible();
+test("left sidebar holds commanders + stats + graveyard; right sidebar holds actions + game-state (per-view, not global)", async ({ page }) => {
+  /* Left sidebar = .play-sidebar without .play-sidebar-right; the
+   * locator excludes the right one to keep assertions unambiguous. */
+  await expect(page.locator(".play-sidebar:not(.play-sidebar-right) #commander-zone")).toBeVisible();
+  await expect(page.locator(".play-sidebar:not(.play-sidebar-right) #stat-lands")).toBeVisible();
+  await expect(page.locator(".play-sidebar:not(.play-sidebar-right) #graveyard")).toBeVisible();
+  await expect(page.locator(".play-sidebar-right #btn-draw")).toBeVisible();
+  await expect(page.locator(".play-sidebar-right #game-state-turn")).toBeVisible();
 
-  /* Switching to manage hides the play view (including its sidebar);
-   * the old shared sidebar would have stayed visible across views. */
+  /* Switching to manage hides both sidebars — the old shared sidebar
+   * would have stayed visible across views. */
   await page.click("#tab-manage");
-  await expect(page.locator(".play-sidebar")).toBeHidden();
+  await expect(page.locator(".play-sidebar:not(.play-sidebar-right)")).toBeHidden();
+  await expect(page.locator(".play-sidebar-right")).toBeHidden();
 });
 
 test("basic lands appear in a bottom panel with .land-btn pills, one per deck color", async ({ page }) => {
@@ -118,10 +126,11 @@ test("primary .btn hover stays on the accent ramp (active CTA still flips)", asy
 });
 
 test("each play zone has a .play-section-head ABOVE its container (label sits outside the box)", async ({ page }) => {
-  /* The new pattern: <section.play-section> → header + cards
-   * (separate siblings). The header should render above the
-   * bordered container, not inside it. */
-  for (const zoneId of ["battlefield", "lands", "hand", "graveyard"]) {
+  /* The play-main zones (battlefield, lands, hand) use the
+   * <section.play-section> → header + cards pattern. Graveyard
+   * lives in the left sidebar in a .panel container now, so it
+   * isn't part of this check. */
+  for (const zoneId of ["battlefield", "lands", "hand"]) {
     const section = page.locator(`#${zoneId}`).locator("xpath=ancestor::section[1]");
     await expect(section.locator(".play-section-head .title")).toBeVisible();
     const headBox = await section.locator(".play-section-head").boundingBox();
@@ -145,14 +154,16 @@ test("hand wraps to a second row instead of overflowing the column (regression)"
   expect(handBox.x + handBox.width).toBeLessThanOrEqual(playMain.x + playMain.width + 1);
 });
 
-test("graveyard stays aligned with play-main right edge regardless of hand size (regression)", async ({ page }) => {
-  /* Empty graveyard + 7-card hand was the worst case — the
-   * graveyard appeared 356px past play-main's right edge. With
-   * the wrap + min-width: 0 fix, it now sits flush. */
+test("graveyard lives in the left sidebar (not in play-main) and stays a compact preview", async ({ page }) => {
+  /* The graveyard pile used to sit beside the hand inside play-main
+   * and frequently overflowed past its right edge on 7-card hands.
+   * Moved to the left sidebar as a .panel-graveyard preview — the
+   * regression now becomes "is it still in the right column?". */
+  const left = await page.locator(".play-sidebar:not(.play-sidebar-right)").boundingBox();
   const playMain = await page.locator(".play-main").boundingBox();
   const graveBox = await page.locator("#graveyard").boundingBox();
-  /* delta should be 0; allow 2px for sub-pixel rounding. */
-  expect(Math.abs((playMain.x + playMain.width) - (graveBox.x + graveBox.width))).toBeLessThanOrEqual(2);
+  expect(graveBox.x).toBeLessThan(playMain.x);
+  expect(graveBox.x).toBeGreaterThanOrEqual(left.x);
 });
 
 test("tapped card shows an 'ENGAGÉ' banner via ::after", async ({ page }) => {

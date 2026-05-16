@@ -592,10 +592,14 @@ function renderBracket(deck) {
   label.textContent = est.label;
   meta.appendChild(label);
 
+  /* Desktop: GC accordion sits inside the meta column flow between the
+   * title and the note (the original layout). Mobile flips this with
+   * `display: contents` so the accordion can break out to a full-width
+   * row below the circle+title+note block — see views.css. */
   const gcs = gameChangers(deck);
   if (gcs.length === 0) {
     const empty = document.createElement("span");
-    empty.className = "gc-count";
+    empty.className = "gc-count gc-count-empty";
     empty.textContent = "Aucun Game Changer dans le deck.";
     meta.appendChild(empty);
   } else {

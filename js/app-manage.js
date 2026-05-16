@@ -264,14 +264,25 @@ function _buildCardRowThumb(entry, resolvedCard) {
     img.alt = "";
     img.loading = "lazy";
     thumb.appendChild(img);
+  } else {
+    // Card hasn't been resolved by Scryfall (typo on import → "Inconnu"
+    // bucket, or fetch still pending). Mirror the play-view skeleton
+    // pattern: shimmer background + card name centered, so the row's
+    // thumb identifies the missing card at a glance instead of showing
+    // an empty dark rectangle.
+    const skel = document.createElement("div");
+    skel.className = "skeleton";
+    thumb.appendChild(skel);
+    const lbl = document.createElement("div");
+    lbl.className = "skeleton-label";
+    lbl.textContent = entry.name;
+    thumb.appendChild(lbl);
   }
   if (resolvedCard) {
     thumb.title = `Agrandir ${entry.name}`;
     thumb.setAttribute("aria-label", `Agrandir ${entry.name}`);
     thumb.addEventListener("click", () => showModal(resolvedCard, []));
   } else {
-    // Card hasn't been resolved by Scryfall yet (or not at all). The
-    // button stays in the tab order for consistency but does nothing.
     thumb.disabled = true;
     thumb.setAttribute("aria-label", `Image indisponible pour ${entry.name}`);
   }

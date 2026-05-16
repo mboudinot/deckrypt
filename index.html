@@ -239,7 +239,52 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section class="panel panel-graveyard">
+            <div class="panel-head">
+              <h3>Cimetière</h3>
+              <span class="panel-meta" id="graveyard-info">vide</span>
+            </div>
+            <div class="cards graveyard-zone" id="graveyard"></div>
+          </section>
+
+        </aside>
+
+        <main class="play-main">
+          <section class="play-section">
+            <div class="play-section-head">
+              <span class="title">Champ de bataille</span>
+              <span class="meta" id="battlefield-info">vide</span>
+            </div>
+            <div class="cards play-zone" id="battlefield"></div>
+          </section>
+
+          <section class="play-section">
+            <div class="play-section-head">
+              <span class="title">Terrains</span>
+              <span class="meta" id="lands-info">vide</span>
+            </div>
+            <div class="cards play-zone" id="lands"></div>
+          </section>
+
+          <section class="play-section">
+            <div class="play-section-head">
+              <span class="title">Main</span>
+              <span class="meta" id="hand-info" aria-live="polite">—</span>
+            </div>
+            <div class="cards hand-strip" id="hand"></div>
+          </section>
+
+        </main>
+
+        <!-- Right sidebar: the combined Actions panel (turn-level
+             buttons + basic-land grid). Living on its own column on
+             desktop keeps the play-main free for the gameplay zones,
+             and makes the buttons reachable without scrolling the
+             left sidebar. On mobile the @media block in views.css
+             pulls this panel out of the grid and pins it to the
+             viewport bottom via `position: fixed`. -->
+        <aside class="play-sidebar play-sidebar-right">
+          <section class="panel play-actions">
             <div class="panel-head">
               <h3>Actions</h3>
             </div>
@@ -264,70 +309,38 @@
                 Nouvelle main
               </button>
             </div>
-          </section>
-        </aside>
-
-        <main class="play-main">
-          <!-- Game state bar: status + actions, always visible at the top. -->
-          <div class="game-state">
-            <div class="game-state-tile">
-              <span class="label">Tour</span>
-              <strong class="num" id="game-state-turn">—</strong>
-            </div>
-            <span class="game-state-sep" aria-hidden="true"></span>
-            <div class="game-state-tile">
-              <span class="label">Bibli.</span>
-              <strong class="num" id="game-state-library">—</strong>
-            </div>
-            <span class="game-state-sep" aria-hidden="true"></span>
-            <div class="game-state-tile">
-              <span class="label">Main</span>
-              <strong class="num" id="game-state-hand">—</strong>
-            </div>
-          </div>
-
-          <section class="play-section">
-            <div class="play-section-head">
-              <span class="title">Champ de bataille</span>
-              <span class="meta" id="battlefield-info">vide</span>
-            </div>
-            <div class="cards play-zone" id="battlefield"></div>
-          </section>
-
-          <section class="play-section">
-            <div class="play-section-head">
-              <span class="title">Terrains</span>
-              <span class="meta" id="lands-info">vide</span>
-            </div>
-            <div class="cards play-zone" id="lands"></div>
-          </section>
-
-          <div class="hand-row">
-            <section class="play-section">
-              <div class="play-section-head">
-                <span class="title">Main</span>
-                <span class="meta" id="hand-info" aria-live="polite">—</span>
-              </div>
-              <div class="cards hand-strip" id="hand"></div>
-            </section>
-
-            <section class="play-section">
-              <div class="play-section-head">
-                <span class="title">Cimetière</span>
-                <span class="meta" id="graveyard-info">vide</span>
-              </div>
-              <div class="cards graveyard-zone" id="graveyard"></div>
-            </section>
-          </div>
-
-          <section class="panel">
-            <div class="panel-head">
-              <h3>Jouer un terrain de base</h3>
-              <span class="panel-meta">depuis la pioche</span>
+            <div class="play-actions-sep" aria-hidden="true"></div>
+            <div class="play-actions-sub-head">
+              <span class="play-actions-sub-title">Jouer un terrain de base</span>
+              <span class="play-actions-sub-meta">depuis la pioche</span>
             </div>
             <div class="basic-lands" id="basic-lands" role="group" aria-label="Boutons d'ajout d'un terrain de base"></div>
           </section>
-        </main>
+
+          <!-- Game-state tiles (Tour / Bibli. / Main). Below the Actions
+               panel on desktop — flipped to a vertical "label → value"
+               list via CSS to fit the narrow column. On mobile, grid
+               order pulls this block up to the top of the flow and
+               restores the original horizontal bar form. -->
+          <section class="panel panel-game-state">
+            <div class="game-state">
+              <div class="game-state-tile">
+                <span class="label">Tour</span>
+                <strong class="num" id="game-state-turn">—</strong>
+              </div>
+              <span class="game-state-sep" aria-hidden="true"></span>
+              <div class="game-state-tile">
+                <span class="label">Bibli.</span>
+                <strong class="num" id="game-state-library">—</strong>
+              </div>
+              <span class="game-state-sep" aria-hidden="true"></span>
+              <div class="game-state-tile">
+                <span class="label">Main</span>
+                <strong class="num" id="game-state-hand">—</strong>
+              </div>
+            </div>
+          </section>
+        </aside>
 
       </div>
     </div>

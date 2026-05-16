@@ -622,7 +622,17 @@ section {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
-  min-height: 200px;
+  /* `align-items: flex-start` empêche le stretch vertical des cards
+   * quand `.cards` est plus haut qu'elles (cas mobile où la carte
+   * passe à 110×153 px via aspect-ratio + ancien `min-height: 200`
+   * → stretch à 110×200 → aspect cassé → `object-fit: cover` crop
+   * les bords gauche/droit. Symptôme : "Ukkima" affiché "kkima"). */
+  align-items: flex-start;
+  /* Pas de `min-height` ici — il n'était utile que pour `.play-zone`
+   * (battlefield/lands en tant que zones de drop visibles) et celui-là
+   * a déjà son propre `min-height: 220 px`. Sur `#commander-zone` qui
+   * utilise juste `.cards`, le min-height créait juste un espace
+   * blanc sous les commandants en mobile. */
 }
 /* Skeleton placeholders shown while a deck resolves on a cold cache.
    Shimmer animation tells the user something's loading without the
