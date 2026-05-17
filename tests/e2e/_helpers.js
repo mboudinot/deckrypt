@@ -118,12 +118,20 @@ export async function mockScryfall(page) {
          * list; using them keeps the mock realistic. */
         const GAME_CHANGERS = new Set(["Sol Ring", "Rhystic Study"]);
         const isGameChanger = id.name && GAME_CHANGERS.has(id.name);
+        /* `colors` mirrors a card's printed colour (mana cost), used
+         * by the gallery color filter. Real cards: basic lands have
+         * colors=[] (no mana cost), most spells have colors matching
+         * their cost. The mock only sets it for commanders (so the
+         * Multi chip in the gallery toolbar has something to match);
+         * everything else is colourless, which lines up with how
+         * basic lands + colourless artifacts behave in reality. */
+        const colors = isCommander ? SEEDED_COMMANDERS.get(id.name) : [];
         return {
           name: id.name || `Test Card ${cn}`,
           set, collector_number: cn,
           cmc: 1,
           type_line: typeLine,
-          colors: [],
+          colors,
           color_identity: colorIdentity,
           produced_mana: producedMana,
           image_uris: fakeImageUris(set, cn),

@@ -1,42 +1,46 @@
-/* Sliding indicator under the top nav.
+/* Sliding indicator under a row of segmented controls.
  *
- * A single absolutely-positioned <span> tracks the active tab and
- * slides between siblings on hover. The visual (pill in Studio,
- * 2px underline in Editorial) is carried by the indicator; the
- * native .nav-tab.active rules in components.css are the fallback
- * when this script is absent (no .has-indicator class on .nav).
+ * A single absolutely-positioned <span> tracks the active item and
+ * slides between siblings on hover. The visual (pill / underline /
+ * chip-bg, depending on the surface) is carried by the indicator;
+ * the native `.active` rules in CSS are the fallback when this
+ * script is absent (no `.has-indicator` class on the container).
  *
- * Active-class changes are detected via MutationObserver rather
- * than coupling to switchView(), so clicks, keyboard nav, or any
- * future programmatic switch updates the indicator without extra
- * wiring.
+ * `setupSlidingIndicator(container, opts)` is the generic helper —
+ * used by both the top nav (pill / underline under .nav-tab) and the
+ * gallery toolbar chip groups (pill under .gallery-chip). Active-
+ * class changes are observed via MutationObserver so clicks /
+ * keyboard / programmatic switches all re-anchor the indicator
+ * without extra wiring.
  *
- * Exposed: window-global function setupNavIndicator(), called by
- * app.js init() per the project's load-order pattern (see
- * project_app_js_size memory).
- */
-function setupNavIndicator() {
-  const nav = document.querySelector(".nav");
-  if (!nav) return;
-  const tabs = Array.from(nav.querySelectorAll(".nav-tab"));
-  if (tabs.length === 0) return;
+ * Exposed: window-globals `setupNavIndicator` (called once from
+ * app.js init) and `setupSlidingIndicator` (called per chip group
+ * by app-gallery.js after each toolbar rebuild). */
+function setupSlidingIndicator(container, opts = {}) {
+  if (!container) return;
+  const itemSelector = opts.itemSelector || ".nav-tab";
+  const indicatorClass = opts.indicatorClass || "nav-indicator";
+  const activeClass = opts.activeClass || "active";
+
+  const items = Array.from(container.querySelectorAll(itemSelector));
+  if (items.length === 0) return;
 
   const indicator = document.createElement("span");
-  indicator.className = "nav-indicator";
+  indicator.className = indicatorClass;
   indicator.setAttribute("aria-hidden", "true");
-  nav.insertBefore(indicator, nav.firstChild);
-  nav.classList.add("has-indicator");
+  container.insertBefore(indicator, container.firstChild);
+  container.classList.add("has-indicator");
 
-  function positionOn(tab) {
-    if (!tab) return;
-    const navRect = nav.getBoundingClientRect();
-    const tabRect = tab.getBoundingClientRect();
-    indicator.style.width = `${tabRect.width}px`;
-    indicator.style.transform = `translateX(${tabRect.left - navRect.left}px)`;
+  function positionOn(item) {
+    if (!item) return;
+    const cRect = container.getBoundingClientRect();
+    const iRect = item.getBoundingClientRect();
+    indicator.style.width = `${iRect.width}px`;
+    indicator.style.transform = `translateX(${iRect.left - cRect.left}px)`;
   }
 
   function positionOnActive() {
-    positionOn(nav.querySelector(".nav-tab.active"));
+    positionOn(container.querySelector(`${itemSelector}.${activeClass}`));
   }
 
   /* requestAnimationFrame gives the inline-flex layout a chance to
@@ -45,41 +49,39 @@ function setupNavIndicator() {
    * flex container, especially under a defer-script load order. */
   requestAnimationFrame(positionOnActive);
 
-  for (const tab of tabs) {
-    tab.addEventListener("mouseenter", () => positionOn(tab));
+  for (const item of items) {
+    item.addEventListener("mouseenter", () => positionOn(item));
   }
-  /* Listening on the whole nav (not per-tab) avoids races between
-   * a leave-from-A and an enter-on-B firing in either order. */
-  nav.addEventListener("mouseleave", positionOnActive);
+  /* Listening on the whole container (not per-item) avoids races
+   * between a leave-from-A and an enter-on-B firing in either order. */
+  container.addEventListener("mouseleave", positionOnActive);
 
-  /* Re-sync when .active moves (clicks, keyboard, switchView, etc).
-   * Skip while the pointer is inside the nav so the indicator stays
-   * on the hover target instead of snapping back. */
   /* Active-class flips (click, keyboard, programmatic switchView)
-   * don't necessarily resize the nav, so ResizeObserver wouldn't
-   * catch them — we still need a MutationObserver on the tabs. */
+   * don't necessarily resize the container, so ResizeObserver
+   * wouldn't catch them — we still need a MutationObserver on the
+   * items. Skip while the pointer is inside the container so the
+   * indicator stays on the hover target instead of snapping back. */
   const classObserver = new MutationObserver(() => {
-    if (!nav.matches(":hover")) positionOnActive();
+    if (!container.matches(":hover")) positionOnActive();
   });
-  for (const tab of tabs) {
-    classObserver.observe(tab, { attributes: true, attributeFilter: ["class"] });
+  for (const item of items) {
+    classObserver.observe(item, { attributes: true, attributeFilter: ["class"] });
   }
 
-  /* ResizeObserver covers every reflow that shifts tab geometry:
-   *   - theme switch (Studio ↔ Editorial change .nav padding/gap and
-   *     .nav-tab padding/font-size);
-   *   - web-font load completion (Fraunces in Editorial swaps in from
-   *     the Georgia fallback after Google Fonts arrives, changing
-   *     text metrics and therefore tab widths — caught by CI as a
-   *     theme-switch flake before this observer was wired in);
-   *   - viewport resize that reflows nav contents.
-   *
-   * ResizeObserver fires AFTER the layout pass by contract, so no
-   * rAF dance is needed — the measurements we read inside the
-   * callback are guaranteed up-to-date. */
+  /* ResizeObserver covers every reflow that shifts item geometry
+   * (theme switch, web-font load completion, viewport resize). It
+   * fires AFTER the layout pass by contract, so no rAF dance needed
+   * — the measurements we read are guaranteed up-to-date. */
   const sizeObserver = new ResizeObserver(() => {
-    const hovered = nav.querySelector(".nav-tab:hover");
-    positionOn(hovered || nav.querySelector(".nav-tab.active"));
+    const hovered = container.querySelector(`${itemSelector}:hover`);
+    positionOn(hovered || container.querySelector(`${itemSelector}.${activeClass}`));
   });
-  sizeObserver.observe(nav);
+  sizeObserver.observe(container);
+}
+
+function setupNavIndicator() {
+  setupSlidingIndicator(document.querySelector(".nav"), {
+    itemSelector: ".nav-tab",
+    indicatorClass: "nav-indicator",
+  });
 }

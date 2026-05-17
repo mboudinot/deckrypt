@@ -206,6 +206,7 @@ function _cacheAnalyzeElements() {
 
 function _cacheGalleryElements() {
   els.galleryContent = document.getElementById("gallery-content");
+  els.galleryToolbar = document.getElementById("gallery-toolbar");
 }
 
 function _cacheModalElements() {

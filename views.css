@@ -1565,7 +1565,11 @@
   position: absolute;
   inset: auto 0 0 0;
   background: linear-gradient(0deg, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0));
-  color: var(--text);
+  /* Hardcoded white: the cap rides on a fixed dark gradient overlay
+   * regardless of theme, so var(--text) (dark in editorial) would
+   * vanish into the gradient. Same theme-invariant treatment as
+   * .gallery-tile-qty. */
+  color: #fff;
   padding: 12px 8px 6px;
   font-size: 0.72rem;
   font-weight: 600;
@@ -2005,6 +2009,164 @@ html:has(.modal-backdrop:not([hidden])) {
    lazy-loaded so the gallery is cheap to pre-render: nothing
    fetches until the user actually opens the Galerie tab.
    ============================================================ */
+/* Toolbar above the gallery groups: search + type chips + color chips
+ * + counter. Mirrors the claude.design view-gallery mockup —
+ * each chip group sits in its own framed `.gallery-toolbar-chips`
+ * wrapper (surface bg + border + radius + tight padding), and the
+ * chips inside are transparent until active. Same segmented pattern
+ * as `.lang-switch`. Empty when the deck is empty — and the
+ * `.view-empty > :not(.view-empty-state)` rule above hides it
+ * whenever the whole gallery is in its empty-state. */
+.gallery-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.gallery-toolbar:empty { display: none; }
+.gallery-toolbar-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 240px;
+  min-width: 180px;
+}
+.gallery-toolbar-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.gallery-toolbar-search input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 32px 8px 34px;
+  color: var(--text);
+  font-size: 13px;
+}
+.gallery-toolbar-search input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+/* Clear button — inline on the right, only when the input has content.
+ * Uses `:placeholder-shown + .clear` to hide it while the input is
+ * empty (no JS toggle needed). */
+.gallery-toolbar-search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.gallery-toolbar-search-clear:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.gallery-toolbar-search input:placeholder-shown + .gallery-toolbar-search-clear {
+  display: none;
+}
+.gallery-toolbar-chips {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px;
+}
+.gallery-chip {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+/* Non-indicator fallback (script absent / not yet attached): static
+ * hover + active backgrounds carry the affordance themselves. */
+.gallery-chip:hover:not(.active):not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.gallery-chip.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.gallery-chip.active:hover { background: var(--accent-2); }
+.gallery-chip .pip-dot { width: 10px; height: 10px; }
+
+/* Sliding chip indicator — same pattern as `.nav-indicator`. A single
+ * absolutely-positioned pill carries the accent bg; the chips above
+ * hand off their `.active` background (color stays for readability).
+ * Wired by setupSlidingIndicator in js/nav-indicator.js per chip
+ * group. */
+.chip-indicator {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  width: 0;
+  height: calc(100% - 6px);
+  background: var(--accent);
+  border-radius: var(--radius);
+  transform: translateX(0);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+.gallery-toolbar-chips.has-indicator .gallery-chip.active,
+.gallery-toolbar-chips.has-indicator .gallery-chip.active:hover {
+  background: transparent;
+}
+.gallery-toolbar-chips.has-indicator .gallery-chip:hover:not(:disabled) {
+  background: transparent;
+  color: var(--accent-text);
+}
+/* Same text-color shuffle as the nav: while the group is hovered,
+ * the indicator slides to the cursor; the active chip (if not the
+ * hover target) loses its accent-text combo and would vanish on the
+ * neutral group bg — show it as readable neutral text instead. */
+.gallery-toolbar-chips.has-indicator:hover .gallery-chip.active:not(:hover) {
+  color: var(--text);
+}
+.gallery-toolbar-chips.has-indicator:hover .gallery-chip:hover:not(:disabled) {
+  color: var(--accent-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-indicator { transition: none; }
+}
+.gallery-toolbar-count {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.gallery-toolbar-count .num { color: var(--text); }
+
 /* Gallery groups are panels — same `.panel` look as the analyze view.
  * The `gap` lives on #gallery-content (the direct parent of the group
  * sections) because `.gallery-area` only has one child (#gallery-content)

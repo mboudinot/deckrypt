@@ -81,3 +81,117 @@ test("Galerie is pre-rendered before its first tab click (instant switch)", asyn
    * cycle. */
   await expect(page.locator("#gallery-content .gallery-tile").first()).toBeAttached();
 });
+
+/* Toolbar — search + type chips + color chips + counter.
+ * Mirrors the claude.design view-gallery toolbar, but kept on top
+ * of the existing type-grouped panels (filters hide non-matching
+ * panels rather than flattening the grid). */
+
+test("toolbar renders with search, type chips, color chips and counter", async ({ page }) => {
+  await page.click("#tab-gallery");
+  const toolbar = page.locator("#gallery-toolbar");
+  await expect(toolbar).toBeVisible();
+  await expect(toolbar.locator(".gallery-toolbar-search input")).toBeVisible();
+  /* Two chip groups: type + color. Each has a "Tous types" / "Toutes"
+   * default chip in active state, plus one chip per type/color
+   * present in the deck. */
+  const groups = toolbar.locator(".gallery-toolbar-chips");
+  await expect(groups).toHaveCount(2);
+  await expect(toolbar.locator(".gallery-chip.active", { hasText: "Tous types" })).toHaveCount(1);
+  await expect(toolbar.locator(".gallery-chip.active", { hasText: "Toutes" })).toHaveCount(1);
+  /* Counter "X / Y cartes" with X == Y at rest. */
+  const count = await toolbar.locator(".gallery-toolbar-count").textContent();
+  const match = count.match(/^(\d+)\s*\/\s*(\d+)\s*cartes$/);
+  expect(match).not.toBeNull();
+  expect(match[1]).toBe(match[2]);
+});
+
+test("type chip narrows panels and updates counter", async ({ page }) => {
+  await page.click("#tab-gallery");
+  /* Click the "Terrains" chip — only the Lands panel should remain. */
+  await page.locator("#gallery-toolbar .gallery-chip", { hasText: "Terrains" }).click();
+  const titles = await page.locator("#gallery-content .panel-head h3").allTextContents();
+  expect(titles).toEqual(["Terrains"]);
+  /* Counter X should equal the sum of land qty (Forest 5 + Island 6
+   * + Swamp 6 = 17 in the seeded Sultai fixture). The denominator
+   * stays the deck total. */
+  const count = await page.locator("#gallery-toolbar .gallery-toolbar-count").textContent();
+  const [, x, y] = count.match(/^(\d+)\s*\/\s*(\d+)\s*cartes$/);
+  expect(parseInt(x, 10)).toBe(17);
+  expect(parseInt(y, 10)).toBeGreaterThan(parseInt(x, 10));
+});
+
+test("color Multi chip keeps only the commanders panel", async ({ page }) => {
+  /* The two seeded commanders are the only cards with `colors.length
+   * >= 2` (UB + BG). Everything else has colors=[] in the mock, so
+   * Multi narrows the gallery to just Commandants. */
+  await page.click("#tab-gallery");
+  await page.locator("#gallery-toolbar .gallery-chip", { hasText: /^Multi$/ }).click();
+  const titles = await page.locator("#gallery-content .panel-head h3").allTextContents();
+  expect(titles).toEqual(["Commandants"]);
+  const count = await page.locator("#gallery-toolbar .gallery-toolbar-count").textContent();
+  expect(count).toMatch(/^2\s*\//);
+});
+
+test("search filters by name and updates counter", async ({ page }) => {
+  await page.click("#tab-gallery");
+  const input = page.locator("#gallery-toolbar .gallery-toolbar-search input");
+  await input.fill("sol");
+  /* Only Sol Ring matches "sol" (case-insensitive) in the Sultai
+   * deck. Panels collapse to a single Creature (the mock types every
+   * non-land as Creature, including Sol Ring). */
+  const tiles = page.locator("#gallery-content .gallery-tile");
+  await expect(tiles).toHaveCount(1);
+  await expect(tiles.first()).toHaveAttribute("title", "Sol Ring");
+  const count = await page.locator("#gallery-toolbar .gallery-toolbar-count").textContent();
+  expect(count).toMatch(/^1\s*\//);
+  /* Erasing the search restores the full gallery. */
+  await input.fill("");
+  await expect(page.locator("#gallery-content .gallery-tile").first()).toBeVisible();
+});
+
+test("clear button wipes the search and re-applies filters", async ({ page }) => {
+  await page.click("#tab-gallery");
+  const input = page.locator("#gallery-toolbar .gallery-toolbar-search input");
+  const clear = page.locator("#gallery-toolbar .gallery-toolbar-search-clear");
+  /* Clear button is hidden while the input is empty (CSS via
+   * :placeholder-shown). Becomes visible as soon as the user types. */
+  await expect(clear).toBeHidden();
+  await input.fill("sol");
+  await expect(clear).toBeVisible();
+  await expect(page.locator("#gallery-content .gallery-tile")).toHaveCount(1);
+  await clear.click();
+  await expect(input).toHaveValue("");
+  await expect(clear).toBeHidden();
+  /* Full gallery is back after the wipe. */
+  expect(await page.locator("#gallery-content .gallery-tile").count()).toBeGreaterThan(10);
+});
+
+test("search matches FR translations from the cache", async ({ page }) => {
+  /* The FR cache is the same one Manage's EN/FR toggle fills (see
+   * js/translations.js, project_translations_fr memory). Pre-seed
+   * it via addInitScript so the search has FR names available
+   * without depending on the async fetchFrenchNames round-trip
+   * timing. */
+  await page.addInitScript(() => {
+    localStorage.setItem("mtg-hand-sim:translations-fr-v1", JSON.stringify({
+      "Sol Ring": "Anneau solaire",
+    }));
+  });
+  await page.reload();
+  await page.locator("#commander-zone .card").first().waitFor();
+  await page.click("#tab-gallery");
+  await page.locator("#gallery-toolbar .gallery-toolbar-search input").fill("anneau");
+  const tiles = page.locator("#gallery-content .gallery-tile");
+  await expect(tiles).toHaveCount(1);
+  await expect(tiles.first()).toHaveAttribute("title", "Sol Ring");
+});
+
+test("search with no match shows the empty-filter placeholder", async ({ page }) => {
+  await page.click("#tab-gallery");
+  await page.locator("#gallery-toolbar .gallery-toolbar-search input").fill("zzznomatch");
+  await expect(page.locator("#gallery-content .panel")).toHaveCount(0);
+  await expect(page.locator("#gallery-content .placeholder-empty")).toHaveText(
+    "Aucune carte ne correspond aux filtres.",
+  );
+});
