@@ -2160,6 +2160,45 @@ html:has(.modal-backdrop:not([hidden])) {
 @media (prefers-reduced-motion: reduce) {
   .chip-indicator { transition: none; }
 }
+/* Mobile : la toolbar bascule en scroll horizontal — une seule ligne
+ * par rang, on swipe pour découvrir (pattern App Store / Spotify).
+ * Les chips mono (W/U/B/R/G) deviennent pip-only : le label texte est
+ * caché, seule la pastille colorée reste, avec un min-width tap-cible.
+ * Voir project_gallery_view_choices pour le pourquoi.
+ *
+ * L'indicator coulissant est désactivé (il ne tracke que translateX
+ * d'un container linéaire, pas le défilement intérieur d'un overflow
+ * scroller) — le static `.active` bg du chip reprend le relais. */
+@media (max-width: 600px) {
+  .gallery-toolbar-chips {
+    display: flex;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .gallery-toolbar-chips::-webkit-scrollbar { display: none; }
+  .gallery-toolbar-chips .gallery-chip {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 6px 12px;
+  }
+  .gallery-toolbar-chips.has-indicator .chip-indicator { display: none; }
+  .gallery-toolbar-chips.has-indicator .gallery-chip.active {
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  /* Pip-only sur les chips mono : on cache le label texte, on garde
+   * la pastille seule. min-width 40 px pour la zone tappable. */
+  .gallery-chip-mono .gallery-chip-text { display: none; }
+  .gallery-chip-mono {
+    gap: 0;
+    min-width: 40px;
+    justify-content: center;
+  }
+  .gallery-chip-mono .pip-dot { width: 16px; height: 16px; }
+}
 .gallery-toolbar-count {
   margin-left: auto;
   color: var(--text-muted);

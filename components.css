@@ -283,7 +283,14 @@ html.auth-locked #login-overlay[hidden] { display: block; }
   .nav {
     grid-column: 1 / -1;
     grid-row: 3;
-    justify-self: center;
+    /* Stretched plutôt que centered : avec `inline-flex`-content le
+     * nav remplissait déjà toute la rangée en éditorial (4 tabs
+     * paddés à 22 px), donc `justify-self: center` ne respirait pas
+     * — "Galerie" finissait flush right. En stretch + space-around à
+     * l'intérieur, les tabs sont distribués avec une marge égale de
+     * chaque côté → visuellement centrés et équilibrés. */
+    justify-self: stretch;
+    justify-content: space-around;
     max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none;

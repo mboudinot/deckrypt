@@ -294,7 +294,15 @@ function buildToolbar({ orderedTypes, orderedMonoColors, hasMulti, hasColorless,
   const colorGroup = makeChipGroup("Filtrer par couleur");
   colorGroup.appendChild(makeChip(chips, "color", "all", "Toutes", onChange));
   for (const c of orderedMonoColors) {
+    /* Mono : label texte (W/U/B/R/G) + pip dot. Le label est wrappé
+     * par makeChip dans `.gallery-chip-text` pour pouvoir être caché
+     * sur mobile (le CSS @media bascule en pip-only ; aria-label +
+     * title gardent l'a11y intacte). */
     const chip = makeChip(chips, "color", c, c, onChange);
+    chip.classList.add("gallery-chip-mono");
+    const name = COLOR_NAMES[c] || c;
+    chip.setAttribute("aria-label", name);
+    chip.title = name;
     const dot = document.createElement("span");
     dot.className = `pip-dot dot-${c.toLowerCase()}`;
     chip.prepend(dot);
@@ -339,7 +347,12 @@ function makeChip(chips, group, value, label, onChange) {
   btn.className = "gallery-chip";
   btn.dataset.group = group;
   btn.dataset.value = value;
-  btn.textContent = label;
+  /* Label wrappé pour que le @media mobile puisse cacher le texte
+   * sur les chips mono (cf. .gallery-chip-mono) sans bouger le pip. */
+  const text = document.createElement("span");
+  text.className = "gallery-chip-text";
+  text.textContent = label;
+  btn.appendChild(text);
   btn.addEventListener("click", () => {
     galleryFilters[group] = value;
     onChange();
