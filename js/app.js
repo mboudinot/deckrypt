@@ -165,6 +165,10 @@ function _cacheManageElements() {
   els.addCardSuggestions = document.getElementById("add-card-suggestions");
   els.addCardPasteText = document.getElementById("add-card-paste-text");
   els.addCardPasteBtn = document.getElementById("add-card-paste-btn");
+  els.addCardPasteFile = document.getElementById("add-card-paste-file");
+  els.addCardPasteFileBtn = document.getElementById("add-card-paste-file-btn");
+  els.addCardPasteFileName = document.getElementById("add-card-paste-file-name");
+  els.addCardSection = document.getElementById("add-card-section");
   els.addCardDraft = document.getElementById("add-card-draft");
   els.addCardDraftName = document.getElementById("add-card-draft-name");
   els.addCardDraftPreview = document.getElementById("add-card-draft-preview");
@@ -218,6 +222,9 @@ function _cacheModalElements() {
 function _cacheImportExportElements() {
   els.importName = document.getElementById("import-name");
   els.importText = document.getElementById("import-text");
+  els.importFile = document.getElementById("import-file");
+  els.importFileBtn = document.getElementById("import-file-btn");
+  els.importFileName = document.getElementById("import-file-name");
   els.importPreview = document.getElementById("import-preview");
   els.importCancel = document.getElementById("import-cancel");
   els.importConfirm = document.getElementById("import-confirm");
@@ -227,6 +234,9 @@ function _cacheImportExportElements() {
   els.ieModalTitle = document.getElementById("ie-modal-title");
   els.iePanelImport = document.getElementById("ie-panel-import");
   els.iePanelExport = document.getElementById("ie-panel-export");
+  els.ieModalContent = document.querySelector(".ie-modal-content");
+  els.importDropOverlay = document.getElementById("import-drop-overlay");
+  els.manageDropOverlay = document.getElementById("manage-drop-overlay");
   els.exportFormat = document.getElementById("export-format");
   els.exportDescription = document.getElementById("export-description");
   els.exportOutput = document.getElementById("export-output");
@@ -697,6 +707,8 @@ function duplicateCurrentDeck() {
 function openImportPanel() {
   els.importName.value = "";
   els.importText.value = "";
+  els.importFile.value = "";
+  els.importFileName.textContent = "";
   els.importPreview.replaceChildren();
   els.importPreview.textContent = "Colle une liste pour voir le récap.";
   /* Button stays enabled — validation is the gatekeeper, not a
@@ -819,6 +831,94 @@ function onExportDownload() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+ * Decklist file ingest — mutualisé entre la modal d'import et la
+ * zone "Ajouter une carte" du Manage. 3 helpers :
+ *   - loadDecklistFile : lit le fichier, valide la taille, peuple
+ *     le textarea cible, dispatche `input` pour réutiliser le
+ *     pipeline existant (preview / auto-clear).
+ *   - bindFileUpload : branche le couple bouton+input file caché.
+ *   - bindFileDrop : transforme un textarea en zone DnD.
+ * Les deux entrées (click / drop) convergent vers loadDecklistFile,
+ * donc le `onLoaded` callback (auto-add côté Manage, pré-remplissage
+ * du nom côté Import) tire le même chemin quelle que soit la source.
+ * ============================================================ */
+async function loadDecklistFile({ file, target, nameLabel, onLoaded }) {
+  /* Same byte cap as the textarea path : parseDecklist refuses
+   * anything > MAX_INPUT_LENGTH (100KB). On bail-out plus tôt avec
+   * un message visible, plutôt que de laisser le parser shipper un
+   * `result.errors` silencieux. */
+  if (file.size > MAX_INPUT_LENGTH) {
+    setStatus(`Fichier trop volumineux (${(file.size / 1024).toFixed(0)} Ko, max ${MAX_INPUT_LENGTH / 1024} Ko).`, "error");
+    return;
+  }
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    setStatus("Lecture du fichier impossible.", "error");
+    return;
+  }
+  target.value = text;
+  if (nameLabel) nameLabel.textContent = file.name;
+  /* Dispatch input so any listener wired on the textarea (preview,
+   * auto-clear, …) fires — same code path as un paste manuel. */
+  target.dispatchEvent(new Event("input", { bubbles: true }));
+  if (onLoaded) onLoaded(file);
+}
+
+function bindFileUpload({ button, input, target, nameLabel, onLoaded }) {
+  button.addEventListener("click", () => input.click());
+  input.addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) await loadDecklistFile({ file, target, nameLabel, onLoaded });
+    /* Reset value so re-selecting the SAME file relance le change
+     * event (sinon le browser le considère identique et n'émet rien). */
+    e.target.value = "";
+  });
+}
+
+function bindFileDrop({ wrapper, overlay, target, nameLabel, onLoaded }) {
+  /* Only react if the drag carries Files (we don't want to intercept
+   * text drops — those are handled natively by the textarea). */
+  const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
+  /* Counter approach : dragenter/leave bubblent à travers chaque
+   * descendant ; pour savoir si on est encore "à l'intérieur du
+   * wrapper", on compte enter-leave plutôt que de checker le target.
+   * Showcase l'overlay sur la 1re entrée, le cache au passage à 0
+   * ou au drop. Robust contre les flickers de hover entre enfants
+   * (l'overlay reste stable grâce à `pointer-events: none`). */
+  let counter = 0;
+  const show = () => { overlay.hidden = false; wrapper.classList.add("drag-active"); };
+  const hide = () => { counter = 0; overlay.hidden = true; wrapper.classList.remove("drag-active"); };
+  wrapper.addEventListener("dragenter", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    counter++;
+    if (counter === 1) show();
+  });
+  wrapper.addEventListener("dragover", (e) => {
+    if (!hasFiles(e)) return;
+    /* preventDefault sur dragover est requis pour autoriser le drop
+     * (sinon le browser tombe sur son comportement par défaut = open
+     * the file in a new tab). */
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  wrapper.addEventListener("dragleave", (e) => {
+    if (!hasFiles(e)) return;
+    counter = Math.max(0, counter - 1);
+    if (counter === 0) hide();
+  });
+  wrapper.addEventListener("drop", async (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    hide();
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) await loadDecklistFile({ file, target, nameLabel, onLoaded });
+  });
 }
 
 function refreshImportPreview() {
@@ -1159,6 +1259,25 @@ function bindEvents() {
   els.importCancel.addEventListener("click", closeImportPanel);
   els.importConfirm.addEventListener("click", confirmImport);
   els.importText.addEventListener("input", refreshImportPreview);
+  /* File upload + drag-and-drop sur la modal d'import. Convergent
+   * sur loadDecklistFile (cf. helpers). Le `onLoaded` pré-remplit le
+   * nom du deck depuis le filename quand vide — pas d'auto-submit
+   * (il faut un nom validé avant de créer le deck). */
+  const importOnLoaded = (file) => {
+    if (!els.importName.value.trim()) {
+      els.importName.value = file.name.replace(/\.[^.]+$/, "").trim();
+    }
+  };
+  bindFileUpload({
+    button: els.importFileBtn, input: els.importFile,
+    target: els.importText, nameLabel: els.importFileName,
+    onLoaded: importOnLoaded,
+  });
+  bindFileDrop({
+    wrapper: els.ieModalContent, overlay: els.importDropOverlay,
+    target: els.importText, nameLabel: els.importFileName,
+    onLoaded: importOnLoaded,
+  });
   els.deckSelect.addEventListener("change", (e) => switchDeck(e.target.value));
 
   /* Manage view deck-summary "Lancer une partie" — switches to the

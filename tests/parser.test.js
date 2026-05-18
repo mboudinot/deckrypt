@@ -93,6 +93,71 @@ describe("parseDecklist — card line formats", () => {
     const r = parseDecklist("1 Spike Weaver (PLST) EXO-128");
     expect(r.cards[0].collector_number).toBe("EXO-128");
   });
+
+  it("accepts the Moxfield '1x' quantity prefix (lowercase x)", () => {
+    const r = parseDecklist("1x Envahissement (FDN) 230");
+    expect(r.cards[0]).toMatchObject({
+      name: "Envahissement", set: "fdn", collector_number: "230", qty: 1,
+    });
+  });
+
+  it("accepts the Moxfield '1X' quantity prefix (uppercase X)", () => {
+    const r = parseDecklist("2X Forest (UNH) 140");
+    expect(r.cards[0]).toMatchObject({ name: "Forest", qty: 2 });
+  });
+
+  it("strips a bare 'F' trailing foil flag (Moxfield)", () => {
+    const r = parseDecklist("1 Envahissement (FDN) 230 F");
+    expect(r.cards[0]).toMatchObject({
+      name: "Envahissement", set: "fdn", collector_number: "230",
+    });
+  });
+
+  it("strips a bare 'E' trailing etched flag (Moxfield)", () => {
+    const r = parseDecklist("1 Sol Ring (CMD) 259 E");
+    expect(r.cards[0]).toMatchObject({
+      name: "Sol Ring", set: "cmd", collector_number: "259",
+    });
+  });
+
+  it("combines '1x' prefix + bare foil flag + split-card name", () => {
+    const r = parseDecklist("1x Stump Stomp // Burnwillow Clearing (MH3) 259 F");
+    expect(r.cards[0]).toMatchObject({
+      name: "Stump Stomp // Burnwillow Clearing",
+      set: "mh3",
+      collector_number: "259",
+      qty: 1,
+    });
+  });
+
+  it("strips multiple chained trailing flags", () => {
+    const r = parseDecklist("1 Llanowar Elves (M19) 314 *F* *P*");
+    expect(r.cards[0]).toMatchObject({
+      name: "Llanowar Elves", set: "m19", collector_number: "314",
+    });
+  });
+
+  it("parses a mixed-format block without bleeding flags into later names", () => {
+    /* Regression for the bug Matthieu hit before this fix : the trailing
+     * `F` was absorbed into the name, Scryfall couldn't resolve it, and
+     * every subsequent card fell through to type "Inconnu". */
+    const r = parseDecklist([
+      "1x Envahissement (FDN) 230 F",
+      "1x Incrimination (SNC) 84",
+      "1x Routine du vagabond (TDM) 154",
+      "1x Stump Stomp // Burnwillow Clearing (MH3) 259 F",
+      "1x Victimize (SLD) 2486",
+    ].join("\n"));
+    expect(r.errors).toEqual([]);
+    expect(r.cards.map((c) => c.name)).toEqual([
+      "Envahissement",
+      "Incrimination",
+      "Routine du vagabond",
+      "Stump Stomp // Burnwillow Clearing",
+      "Victimize",
+    ]);
+    expect(r.cards.every((c) => c.set && c.collector_number)).toBe(true);
+  });
 });
 
 describe("parseDecklist — sections", () => {

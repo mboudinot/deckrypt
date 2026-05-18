@@ -810,6 +810,19 @@ function setupAddCardUI() {
    * Auto-clear listener attached once at setup. */
   window.formValidate.attachAutoClear(els.addCardPasteText);
   els.addCardPasteBtn.addEventListener("click", onPasteAdd);
+  /* File upload + drag-and-drop sur la même zone. On remplit
+   * uniquement le textarea — l'utilisateur valide ensuite via
+   * "Ajouter depuis la liste". Même contrat que la modal d'import
+   * (load → preview → confirm), pour laisser une fenêtre de vérif
+   * avant que les cartes ne soient ajoutées au deck. */
+  bindFileUpload({
+    button: els.addCardPasteFileBtn, input: els.addCardPasteFile,
+    target: els.addCardPasteText, nameLabel: els.addCardPasteFileName,
+  });
+  bindFileDrop({
+    wrapper: els.addCardSection, overlay: els.manageDropOverlay,
+    target: els.addCardPasteText, nameLabel: els.addCardPasteFileName,
+  });
   els.addCardDraftCancel.addEventListener("click", cancelAddCardDraft);
   els.addCardDraftSubmit.addEventListener("click", submitAddCardDraft);
   els.addCardDraftPrinting.addEventListener("change", () => {
@@ -1143,6 +1156,7 @@ function onPasteAdd() {
   for (const e of parsed.commanders) addCommander(def, e);
   if (commitDeckChange(def)) {
     els.addCardPasteText.value = "";
+    if (els.addCardPasteFileName) els.addCardPasteFileName.textContent = "";
     markRecentlyAdded([...parsed.cards, ...parsed.commanders].map((c) => c.name));
     rerenderDeckViews();
     const n = parsed.cards.length + parsed.commanders.length;

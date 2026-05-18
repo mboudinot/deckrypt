@@ -665,6 +665,12 @@
   resize: vertical;
   margin-bottom: 8px;
 }
+/* La rangée bouton "Charger un .txt" + filename a besoin d'un peu
+ * d'air sous elle — sinon le bouton colle au textarea (la modal
+ * d'import a son propre `gap: 10px` via `.ie-panel`, donc l'air
+ * y est déjà gratuit ; ici c'est un block-flow donc on l'ajoute
+ * explicitement). */
+.add-card-paste .paste-file-row { margin-bottom: 8px; }
 
 /* ============================================================
    Analyze view
@@ -1811,6 +1817,78 @@ html:has(.modal-backdrop:not([hidden])) {
   min-height: 220px;
   resize: vertical;
 }
+/* File upload row : bouton "Charger un .txt" + nom du fichier choisi.
+ * Alternative au paste dans le textarea (l'input file natif est masqué
+ * via .sr-only, le button le déclenche). Le filename a un overflow
+ * ellipsis pour ne pas casser le layout sur les longs noms.
+ *
+ * Mutualisé entre la modal d'import (#ie-panel-import) et la zone
+ * "Ajouter une carte" du Manage (.add-card-paste). Mêmes classes,
+ * mêmes comportements (file upload + drag-and-drop sur le textarea
+ * adjacent). */
+.paste-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.paste-file-name {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* Drop overlay full-cover sur le wrapper de paste (modal d'import ou
+ * vue Gérer). Posé/retiré par bindFileDrop dans js/app.js, qui pose
+ * aussi `.drag-active` sur le wrapper pour stack ordering / debug.
+ * Bordure dashed accent + bg accent-tinté + message centré pour
+ * signaler qu'on accepte le drop. `pointer-events: none` pour que
+ * le drop traverse vers le wrapper (qui écoute) sans que le mouvement
+ * du curseur ENTRE l'overlay et les enfants en dessous ne déclenche
+ * un cycle de dragenter/leave qui ferait flicker l'overlay. */
+.paste-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in oklch, var(--bg) 80%, var(--accent));
+  border: 3px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+.paste-drop-overlay[hidden] { display: none; }
+.paste-drop-overlay-inner {
+  text-align: center;
+  color: var(--accent);
+  max-width: 480px;
+}
+.paste-drop-overlay-icon {
+  display: block;
+  margin: 0 auto 12px;
+  color: var(--accent);
+}
+.paste-drop-overlay-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.paste-drop-overlay-sub {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+/* `position: relative` requis pour ancrer l'overlay absolute. Pour
+ * la modal d'import c'est `.ie-modal-content` (l'overlay couvre tout
+ * le contenu de la modal) ; pour Gérer c'est la section "Ajouter
+ * une carte" ciblée (#add-card-section) — pas la vue entière, comme
+ * spec'd par le user pour garder une zone de drop précise. */
+.ie-modal-content,
+#add-card-section { position: relative; }
 #export-output {
   /* Bounded by viewport so the export modal stays within 90vh on
    * any screen — the user scrolls inside this textarea rather than

@@ -321,3 +321,48 @@ test("printing picker has a sticky close X that dismisses without selecting", as
   await closeBtn.click();
   await expect(page.locator("#modal")).not.toHaveClass(/open/);
 });
+
+test("Charger un .txt dans 'Ajouter une carte' remplit le textarea — l'ajout reste manuel", async ({ page }) => {
+  /* Pas d'auto-add : même contrat que la modal d'import. Le file
+   * load remplit `#add-card-paste-text` + affiche le filename ;
+   * l'utilisateur valide ensuite via "Ajouter depuis la liste". */
+  await page.locator("#add-card-paste-file").setInputFiles({
+    name: "extra-lands.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("3 Counterspell"),
+  });
+  await expect(page.locator("#add-card-paste-text")).toHaveValue("3 Counterspell");
+  await expect(page.locator("#add-card-paste-file-name")).toHaveText("extra-lands.txt");
+  /* Aucun flash success tant que l'utilisateur n'a pas cliqué — le
+   * load se contente de peupler le champ. */
+  await expect(page.locator(".flash-success")).toHaveCount(0);
+  /* Le clic sur le bouton fait l'ajout effectif. */
+  const beforeCount = await page.locator("#manage-cards .card-row").count();
+  await page.click("#add-card-paste-btn");
+  await expect(page.locator(".flash-success")).toContainText(/ajout/i);
+  await expect(page.locator("#add-card-paste-text")).toHaveValue("");
+  const afterCount = await page.locator("#manage-cards .card-row").count();
+  expect(afterCount).toBeGreaterThanOrEqual(beforeCount);
+});
+
+test("Drop d'un .txt sur la section 'Ajouter une carte' remplit le textarea (overlay visible pendant drag)", async ({ page }) => {
+  /* Drop target scoped à #add-card-section (pas toute la vue) —
+   * l'overlay full-cover ne couvre que ce panel, et la sémantique
+   * reste "remplir, pas auto-ajouter" comme pour le bouton. */
+  await page.evaluate(() => {
+    window.__dt = new DataTransfer();
+    const file = new File(["2 Counterspell"], "drop-add.txt", { type: "text/plain" });
+    window.__dt.items.add(file);
+    const target = document.getElementById("add-card-section");
+    target.dispatchEvent(new DragEvent("dragenter", { dataTransfer: window.__dt, bubbles: true, cancelable: true }));
+    target.dispatchEvent(new DragEvent("dragover", { dataTransfer: window.__dt, bubbles: true, cancelable: true }));
+  });
+  await expect(page.locator("#manage-drop-overlay")).toBeVisible();
+  await page.evaluate(() => {
+    const target = document.getElementById("add-card-section");
+    target.dispatchEvent(new DragEvent("drop", { dataTransfer: window.__dt, bubbles: true, cancelable: true }));
+  });
+  await expect(page.locator("#manage-drop-overlay")).toBeHidden();
+  await expect(page.locator("#add-card-paste-text")).toHaveValue("2 Counterspell");
+  await expect(page.locator(".flash-success")).toHaveCount(0);
+});

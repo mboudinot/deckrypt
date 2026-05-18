@@ -1,10 +1,18 @@
 /* Decklist parser — MTGA / Moxfield / Archidekt format.
  *   "1 Card Name (SET) 123"      basic
- *   "1 Card Name (SET) 73★ *F*"  promo + foil
+ *   "1x Card Name (SET) 123"     Moxfield qty prefix (x|X optional)
+ *   "1 Card Name (SET) 123 F"    Moxfield foil flag (bare letter)
+ *   "1 Card Name (SET) 73★ *F*"  promo + MTGA-style foil flag
+ *   "1 Card Name (SET) 123 E"    Moxfield etched flag (bare letter)
  *   "1 Card Name (PLST) EXO-128" The List style
+ *   "1 Card Name // Other (SET) 123 F" split / DFC + foil
  *   "1 Card Name"                name only
  *   "// COMMANDER"               section header
  *   "Commander", "Sideboard"     standalone keyword headers
+ *
+ * Trailing flags (foil, etched, promo…) are silently dropped — they
+ * don't drive any deck-edit decision today. A flag is one ASCII letter
+ * optionally wrapped in `*` ; multiple flags allowed (e.g. `*F* *P*`).
  *
  * Hardening: bounded inputs to prevent DoS via pathological lists
  * (e.g. "1000000 Forest" expanding into a billion-entry array, a 100MB
@@ -42,12 +50,15 @@ function parseDecklist(text) {
     return result; // fatal
   }
 
-  // Set code and collector number are independently optional:
-  //   "1 Sol Ring"                 → name only
-  //   "1 Sol Ring (CMD)"           → name + set, no collector
-  //   "1 Sol Ring (CMD) 259"       → full
-  //   "1 Sol Ring (CMD) 259 *F*"   → full + foil flag
-  const cardRe = /^(\d+)\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)(?:\s+(\S+))?)?(?:\s+\*F\*)?\s*$/;
+  // Set code, collector number, and trailing flags are all optional :
+  //   "1 Sol Ring"                  → name only
+  //   "1x Sol Ring"                 → Moxfield qty prefix
+  //   "1 Sol Ring (CMD)"            → name + set, no collector
+  //   "1 Sol Ring (CMD) 259"        → full
+  //   "1 Sol Ring (CMD) 259 F"      → full + Moxfield foil flag
+  //   "1 Sol Ring (CMD) 259 *F*"    → full + MTGA foil flag
+  //   "1 Sol Ring (CMD) 259 *F* *P*" → multiple flags
+  const cardRe = /^(\d+)[xX]?\s+(.+?)(?:\s+\(([A-Za-z0-9]+)\)(?:\s+(\S+))?)?(?:\s+\*?[A-Za-z]\*?)*\s*$/;
 
   let section = "main";
   let inCommanderBlock = false;

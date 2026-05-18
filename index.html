@@ -505,7 +505,21 @@
           </div>
 
           <!-- Add card -->
-          <section class="panel">
+          <section class="panel" id="add-card-section">
+            <!-- Drop overlay scoped à la section "Ajouter une carte"
+                 (et pas à la vue Gérer entière) — le user veut une
+                 zone de drop précise plutôt que toute la page. -->
+            <div class="paste-drop-overlay" id="manage-drop-overlay" hidden aria-hidden="true">
+              <div class="paste-drop-overlay-inner">
+                <svg class="paste-drop-overlay-icon" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <div class="paste-drop-overlay-title">Dépose ton fichier .txt</div>
+                <div class="paste-drop-overlay-sub">La liste sera chargée et prévisualisée ci-dessous.</div>
+              </div>
+            </div>
             <div class="panel-head">
               <h3>Ajouter une carte</h3>
             </div>
@@ -553,7 +567,12 @@
                   </svg>
                   Noms en anglais — sinon les cartes atterrissent dans « Inconnu ».
                 </p>
-                <textarea id="add-card-paste-text" placeholder="Ou colle une liste MTGA / Moxfield :
+                <div class="paste-file-row">
+                  <input id="add-card-paste-file" type="file" accept=".txt,text/plain" class="sr-only">
+                  <button id="add-card-paste-file-btn" type="button" class="btn btn-sm">Charger un .txt</button>
+                  <span id="add-card-paste-file-name" class="paste-file-name" aria-live="polite"></span>
+                </div>
+                <textarea id="add-card-paste-text" placeholder="Colle, ou utilise le bouton / drag-and-drop ci-dessus. Format MTGA / Moxfield :
 1 Sol Ring (CMD) 259
 2 Forest"></textarea>
                 <button id="add-card-paste-btn" type="button" class="btn btn-sm primary">Ajouter depuis la liste</button>
@@ -750,6 +769,22 @@
 
 <div class="ie-modal" id="ie-modal" role="dialog" aria-modal="true" aria-labelledby="ie-modal-title" tabindex="-1" hidden>
   <div class="ie-modal-content">
+    <!-- Drop overlay rendu au-dessus du contenu de la modal pendant
+         qu'un fichier est trainé. Détails du comportement : voir
+         bindFileDrop dans js/app.js. Le aria-hidden=true reste — le
+         drop est piloté à la souris/trackpad, le clavier passe par
+         le bouton "Charger un .txt". -->
+    <div class="paste-drop-overlay" id="import-drop-overlay" hidden aria-hidden="true">
+      <div class="paste-drop-overlay-inner">
+        <svg class="paste-drop-overlay-icon" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="paste-drop-overlay-title">Dépose ton fichier .txt</div>
+        <div class="paste-drop-overlay-sub">La liste sera chargée et prévisualisée ci-dessous.</div>
+      </div>
+    </div>
     <button id="ie-modal-close" class="ie-modal-close" type="button" aria-label="Fermer">×</button>
     <!-- Title doubles as context indicator: "Importer une liste" when
          entered via the deck-pill, "Exporter le deck" when entered
@@ -762,6 +797,11 @@
     <div class="ie-panel" id="ie-panel-import" role="region" aria-labelledby="ie-modal-title">
       <label for="import-name" class="sr-only">Nom du deck</label>
       <input id="import-name" type="text" placeholder="Nom du deck (ex: Meren EDH)">
+      <div class="paste-file-row">
+        <input id="import-file" type="file" accept=".txt,text/plain" class="sr-only">
+        <button id="import-file-btn" type="button" class="btn">Charger un fichier .txt</button>
+        <span id="import-file-name" class="paste-file-name" aria-live="polite"></span>
+      </div>
       <label for="import-text" class="sr-only">Liste de cartes</label>
       <p class="paste-hint">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -771,7 +811,7 @@
         </svg>
         Noms en anglais (« Sol Ring », pas « Anneau Solaire ») — Scryfall ne reconnaît pas les noms traduits.
       </p>
-      <textarea id="import-text" placeholder="Colle ta liste ici. Format MTGA / Moxfield :
+      <textarea id="import-text" placeholder="Colle ta liste ici, ou utilise le bouton + drag-and-drop ci-dessus. Format MTGA / Moxfield :
 // Commanders
 1 Meren of Clan Nel Toth (C15) 49
 

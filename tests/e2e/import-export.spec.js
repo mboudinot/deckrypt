@@ -213,3 +213,69 @@ test("Import flow still works end-to-end via the modal", async ({ page }) => {
   await expect(page.locator("#deck-select option", { hasText: "Tiny test deck" }))
     .toHaveCount(1);
 });
+
+test("Charger un fichier .txt remplit le textarea, affiche le filename et pré-remplit le nom du deck", async ({ page }) => {
+  await openDeckMenu(page);
+  await page.click("#btn-import-toggle");
+  /* `setInputFiles` accepte un payload virtuel : pas besoin de
+   * fixture sur disque. Le bouton visible déclenche l'input file
+   * caché via JS, mais Playwright peut piloter l'input directement. */
+  await page.locator("#import-file").setInputFiles({
+    name: "meren-edh.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("1 Sol Ring (CMD) 259\n2 Forest (UNH) 140\n"),
+  });
+  await expect(page.locator("#import-text"))
+    .toHaveValue("1 Sol Ring (CMD) 259\n2 Forest (UNH) 140\n");
+  /* Filename affiché à côté du bouton (feedback utilisateur). */
+  await expect(page.locator("#import-file-name")).toHaveText("meren-edh.txt");
+  /* Le nom du deck était vide → pré-rempli depuis le filename sans ext. */
+  await expect(page.locator("#import-name")).toHaveValue("meren-edh");
+  /* Le preview a été mis à jour (le récap parsed affiche les compteurs). */
+  await expect(page.locator("#import-preview .ok")).toContainText(/3 cartes/);
+});
+
+test("Charger un fichier ne touche PAS au nom du deck si déjà rempli", async ({ page }) => {
+  await openDeckMenu(page);
+  await page.click("#btn-import-toggle");
+  await page.locator("#import-name").fill("Mon deck à moi");
+  await page.locator("#import-file").setInputFiles({
+    name: "other-name.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("1 Sol Ring"),
+  });
+  await expect(page.locator("#import-name")).toHaveValue("Mon deck à moi");
+});
+
+test("Drop d'un fichier .txt n'importe où sur la modal déclenche le même flow que le bouton", async ({ page }) => {
+  await openDeckMenu(page);
+  await page.click("#btn-import-toggle");
+  /* Simule un drag-over puis un drop natif sur le wrapper de la modal
+   * (.ie-modal-content). Le browser n'expose pas setInputFiles pour
+   * les drops ; on dispatch des DragEvent synthétiques avec un
+   * DataTransfer construit en page-side, c'est le canonical workaround.
+   *
+   * On vérifie au passage que l'overlay devient visible pendant le
+   * dragover et se cache au drop — c'est la promesse UX de la zone
+   * full-cover (l'utilisateur voit la modal "accepter" le fichier
+   * avant même de lâcher). */
+  await page.evaluate(() => {
+    window.__dt = new DataTransfer();
+    const file = new File(["1 Sol Ring (CMD) 259\n2 Forest (UNH) 140\n"], "drop-test.txt", { type: "text/plain" });
+    window.__dt.items.add(file);
+    const target = document.querySelector(".ie-modal-content");
+    target.dispatchEvent(new DragEvent("dragenter", { dataTransfer: window.__dt, bubbles: true, cancelable: true }));
+    target.dispatchEvent(new DragEvent("dragover", { dataTransfer: window.__dt, bubbles: true, cancelable: true }));
+  });
+  await expect(page.locator("#import-drop-overlay")).toBeVisible();
+  await page.evaluate(() => {
+    const target = document.querySelector(".ie-modal-content");
+    target.dispatchEvent(new DragEvent("drop", { dataTransfer: window.__dt, bubbles: true, cancelable: true }));
+  });
+  await expect(page.locator("#import-drop-overlay")).toBeHidden();
+  await expect(page.locator("#import-text"))
+    .toHaveValue("1 Sol Ring (CMD) 259\n2 Forest (UNH) 140\n");
+  await expect(page.locator("#import-file-name")).toHaveText("drop-test.txt");
+  await expect(page.locator("#import-name")).toHaveValue("drop-test");
+  await expect(page.locator("#import-preview .ok")).toContainText(/3 cartes/);
+});
