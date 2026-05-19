@@ -3766,7 +3766,7 @@ select.is-invalid:focus {
   height: 40px;
   padding: 0;
   border-radius: var(--radius);
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--text-2);
   display: inline-flex;
@@ -3785,7 +3785,6 @@ select.is-invalid:focus {
 .kebab-trigger:hover:not(:disabled),
 .kebab-trigger[aria-expanded="true"] {
   background: var(--surface-2);
-  border-color: var(--border);
   color: var(--text);
 }
 .kebab-menu {
