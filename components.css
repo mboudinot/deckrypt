@@ -296,6 +296,16 @@ html.auth-locked #login-overlay[hidden] { display: block; }
     scrollbar-width: none;
   }
   .nav::-webkit-scrollbar { display: none; }
+  /* Editorial tabs are sized for desktop (16px display font + 22px
+   * horizontal padding) — the 4 tabs together overflow a 360px
+   * viewport, triggering the scrollbar-hidden `overflow-x: auto` and
+   * pushing the active indicator off-axis. Studio (13px / 18px) fits
+   * natively. Bring editorial down to a comparable mobile footprint
+   * while keeping the display font for character. */
+  [data-direction="editorial"] .nav-tab {
+    font-size: 14px;
+    padding: 8px 14px;
+  }
 }
 
 .deck-pill {
