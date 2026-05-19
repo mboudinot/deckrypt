@@ -652,6 +652,15 @@
   line-height: 1.4;
 }
 .paste-hint svg { flex-shrink: 0; opacity: 0.75; }
+.paste-hint code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0 4px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
 .add-card-paste textarea {
   width: 100%;
   background: var(--surface-2);
