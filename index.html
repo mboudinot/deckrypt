@@ -532,6 +532,13 @@
                 <div id="add-card-draft" class="add-card-draft" hidden>
                   <strong id="add-card-draft-name" class="add-card-draft-name"></strong>
                   <img id="add-card-draft-preview" class="add-card-draft-preview" alt="" hidden>
+                  <!-- Card-shaped skeleton shown between the user picking a
+                       suggestion and the printings fetch / image download
+                       finishing. Same dimensions as the img so swapping
+                       doesn't shift the layout. -->
+                  <div id="add-card-draft-preview-loader" class="add-card-draft-preview-loader" hidden>
+                    <span class="skeleton" aria-hidden="true"></span>
+                  </div>
                   <!-- Role toggle (segmented). Shown only when the deck's
                        format === "commander" (Limited / Format libre
                        have no commander zone). The active button drives:

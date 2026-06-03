@@ -60,3 +60,47 @@ test("cancelling the draft hides the preview again", async ({ page }) => {
   await page.click("#add-card-draft-cancel");
   await expect(page.locator("#add-card-draft-preview")).toBeHidden();
 });
+
+test("dropdown shows a loading row while the autocomplete request is in flight", async ({ page }) => {
+  /* Override the autocomplete route with a 500 ms delay so the
+   * loading row stays observable — the in-memory mock used by
+   * mockScryfall otherwise resolves in a tick and the loader flashes
+   * in/out below Playwright's polling resolution. */
+  await page.route("**/api.scryfall.com/cards/autocomplete**", async (route) => {
+    await new Promise((r) => setTimeout(r, 500));
+    await route.fulfill({ json: { data: ["Sol Ring", "Sol", "Solar Tide"] } });
+  });
+  await page.locator("#add-card-input").fill("sol");
+  await expect(page.locator("#add-card-suggestions .suggestion-loading")).toBeVisible();
+  /* Once the response lands the loading row is replaced by the real
+   * suggestions — same dropdown, same listbox aria role. */
+  await expect(page.locator("#add-card-suggestions li", { hasText: "Sol Ring" }).first()).toBeVisible();
+  await expect(page.locator("#add-card-suggestions .suggestion-loading")).toHaveCount(0);
+});
+
+test("preview skeleton fills the slot while printings are being fetched", async ({ page }) => {
+  /* Delay the printings fetch so the card-shaped skeleton stays
+   * visible long enough for Playwright to assert on it. */
+  await page.route("**/api.scryfall.com/cards/search**", async (route) => {
+    await new Promise((r) => setTimeout(r, 500));
+    await route.fulfill({
+      json: {
+        data: [
+          {
+            name: "Sol Ring", set: "cmd", collector_number: "1",
+            set_name: "Commander",
+            image_uris: { normal: "https://cards.scryfall.io/normal/front/c/1/cmd-1.jpg" },
+          },
+        ],
+      },
+    });
+  });
+  await page.locator("#add-card-input").fill("sol");
+  await page.locator("#add-card-suggestions li", { hasText: "Sol Ring" }).first().click();
+  /* During the wait: skeleton visible, real img still hidden. */
+  await expect(page.locator("#add-card-draft-preview-loader")).toBeVisible();
+  await expect(page.locator("#add-card-draft-preview")).toBeHidden();
+  /* After the printings respond + the img paints: swap completes. */
+  await expect(page.locator("#add-card-draft-preview")).toBeVisible();
+  await expect(page.locator("#add-card-draft-preview-loader")).toBeHidden();
+});

@@ -854,16 +854,41 @@ function onAutocompleteInput() {
   }
   _autocompleteTimer = setTimeout(async () => {
     const myToken = ++_autocompleteToken;
+    /* Paint the loading row immediately so the user has feedback
+     * during the Scryfall round-trip — without it the dropdown stayed
+     * empty for 300-700 ms after each pause, which read as "the input
+     * is broken". */
+    renderSuggestionsLoading();
     let entries;
     try {
       entries = await autocompleteCardNamesMultilingual(q);
     } catch (err) {
       console.warn("Autocomplete failed", err);
+      if (myToken === _autocompleteToken) {
+        els.addCardSuggestions.replaceChildren();
+        els.addCardSuggestions.hidden = true;
+      }
       return;
     }
     if (myToken !== _autocompleteToken) return;
     renderSuggestions(entries);
   }, 250);
+}
+
+function renderSuggestionsLoading() {
+  els.addCardSuggestions.replaceChildren();
+  const li = document.createElement("li");
+  li.className = "suggestion-loading";
+  li.setAttribute("role", "presentation");
+  li.setAttribute("aria-live", "polite");
+  const spinner = document.createElement("span");
+  spinner.className = "suggestion-loading-spinner";
+  spinner.setAttribute("aria-hidden", "true");
+  const label = document.createElement("span");
+  label.textContent = "Recherche…";
+  li.append(spinner, label);
+  els.addCardSuggestions.appendChild(li);
+  els.addCardSuggestions.hidden = false;
 }
 
 function renderSuggestions(entries) {
@@ -932,9 +957,12 @@ function openAddCardDraft(name) {
   els.addCardDraftPrinting.disabled = true;
   // Hide the preview until printings land (we don't know which art
   // to show yet). Avoids a stale image flash from a previous draft.
+  // Show the skeleton loader in its place so the slot doesn't read
+  // as "broken" during the Scryfall round-trip (~300-700 ms cold).
   els.addCardDraftPreview.removeAttribute("src");
   els.addCardDraftPreview.alt = "";
   els.addCardDraftPreview.hidden = true;
+  els.addCardDraftPreviewLoader.hidden = false;
   els.addCardDraft.hidden = false;
   els.addCardDraftQty.focus();
   els.addCardDraftQty.select();
@@ -1024,15 +1052,28 @@ function updateDraftPreview(printingValue) {
   }
   const src = card ? cardImage(card, "normal") : null;
   if (src) {
-    els.addCardDraftPreview.src = src;
     els.addCardDraftPreview.alt = card.name
       ? `Aperçu de ${card.name} (${(card.set || "").toUpperCase()} #${card.collector_number})`
       : "Aperçu";
-    els.addCardDraftPreview.hidden = false;
+    /* Keep the skeleton visible until the img actually paints. The
+     * printings fetch is the main culprit (300-700 ms) but the image
+     * download on a cold cache adds another 100-300 ms; swap on
+     * `load` (or `error`, so a broken Scryfall URL doesn't leave the
+     * loader spinning forever). When the img is already cached,
+     * `complete` is true synchronously and we drop the loader now. */
+    const swapToImg = () => {
+      els.addCardDraftPreview.hidden = false;
+      els.addCardDraftPreviewLoader.hidden = true;
+    };
+    els.addCardDraftPreview.onload = swapToImg;
+    els.addCardDraftPreview.onerror = swapToImg;
+    els.addCardDraftPreview.src = src;
+    if (els.addCardDraftPreview.complete) swapToImg();
   } else {
     els.addCardDraftPreview.removeAttribute("src");
     els.addCardDraftPreview.alt = "";
     els.addCardDraftPreview.hidden = true;
+    els.addCardDraftPreviewLoader.hidden = true;
   }
 }
 
@@ -1044,6 +1085,7 @@ function cancelAddCardDraft() {
   els.addCardDraftPreview.removeAttribute("src");
   els.addCardDraftPreview.alt = "";
   els.addCardDraftPreview.hidden = true;
+  els.addCardDraftPreviewLoader.hidden = true;
   els.addCardInput.focus();
 }
 

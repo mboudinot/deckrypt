@@ -552,7 +552,31 @@
   align-items: baseline;
   gap: 8px;
 }
-.suggestions li:hover { background: var(--accent); color: var(--accent-text); }
+.suggestions li:not(.suggestion-loading):hover { background: var(--accent); color: var(--accent-text); }
+/* Loading row shown during the autocomplete fetch — Scryfall takes
+ * 300-700 ms on a cold cache and the dropdown used to stay empty,
+ * which read as "the UI is broken" to the user. Non-interactive
+ * (pointer-events: none) so it can't be clicked. */
+.suggestion-loading {
+  cursor: default;
+  pointer-events: none;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.85rem;
+  gap: 10px;
+}
+.suggestion-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in oklch, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: lang-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .suggestion-loading-spinner { animation: none; }
+}
 /* Two-tier suggestion: French (primary) + English (muted). When only
    English is available, .suggestion-primary stands alone. */
 .suggestion-primary { font-weight: 500; }
@@ -581,18 +605,29 @@
   font-size: 1rem;
   color: var(--text);
 }
-.add-card-draft-preview {
+.add-card-draft-preview,
+.add-card-draft-preview-loader {
   align-self: center;
   width: 200px;
   max-width: 100%;
   aspect-ratio: 488 / 680;
-  object-fit: cover;
   border-radius: 10px;
   border: 1px solid var(--border);
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
   background: var(--surface);
 }
+.add-card-draft-preview { object-fit: cover; }
 .add-card-draft-preview[hidden] { display: none; }
+/* Skeleton placeholder shown between the suggestion-click and the
+ * first paint of the printing image. Anchors the shared `.skeleton`
+ * shimmer (defined in components.css) so the user has something at
+ * the preview location during the Scryfall round-trip — was a blank
+ * area before. */
+.add-card-draft-preview-loader {
+  position: relative;
+  overflow: hidden;
+}
+.add-card-draft-preview-loader[hidden] { display: none; }
 .add-card-draft label {
   display: flex;
   flex-direction: column;

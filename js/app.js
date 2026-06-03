@@ -172,6 +172,7 @@ function _cacheManageElements() {
   els.addCardDraft = document.getElementById("add-card-draft");
   els.addCardDraftName = document.getElementById("add-card-draft-name");
   els.addCardDraftPreview = document.getElementById("add-card-draft-preview");
+  els.addCardDraftPreviewLoader = document.getElementById("add-card-draft-preview-loader");
   els.addCardDraftPrinting = document.getElementById("add-card-draft-printing");
   els.addCardDraftQty = document.getElementById("add-card-draft-qty");
   els.addCardDraftCancel = document.getElementById("add-card-draft-cancel");
