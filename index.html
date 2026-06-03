@@ -175,6 +175,11 @@
         <button id="btn-account" type="button" class="account account-anon" aria-haspopup="menu" aria-expanded="false">
           <span class="account-name" id="account-label">Connexion</span>
         </button>
+        <!-- Sync pre-paint prim: reads the cached account snapshot and
+             renders the authed pill at content width (no skeleton flash).
+             Must be NON-defer + positioned AFTER #btn-account so the DOM
+             node exists. See js/boot-account.js for the rationale. -->
+        <script src="js/boot-account.js"></script>
         <div class="dropdown-menu account-dropdown-menu" id="account-dropdown-menu" role="menu" hidden>
           <div class="dropdown-head">
             <div class="name" id="account-menu-name"></div>

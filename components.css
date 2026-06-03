@@ -386,16 +386,17 @@ html.auth-locked #login-overlay[hidden] { display: block; }
   border-color: var(--accent-2);
 }
 
-/* Returning-user placeholder: when boot-theme.js found the session
- * hint in localStorage we optimistically paint the account button
- * in its authed shape (white pill + avatar circle, no name) BEFORE
- * Firebase Auth's async resolve has a chance to fire. Without this,
- * a returning user sees the red "Connexion" CTA for ~100-200 ms on
- * every F5 before it swaps to their avatar — jarring.
- * The selector targets `.account-anon` specifically so once
- * `refreshAccountButton` swaps the classes to `.account-authed` (or
- * `applyAuthState` removes the hint), the rule stops applying and
- * the real authed state renders without further intervention. */
+/* Returning-user fallback skeleton — used only when the session
+ * hint is set but boot-account.js found no cached snapshot (first
+ * login on this device, cache wiped). Paints the authed pill shape
+ * (white surface + avatar circle, no name) before Firebase resolves.
+ *
+ * The common path is now handled by boot-account.js: when a snapshot
+ * exists it flips the markup to `.account-authed` with real content
+ * pre-paint, so this rule no longer applies. Width is content-driven
+ * — the once-per-user skeleton-to-authed shift this fallback can
+ * still cause is accepted in exchange for the right pill width
+ * everywhere else. */
 html.has-session-hint .account.account-anon {
   background: var(--surface);
   border-color: var(--border);
@@ -425,11 +426,11 @@ html.has-session-hint .account.account-anon::after {
   flex-shrink: 0;
 }
 html.has-session-hint .account.account-anon .account-name {
-  /* Width (140px) is set by the joint .account-authed/.has-session-hint
-   * rule below — same value on both sides so the slot doesn't shift
-   * when refreshAccountButton swaps the placeholder for the real
-   * label. We just hide the literal "Connexion" text here so it
-   * doesn't peek through during the skeleton phase. */
+  /* Hide the literal "Connexion" text while we're in the fallback
+   * skeleton — the user is signed in per the hint, the CTA shouldn't
+   * peek through. `visibility: hidden` keeps the span's natural
+   * width so the pill still has a sensible size during the brief
+   * skeleton window. */
   visibility: hidden;
 }
 .account-avatar {
@@ -453,19 +454,14 @@ html.has-session-hint .account.account-anon .account-name {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Authed + skeleton states: lock the name slot to a fixed width so
- * the header doesn't shift when refreshAccountButton swaps the
- * skeleton out for the real label. Without this, the slot rétrécit
- * pour un displayName court ("Matthieu", ~55 px) puis s'élargit pour
- * un email long (~155 px) au prochain refresh. 140 px loge confort-
- * ablement un "prénom + initiale" et ellipsise les emails longs (la
- * version complète reste visible dans le menu déroulant). Scope
- * explicit : NOT applied to the pure anon state (no session hint, no
- * user) so the "Connexion" CTA garde sa largeur naturelle. */
-.account-authed .account-name,
-html.has-session-hint .account.account-anon .account-name {
-  width: 140px;
-}
+/* Width is content-driven now — boot-account.js paints the cached
+ * display name into the pill pre-paint, so a returning user sees
+ * the right size from frame 1 and short names ("Cyntaël", ~55 px)
+ * don't end up rattling around inside a 140 px slot. The previous
+ * `width: 140px` reservation existed to mask the skeleton→authed
+ * width-jump on F5; we now mask that jump by priming the real
+ * content directly. `max-width: 160px` above still ellipsises long
+ * emails. */
 .account-chev {
   color: var(--text-muted);
   display: inline-grid;

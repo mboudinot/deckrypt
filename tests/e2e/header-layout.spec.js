@@ -60,37 +60,58 @@ test("clicking a nav tab toggles its .active class + aria-selected", async ({ pa
   await expect(page.locator("#tab-play")).toHaveAttribute("aria-selected", "false");
 });
 
-test("authed account-name slot stays a fixed width across short and long labels (no header CLS)", async ({ page }) => {
-  /* Regression: the .account-name had max-width but no min-width, so
-   * the slot grew/shrank depending on displayName length and produced
-   * a header shift between boot-theme's skeleton (100 px reservation)
-   * and the real authed label. Fix : `width: 140px` locks both states
-   * to the same slot. */
+test("authed account-name sizes to content, ellipsises long labels at max-width", async ({ page }) => {
+  /* Previous contract was the opposite — a `width: 140px` lock to
+   * prevent the boot-theme skeleton from jumping to the real label.
+   * That left ~60 px of empty space inside the pill for short names
+   * ("Cyntaël", "Matthieu"). New contract: the pill is sized by its
+   * content; the skeleton→authed jump is masked by boot-account.js
+   * priming the cached display name pre-paint, not by reserving
+   * width. `max-width: 160 px` still caps long labels (full version
+   * remains visible in the account dropdown header). */
   await page.locator("#btn-account.account-authed").waitFor();
   const labelLocator = page.locator(".account-authed .account-name");
 
-  /* mockAuth seeds displayName="Test User" → measure first. */
+  /* mockAuth seeds displayName="Test User" — measure the short-label
+   * width as the baseline. With `max-width: 160 px` and content
+   * sizing, "Test User" lands comfortably below the cap. */
   const initial = (await labelLocator.boundingBox()).width;
-  expect(initial).toBeGreaterThanOrEqual(138);
-  expect(initial).toBeLessThanOrEqual(142);
+  expect(initial).toBeLessThan(120);
 
-  /* Swap the label to an extreme long string in-place; width must
-   * not change. This is the precise regression scenario — replacing
-   * an account's displayName with a long email used to grow the
-   * button. */
+  /* Long email: width grows but caps at 160 px (the ellipsis kicks
+   * in beyond that). */
   await page.evaluate(() => {
     document.getElementById("account-label").textContent = "matthieu.boudinot.long@verylongdomain.example";
   });
   const longLabel = (await labelLocator.boundingBox()).width;
-  expect(longLabel).toBe(initial);
+  expect(longLabel).toBeGreaterThan(initial);
+  expect(longLabel).toBeLessThanOrEqual(160);
 
-  /* And the symmetric case: a single-char label still occupies the
-   * full 140 px slot, so the button doesn't rétrécir either. */
+  /* Single-char label shrinks to ~match the glyph (no minimum slot). */
   await page.evaluate(() => {
     document.getElementById("account-label").textContent = "M";
   });
   const shortLabel = (await labelLocator.boundingBox()).width;
-  expect(shortLabel).toBe(initial);
+  expect(shortLabel).toBeLessThan(initial);
+});
+
+test("returning user's account pill paints at content width from frame 1 (no skeleton flash)", async ({ page }) => {
+  /* mockAuth pre-seeds the account snapshot in localStorage, so
+   * boot-account.js (NON-defer script after #btn-account) primes the
+   * authed pill BEFORE the browser paints. Assertion: the very first
+   * boundingBox we can read is already at content width, AND it
+   * doesn't change once the deferred app-login.js runs and overwrites
+   * the children with the live data. */
+  const widthAtFirstQuery = await page.locator("#btn-account.account-authed").evaluate(
+    (el) => el.getBoundingClientRect().width,
+  );
+  await page.locator("#commander-zone .card").first().waitFor();
+  const widthLater = await page.locator("#btn-account.account-authed").evaluate(
+    (el) => el.getBoundingClientRect().width,
+  );
+  /* Both widths must match within sub-pixel rounding — proves the
+   * priming and the live refresh land on the same geometry. */
+  expect(Math.abs(widthLater - widthAtFirstQuery)).toBeLessThanOrEqual(1);
 });
 
 test("deck pill shows the active deck name + a non-zero cards count", async ({ page }) => {

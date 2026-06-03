@@ -104,6 +104,34 @@ function setSessionHint(authed) {
   } catch (e) { /* localStorage blocked — falls back to flash, acceptable */ }
 }
 
+/* Cached display label + initials for the account button. Read by
+ * `js/boot-account.js` synchronously pre-paint, so a returning user's
+ * pill renders with the real name + avatar initial from the first
+ * frame — instead of a fixed-width skeleton that has to be hidden by
+ * CSS to avoid a width shift. Updated on every auth transition + on
+ * displayName changes; cleared on signOut. */
+const ACCOUNT_SNAPSHOT_KEY = "mtg-hand-sim:account-snapshot-v1";
+function _initialsOf(user) {
+  const src = user.displayName || user.email || "?";
+  const parts = src.split(/[\s@.]+/).filter(Boolean);
+  const first = parts[0]?.[0] || "?";
+  const second = parts[1]?.[0] || "";
+  return (first + second).toUpperCase().slice(0, 2);
+}
+function setAccountSnapshot(user) {
+  try {
+    if (user) {
+      const payload = {
+        name: user.displayName || user.email || "Mon compte",
+        initial: _initialsOf(user),
+      };
+      localStorage.setItem(ACCOUNT_SNAPSHOT_KEY, JSON.stringify(payload));
+    } else {
+      localStorage.removeItem(ACCOUNT_SNAPSHOT_KEY);
+    }
+  } catch (e) { /* localStorage blocked */ }
+}
+
 /* Test seam — Playwright sets window.__deckryptTestUser via
  * addInitScript so the auth-gated boot works without hitting real
  * Firebase. In test mode we skip the onAuthStateChanged subscription
@@ -116,6 +144,7 @@ if (TEST_MODE) {
   cachedUser = { ...window.__deckryptTestUser };
   authResolved = true;
   setSessionHint(true);
+  setAccountSnapshot(cachedUser);
 } else {
   onAuthStateChanged(auth, (fbUser) => {
     const next = toUser(fbUser);
@@ -123,6 +152,7 @@ if (TEST_MODE) {
     cachedUser = next;
     authResolved = true;
     setSessionHint(!!next);
+    setAccountSnapshot(next);
     /* Logout transition (token expired, signed-out from another tab,
      * etc.): wipe the localStorage deck cache so the next user on
      * this browser can't read the previous one's data. Same defense
@@ -244,6 +274,7 @@ async function confirmPasswordReset(oobCode, newPassword) {
 async function updateDisplayName(name) {
   if (TEST_MODE) {
     if (cachedUser) cachedUser = { ...cachedUser, displayName: name || null };
+    setAccountSnapshot(cachedUser);
     for (const cb of authSubscribers) {
       try { cb(cachedUser); } catch (e) { console.error("auth subscriber threw:", e); }
     }
@@ -253,6 +284,7 @@ async function updateDisplayName(name) {
   if (!fbUser) throw new Error("not signed in");
   await updateProfile(fbUser, { displayName: name || "" });
   cachedUser = toUser(fbUser);
+  setAccountSnapshot(cachedUser);
   for (const cb of authSubscribers) {
     try { cb(cachedUser); } catch (e) { console.error("auth subscriber threw:", e); }
   }
@@ -372,6 +404,7 @@ async function deleteAccount({ currentPassword } = {}) {
    * deleteUser-triggered subscriber call sees an empty cache. */
   try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
   try { localStorage.removeItem("mtg-hand-sim:active-deck-id:v1"); } catch (e) {}
+  setAccountSnapshot(null);
   if (window.syncQueue?.queueKeyForUid) {
     try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uid)); } catch (e) {}
   }
@@ -391,6 +424,7 @@ async function signOut() {
   try { localStorage.removeItem("mtg-hand-sim:user-decks-v1"); } catch (e) {}
   try { localStorage.removeItem("mtg-hand-sim:active-deck-id:v1"); } catch (e) {}
   setSessionHint(false);
+  setAccountSnapshot(null);
   if (uidToCleanup && window.syncQueue?.queueKeyForUid) {
     try { localStorage.removeItem(window.syncQueue.queueKeyForUid(uidToCleanup)); } catch (e) {}
     notifyQueueChange();

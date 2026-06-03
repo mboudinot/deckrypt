@@ -256,6 +256,23 @@ export async function mockAuth(page, user = {
      * would briefly paint the locked state before our auth handler
      * unlocks it. */
     localStorage.setItem("mtg-hand-sim:has-session-v1", "1");
+    /* Mirror sync.js: in TEST_MODE it primes both the session hint
+     * AND the account snapshot at module init. Pre-seeding the
+     * snapshot in localStorage means boot-account.js (which runs
+     * BEFORE sync.js) paints the authed pill at content width on the
+     * first page load — matches the post-refresh prod behaviour for
+     * returning users. */
+    const initialsOf = (src) => {
+      const parts = src.split(/[\s@.]+/).filter(Boolean);
+      const first = parts[0]?.[0] || "?";
+      const second = parts[1]?.[0] || "";
+      return (first + second).toUpperCase().slice(0, 2);
+    };
+    const src = u.displayName || u.email || "?";
+    localStorage.setItem("mtg-hand-sim:account-snapshot-v1", JSON.stringify({
+      name: u.displayName || u.email || "Mon compte",
+      initial: initialsOf(src),
+    }));
   }, user);
 }
 
