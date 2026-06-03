@@ -99,9 +99,240 @@ function renderAnalyzeView() {
   renderManaCurveChart(fullDeck);
   renderTypeChart(fullDeck);
   renderManaBasePanel(fullDeck);
+  renderSimulationPanel(resolved);
   renderSubtypesPanel(fullDeck);
   renderTokensPanel(fullDeck);
 }
+
+/* Goldfish simulation panel: one "run vitrine" (timeline of 7 turns
+ * + final state) plus aggregated stats over N runs. Both share the
+ * same base seed so "Relancer" reshuffles everything. */
+const SIM_RUN_COUNT = 500;
+/* Monotonic id incremented on each `_drawSimulation` call. The async
+ * FR-translation re-render checks this id to avoid clobbering a more
+ * recent draw when the user clicks "Relancer" while a fetch is in
+ * flight (or when the deck switches mid-fetch). */
+let _simRenderId = 0;
+
+function renderSimulationPanel(resolved) {
+  const deck = resolved.deck;
+  const commanders = resolved.commanders;
+  els.analyzeSim.replaceChildren();
+  if (deck.length < 7) {
+    els.analyzeSimInfo.textContent = "—";
+    els.analyzeSimReshuffle.hidden = true;
+    els.analyzeSim.appendChild(placeholderText(
+      "Le deck doit contenir au moins 7 cartes pour simuler une main de départ."));
+    return;
+  }
+  els.analyzeSimReshuffle.hidden = false;
+  const draw = () => _drawSimulation(deck, commanders);
+  draw();
+  els.analyzeSimReshuffle.onclick = draw;
+}
+
+function _drawSimulation(deck, commanders) {
+  const baseSeed = Math.floor(Math.random() * 0xFFFFFFFF);
+  const run = simulateGame(deck, commanders, { seed: baseSeed, onPlay: true });
+  const stats = runSimulations(deck, commanders, SIM_RUN_COUNT, { seed: baseSeed, onPlay: true });
+  els.analyzeSimInfo.textContent = `1 partie + ${stats.runs} simulations`;
+
+  /* FR card names via the shared translations cache (same Scryfall
+   * `lang:fr` pipeline as the manage view's EN/FR switch). Render
+   * synchronously with whatever's already cached, then re-render once
+   * the missing names land. The re-render guard avoids clobbering a
+   * later "Relancer" that fired while a fetch was in flight. */
+  const allNames = [...new Set([...deck, ...commanders].map((c) => c.name))];
+  const myRunId = ++_simRenderId;
+  const render = () => {
+    if (myRunId !== _simRenderId) return;
+    const tr = bulkTranslationLookup();
+    els.analyzeSim.replaceChildren();
+    els.analyzeSim.appendChild(_buildSimStats(stats));
+    els.analyzeSim.appendChild(_buildSimTimeline(run, tr));
+    els.analyzeSim.appendChild(_buildSimFinalState(run, tr));
+    els.analyzeSim.appendChild(_buildSimNote());
+  };
+  render();
+  fetchFrenchNames(allNames).then(render);
+}
+
+function _buildSimStats(stats) {
+  const wrap = document.createElement("div");
+  wrap.className = "sim-stats";
+  const fmtTurn = (t) => t === null ? "—" : `T${t.toFixed(1)}`;
+  const fmtPct = (p) => `${Math.round(p * 100)} %`;
+  const tiles = [
+    {
+      label: "Mains gardables",
+      value: fmtPct(stats.keepablePct),
+      tip: "Part des mains de 7 cartes avec 2 à 5 terrains (heuristique simple)",
+    },
+    {
+      label: "Commandant lancé",
+      value: stats.commanderAvgTurn === null
+        ? "—"
+        : `${fmtTurn(stats.commanderAvgTurn)} (${fmtPct(stats.commanderCastPct)})`,
+      tip: "Tour moyen de cast du commandant, et part des parties où il est cast en 7 tours",
+    },
+    {
+      label: "Premier sort à 5+ CMC",
+      value: stats.bigSpellAvgTurn === null
+        ? "—"
+        : `${fmtTurn(stats.bigSpellAvgTurn)} (${fmtPct(stats.bigSpellPct)})`,
+      tip: "Tour moyen du premier sort de CMC ≥ 5, et part des parties où ça arrive",
+    },
+    {
+      label: "Tours sans cast",
+      value: stats.avgStuckTurns.toFixed(1),
+      tip: "Moyenne de tours où aucun sort n'est lancé alors qu'on a un sort en main (mana bloqué)",
+    },
+  ];
+  for (const t of tiles) {
+    const tile = document.createElement("div");
+    tile.className = "sim-stat-tile";
+    tile.title = t.tip;
+    const num = document.createElement("strong");
+    num.textContent = t.value;
+    const lab = document.createElement("span");
+    lab.textContent = t.label;
+    tile.append(num, lab);
+    wrap.appendChild(tile);
+  }
+  return wrap;
+}
+
+function _buildSimTimeline(run, tr) {
+  const wrap = document.createElement("div");
+  wrap.className = "sim-timeline";
+  const head = document.createElement("div");
+  head.className = "sim-timeline-head";
+  head.textContent = "Run vitrine — sur le jeu, 7 tours";
+  wrap.appendChild(head);
+
+  for (const turn of run.turns) {
+    const row = document.createElement("div");
+    row.className = "sim-turn";
+    const num = document.createElement("div");
+    num.className = "sim-turn-num";
+    num.textContent = `T${turn.turn}`;
+    row.appendChild(num);
+
+    const body = document.createElement("div");
+    body.className = "sim-turn-body";
+
+    body.appendChild(_buildSimAction("Pioché", turn.drew ? [turn.drew] : [], null, tr));
+    body.appendChild(_buildSimAction("Posé", turn.playedLand ? [turn.playedLand] : [], null, tr));
+    body.appendChild(_buildSimAction(
+      "Lancé",
+      turn.cast.map((c) => c.card),
+      turn.cast,
+      tr,
+    ));
+
+    row.appendChild(body);
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function _buildSimAction(label, cards, castInfo, tr) {
+  const line = document.createElement("div");
+  line.className = "sim-turn-line";
+  const lab = document.createElement("span");
+  lab.className = "sim-turn-label";
+  lab.textContent = label;
+  line.appendChild(lab);
+  if (cards.length === 0) {
+    const dash = document.createElement("span");
+    dash.className = "sim-turn-empty";
+    dash.textContent = "—";
+    line.appendChild(dash);
+    return line;
+  }
+  const list = document.createElement("span");
+  list.className = "sim-turn-cards";
+  cards.forEach((c, i) => {
+    if (i > 0) list.append(", ");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "sim-card-link";
+    btn.textContent = (tr && tr(c.name)) || c.name;
+    btn.addEventListener("click", () => showModal(c, []));
+    list.appendChild(btn);
+    if (castInfo?.[i]?.fromCommand) {
+      const tag = document.createElement("span");
+      tag.className = "sim-tag";
+      tag.textContent = "commandant";
+      list.appendChild(tag);
+    }
+  });
+  line.appendChild(list);
+  return line;
+}
+
+/* End-of-turn-7 snapshot: battlefield grouped, hand size, library
+ * remaining. Cards open the standard zoom modal. */
+function _buildSimFinalState(run, tr) {
+  const wrap = document.createElement("div");
+  wrap.className = "sim-final";
+  const head = document.createElement("div");
+  head.className = "sim-final-head";
+  head.textContent = "État au début du tour 8";
+  wrap.appendChild(head);
+
+  const groups = { land: [], rock: [], dork: [], creature: [], other: [] };
+  for (const p of run.battlefield) {
+    if (p.type === "land") groups.land.push(p.card);
+    else if (p.type === "rock") groups.rock.push(p.card);
+    else if (p.type === "dork") groups.dork.push(p.card);
+    else if (p.type === "creature") groups.creature.push(p.card);
+    else groups.other.push(p.card);
+  }
+  const sections = [
+    ["En jeu — terrains", groups.land],
+    ["En jeu — sources de mana", [...groups.rock, ...groups.dork]],
+    ["En jeu — créatures", groups.creature],
+    ["En jeu — autres permanents", groups.other],
+    ["En main", run.hand],
+  ];
+  for (const [label, list] of sections) {
+    if (list.length === 0) continue;
+    const sec = document.createElement("div");
+    sec.className = "sim-final-row";
+    const lab = document.createElement("span");
+    lab.className = "sim-final-label";
+    lab.textContent = `${label} (${list.length})`;
+    sec.appendChild(lab);
+    const cards = document.createElement("span");
+    cards.className = "sim-final-cards";
+    list.forEach((c, i) => {
+      if (i > 0) cards.append(", ");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sim-card-link";
+      btn.textContent = (tr && tr(c.name)) || c.name;
+      btn.addEventListener("click", () => showModal(c, []));
+      cards.appendChild(btn);
+    });
+    sec.appendChild(cards);
+    wrap.appendChild(sec);
+  }
+
+  const tail = document.createElement("div");
+  tail.className = "sim-final-tail";
+  tail.textContent = `Bibliothèque : ${run.libraryLeft} cartes restantes`;
+  wrap.appendChild(tail);
+  return wrap;
+}
+
+function _buildSimNote() {
+  const note = document.createElement("p");
+  note.className = "sim-note";
+  note.textContent = "Simulation goldfish (sans adversaire) : on pioche, on pose une terre, on lance le sort le plus pertinent à chaque tour (rocks/dorks/ramp avant les gros sorts). Pas de mulligan, pas de cascade, pas d'effets résolus — la simulation teste la cohérence de la base de mana et de la courbe, pas les combos.";
+  return note;
+}
+
 
 function renderManaBasePanel(deck) {
   const manaBase = analyzeManaBase(deck);

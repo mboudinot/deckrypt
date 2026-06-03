@@ -73,6 +73,7 @@
 <script defer src="js/deck-archetypes.js"></script>
 <script defer src="js/deck-suggestions.js"></script>
 <script defer src="js/deck-mana-base.js"></script>
+<script defer src="js/deck-simulator.js"></script>
 <script defer src="js/deck-export.js"></script>
 <script defer src="js/game.js"></script>
 <script defer src="js/drag.js"></script>
@@ -672,6 +673,15 @@
           <div class="mana-base-panel" id="analyze-mana-base"></div>
         </section>
       </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Simulation de partie</h3>
+          <span class="panel-meta" id="analyze-sim-info">—</span>
+          <button type="button" class="btn sim-reshuffle" id="analyze-sim-reshuffle" hidden>Relancer</button>
+        </div>
+        <div class="sim-panel" id="analyze-sim"></div>
+      </section>
 
       <section class="panel">
         <div class="panel-head">

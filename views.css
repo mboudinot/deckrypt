@@ -1347,6 +1347,150 @@
   margin: 12px 0 0 0;
 }
 
+/* Goldfish simulation panel: stat tiles row, vertical 7-turn timeline,
+   final state recap. Cards are inlined as text-buttons that open the
+   standard zoom modal — keeps the panel scannable without a wall of
+   card thumbnails. */
+.sim-panel { display: flex; flex-direction: column; gap: 16px; }
+.sim-reshuffle { margin-left: auto; }
+/* `.btn` sets `display: inline-flex` which wins the cascade against the
+   UA stylesheet's `[hidden] { display: none }`. Override explicitly so
+   the reshuffle button truly disappears when the panel is in its
+   "deck too small" state. */
+.sim-reshuffle[hidden] { display: none; }
+.sim-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.sim-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.sim-stat-tile strong {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.sim-stat-tile span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.sim-timeline,
+.sim-final {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.sim-timeline-head,
+.sim-final-head {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.sim-turn {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.sim-turn:first-of-type { border-top: none; }
+.sim-turn-num {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.sim-turn-body { display: flex; flex-direction: column; gap: 2px; }
+.sim-turn-line {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 8px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.sim-turn-label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.sim-turn-empty { color: var(--text-muted); }
+.sim-final-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  padding: 4px 0;
+}
+.sim-final-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.sim-final-cards { font-size: 0.9rem; line-height: 1.5; }
+.sim-final-tail {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+/* Inline text-button. The global `button:hover:not(:disabled)` rule
+   (specificity 0,2,1) paints the bg in `var(--accent)` with the text
+   tight against the edges — looks cramped in flowing text. We override
+   with a softer surface bg and add padding so the highlight has some
+   breathing room around the glyphs; the negative margin keeps the
+   button from pushing its neighbours apart. */
+.sim-card-link {
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  margin: 0 -2px;
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted var(--border-strong);
+  text-underline-offset: 2px;
+}
+.sim-card-link:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--accent);
+  border-color: transparent;
+}
+.sim-tag {
+  margin-left: 4px;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+.sim-note {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  line-height: 1.45;
+  margin: 0;
+}
+
 /* Token grid: small thumbnails of each token the deck can produce. */
 .token-grid {
   display: grid;

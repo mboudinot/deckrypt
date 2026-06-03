@@ -206,6 +206,9 @@ function _cacheAnalyzeElements() {
   els.analyzeTokensInfo = document.getElementById("analyze-tokens-info");
   els.analyzeManaBase = document.getElementById("analyze-mana-base");
   els.analyzeManaBaseInfo = document.getElementById("analyze-mana-base-info");
+  els.analyzeSim = document.getElementById("analyze-sim");
+  els.analyzeSimInfo = document.getElementById("analyze-sim-info");
+  els.analyzeSimReshuffle = document.getElementById("analyze-sim-reshuffle");
 }
 
 function _cacheGalleryElements() {
@@ -577,6 +580,38 @@ function clearActiveView() {
   if (typeof renderManageView === "function") renderManageView();
   if (typeof renderAnalyzeView === "function") renderAnalyzeView();
   if (typeof renderGalleryView === "function") renderGalleryView();
+}
+
+/* Neutral "we don't yet know if you have decks" state, used between
+ * boot and Firebase confirming the user's deck list. Avoids the
+ * empty-state CTA flashing (« Aucun deck, importes-en un ») to a user
+ * who actually has cloud decks but whose localStorage cache hasn't
+ * been hydrated yet — typical of a fresh sign-in (cache wiped on the
+ * previous signOut) or a sign-out→sign-in round-trip in the same tab.
+ *
+ * Differs from `clearActiveView` in two ways:
+ *  - does NOT add `view-empty` anywhere — the CTA is suppressed until
+ *    we actually know the user has zero decks.
+ *  - paints quiet "Chargement…" placeholders + manage/analyze skeletons
+ *    instead of the empty-state markup, so a tab switch mid-load lands
+ *    on something coherent. */
+function setHydratingView() {
+  state.resolved = null;
+  state.game = null;
+  els.viewPlay.classList.remove("view-empty");
+  els.viewManage.classList.remove("view-empty");
+  els.viewAnalyze.classList.remove("view-empty");
+  els.viewGallery.classList.remove("view-empty");
+  els.commanderZone.replaceChildren(placeholderText("Chargement…"));
+  els.hand.replaceChildren(placeholderText("Chargement…"));
+  els.battlefield.replaceChildren(placeholderText("Chargement…"));
+  els.lands.replaceChildren(placeholderText("Chargement…"));
+  els.graveyard.replaceChildren(placeholderText("Chargement…"));
+  setStatus("Chargement…");
+  renderGameBar();
+  updateButtons();
+  showManageSkeleton();
+  showAnalyzeSkeleton();
 }
 
 async function switchDeck(deckId) {
@@ -1126,7 +1161,7 @@ function showAnalyzeSkeleton() {
   for (const el of [
     els.analyzeBracket, els.analyzeLegality, els.analyzeArchetypes,
     els.analyzeSuggestions, els.analyzeThemes, els.analyzeCurve,
-    els.analyzeTypes, els.analyzeManaBase,
+    els.analyzeTypes, els.analyzeManaBase, els.analyzeSim,
     els.analyzeSubtypes, els.analyzeTokens,
   ]) {
     el.replaceChildren(makeSkeletonBlock());
@@ -1417,7 +1452,12 @@ function init() {
   if (hasSessionHint && state.currentDeckId) {
     switchDeck(state.currentDeckId);
   } else {
-    clearActiveView();
+    /* No hint OR hint without a cached active deck → we don't know yet
+     * whether the user has decks. Paint a hydrating placeholder; the
+     * onAuthChange handler below resolves it (switchDeck if cloud has
+     * decks, clearActiveView if confirmed empty). The empty-state CTA
+     * is reserved for that confirmed-empty case. */
+    setHydratingView();
   }
 
   /* Honour the user's "default view at open" preference set in
@@ -1474,7 +1514,14 @@ function init() {
        * picks up any cloud-side change, the deckCache.delete forces a
        * fresh resolve in case cloud returned a different version of
        * the active deck, and switchDeck re-renders. Cache hits make
-       * this visually invisible in the happy case. */
+       * this visually invisible in the happy case.
+       *
+       * When NO deck is currently rendered (`state.resolved` null:
+       * fresh sign-in via the login form, or a sign-out→sign-in within
+       * the same tab where clearActiveView posted the empty CTA), paint
+       * a hydrating placeholder so the user doesn't see "Aucun deck"
+       * during the Firestore round-trip below. */
+      if (!state.resolved) setHydratingView();
       try { await window.sync.loadAllDecks(); }
       catch (e) { console.warn("Cloud deck load failed (will retry on next sync trigger):", e); }
       populateDeckSelect();

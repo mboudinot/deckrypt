@@ -114,3 +114,25 @@ test("warm-cache F5 with a seeded deck: skips the loading flash and renders sync
   expect(text).not.toMatch(/Chargement/);
   await expect(page.locator("#commander-zone .card").first()).toBeVisible();
 });
+
+test("setHydratingView: suppresses the empty CTA across all 4 views and paints Chargement… placeholders", async ({ page }) => {
+  /* Regression for the empty-state flash on fresh sign-in. When the
+   * user signs in but Firestore hasn't yet returned their deck list,
+   * we paint a hydrating placeholder (no `view-empty` anywhere)
+   * instead of the « Aucun deck » CTA — that CTA is only correct once
+   * we've confirmed the cloud is genuinely empty. Pins the contract:
+   * the helper clears `view-empty` from all four views and the play
+   * zones show "Chargement…". */
+  await mockAuth(page);
+  await page.goto("/index.html");
+  /* Wait for the post-loadAllDecks settled state (empty CTA visible),
+   * then call setHydratingView via the global classic-defer scope and
+   * assert the hydrating contract. */
+  await expect(page.locator("#view-play")).toHaveClass(/view-empty/);
+  await page.evaluate(() => window.setHydratingView());
+  for (const viewId of ["#view-play", "#view-manage", "#view-analyze", "#view-gallery"]) {
+    await expect(page.locator(viewId)).not.toHaveClass(/view-empty/);
+  }
+  await expect(page.locator("#commander-zone")).toContainText("Chargement");
+  await expect(page.locator("#hand")).toContainText("Chargement");
+});
