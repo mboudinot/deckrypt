@@ -56,13 +56,28 @@ function setupSlidingIndicator(container, opts = {}) {
    * between a leave-from-A and an enter-on-B firing in either order. */
   container.addEventListener("mouseleave", positionOnActive);
 
+  /* Track real-mouse hover via pointer events filtered on `pointerType
+   * === "mouse"`. Was `container.matches(":hover")`, which on touch
+   * devices stays true past the tap (synthesized :hover) and blocked
+   * the MutationObserver's reposition below — the indicator never
+   * followed a tab tap on mobile. Pointer-typed tracking works on
+   * hybrid devices too (a touch tap doesn't set the flag even if
+   * `(hover: hover)` media query matches). */
+  let mouseInside = false;
+  container.addEventListener("pointerenter", (e) => {
+    if (e.pointerType === "mouse") mouseInside = true;
+  });
+  container.addEventListener("pointerleave", (e) => {
+    if (e.pointerType === "mouse") mouseInside = false;
+  });
+
   /* Active-class flips (click, keyboard, programmatic switchView)
    * don't necessarily resize the container, so ResizeObserver
    * wouldn't catch them — we still need a MutationObserver on the
-   * items. Skip while the pointer is inside the container so the
-   * indicator stays on the hover target instead of snapping back. */
+   * items. Skip while a real mouse is inside so the indicator stays
+   * on the hover target instead of snapping back. */
   const classObserver = new MutationObserver(() => {
-    if (!container.matches(":hover")) positionOnActive();
+    if (!mouseInside) positionOnActive();
   });
   for (const item of items) {
     classObserver.observe(item, { attributes: true, attributeFilter: ["class"] });
@@ -71,9 +86,12 @@ function setupSlidingIndicator(container, opts = {}) {
   /* ResizeObserver covers every reflow that shifts item geometry
    * (theme switch, web-font load completion, viewport resize). It
    * fires AFTER the layout pass by contract, so no rAF dance needed
-   * — the measurements we read are guaranteed up-to-date. */
+   * — the measurements we read are guaranteed up-to-date. Same
+   * `mouseInside` gate as the class observer: a stuck synthesized
+   * :hover on touch must not anchor the indicator to the wrong tab
+   * after a viewport rotate / resize. */
   const sizeObserver = new ResizeObserver(() => {
-    const hovered = container.querySelector(`${itemSelector}:hover`);
+    const hovered = mouseInside ? container.querySelector(`${itemSelector}:hover`) : null;
     positionOn(hovered || container.querySelector(`${itemSelector}.${activeClass}`));
   });
   sizeObserver.observe(container);

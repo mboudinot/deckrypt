@@ -76,6 +76,36 @@ test("clicking a tab moves the indicator to it once the cursor leaves the nav", 
   }, { timeout: 1000 }).toBeLessThanOrEqual(2);
 });
 
+test("tapping a tab on touch follows the new active without needing a mouse-leave", async ({ browser }) => {
+  /* Mobile regression: the MutationObserver used to gate on
+   * `container.matches(":hover")` to avoid snapping the indicator
+   * during a real hover. On touch devices the synthesized :hover
+   * sticks past the tap, so the gate fired indefinitely and the
+   * indicator never followed a tab tap (visible as "Gérer underlined
+   * while Analyser is the active red text"). The fix tracks real-
+   * mouse hover via pointer events filtered on pointerType. */
+  const ctx = await browser.newContext({
+    hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 },
+  });
+  const page = await ctx.newPage();
+  await mockScryfall(page);
+  await mockAuth(page);
+  await seedSultaiDeck(page);
+  await page.goto("/index.html");
+  await page.locator("#commander-zone .card").first().waitFor();
+
+  await page.locator("#tab-analyze").tap();
+  const indicator = page.locator(".nav-indicator");
+  const newActive = page.locator("#tab-analyze");
+  await expect.poll(async () => {
+    const i = await indicator.boundingBox();
+    const t = await newActive.boundingBox();
+    return Math.abs(i.x - t.x);
+  }, { timeout: 1500 }).toBeLessThanOrEqual(2);
+
+  await ctx.close();
+});
+
 /* CSS-only fallback: simulate JS-disabled by removing .has-indicator
  * from the nav. The .nav-tab.active rules must keep the active visual
  * even when hovered. Two tests, one per theme. */
