@@ -677,16 +677,24 @@
  * pre-textarea so the user sees the constraint BEFORE typing
  * (placeholders vanish on first keystroke and can't carry the
  * message past that point). */
+/* Inline text flow on purpose: the hint mixes plain text + a <code>
+ * sample, so it must wrap as one paragraph. A `display: flex` parent
+ * promotes each text node to an anonymous flex item, which on narrow
+ * viewports splits the sentence into 3-4 stacked columns ("Sans code
+ * d'édition" | "(CMD) 261" | ", les noms…"). Block flow + inline-
+ * aligned icon keeps the sentence as one wrapping paragraph. */
 .paste-hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   margin: 4px 0 6px;
   font-size: 0.8rem;
   color: var(--text-muted);
   line-height: 1.4;
 }
-.paste-hint svg { flex-shrink: 0; opacity: 0.75; }
+.paste-hint svg {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 6px;
+  opacity: 0.75;
+}
 .paste-hint code {
   font-family: var(--font-mono);
   font-size: 0.75rem;

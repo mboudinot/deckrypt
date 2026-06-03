@@ -366,3 +366,22 @@ test("Drop d'un .txt sur la section 'Ajouter une carte' remplit le textarea (ove
   await expect(page.locator("#add-card-paste-text")).toHaveValue("2 Counterspell");
   await expect(page.locator(".flash-success")).toHaveCount(0);
 });
+
+test("paste-hint stays as a single wrapping paragraph on a narrow viewport", async ({ page }) => {
+  /* Regression: the hint used to be `display: flex`, which promoted
+   * each text node ("Sans code d'édition", ", les noms doivent…") to
+   * a separate anonymous flex item. On mobile that split the sentence
+   * into 3-4 stacked columns around the inline `<code>` sample. The
+   * fix reverts the parent to block flow with the icon as inline-
+   * block so the sentence wraps naturally as one paragraph. */
+  await page.setViewportSize({ width: 400, height: 800 });
+  const hint = page.locator(".add-card-paste .paste-hint");
+  await expect(hint).toBeVisible();
+  await expect(hint).toHaveCSS("display", "block");
+  /* The whole hint fits in ~2 visual lines (~40 px) at 400 px wide.
+   * Threshold at 80 px catches the broken stacked-columns layout
+   * (which measured ~120 px+) without false-positiving on small font
+   * tweaks. */
+  const box = await hint.boundingBox();
+  expect(box.height).toBeLessThan(80);
+});
