@@ -37,7 +37,9 @@
        * current auth state. */
       refreshThemeSelection();
       refreshSegmented("default-view", localStorage.getItem(STORAGE_KEYS.defaultView) || "play");
-      refreshSegmented("card-lang", localStorage.getItem(STORAGE_KEYS.cardLang) || "en");
+      // `state.cardLang` is the source of truth (reflects the FR default
+      // even before anything is written to localStorage).
+      refreshSegmented("card-lang", state.cardLang);
       renderAccountCard();
       /* Defer focus so the modal has rendered. */
       requestAnimationFrame(() => {
@@ -110,6 +112,14 @@
               && prefs.theme !== document.documentElement.getAttribute("data-direction")) {
             applyTheme(prefs.theme, { remote: true });
           }
+          /* Adopt the synced card language if it differs from what the
+           * local boot resolved. setCardLanguage is a no-op when equal,
+           * and re-renders every view (in FR it also fetches names). */
+          if (prefs && (prefs.cardLang === "en" || prefs.cardLang === "fr")
+              && prefs.cardLang !== state.cardLang
+              && typeof window.setCardLanguage === "function") {
+            window.setCardLanguage(prefs.cardLang);
+          }
         }).catch(() => { /* offline / rules — silent */ });
       });
     }
@@ -141,10 +151,10 @@
           if (key) {
             try { localStorage.setItem(key, value); } catch (e) { /* ignore */ }
           }
-          /* Card language affects the manage view immediately — give
-           * the app a chance to react if its hook exists. */
-          if (group === "card-lang" && typeof window.setManageLanguage === "function") {
-            window.setManageLanguage(value);
+          /* Card language is global — setCardLanguage persists it
+           * (local + Firestore) and re-renders every deck view. */
+          if (group === "card-lang" && typeof window.setCardLanguage === "function") {
+            window.setCardLanguage(value);
           }
         });
       }

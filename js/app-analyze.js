@@ -257,7 +257,7 @@ function _buildSimAction(label, cards, castInfo, tr) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "sim-card-link";
-    btn.textContent = (tr && tr(c.name)) || c.name;
+    btn.textContent = cardDisplayName(c.name, tr);
     btn.addEventListener("click", () => showModal(c, []));
     list.appendChild(btn);
     if (castInfo?.[i]?.fromCommand) {
@@ -311,7 +311,7 @@ function _buildSimFinalState(run, tr) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "sim-card-link";
-      btn.textContent = (tr && tr(c.name)) || c.name;
+      btn.textContent = cardDisplayName(c.name, tr);
       btn.addEventListener("click", () => showModal(c, []));
       cards.appendChild(btn);
     });
@@ -1122,7 +1122,7 @@ async function renderTokensPanel(deck) {
     const tr = bulkTranslationLookup();
     els.analyzeTokens.replaceChildren();
     for (const t of tokens) {
-      const frName = tr(t.name) || t.name;
+      const frName = cardDisplayName(t.name, tr);
       const tile = document.createElement("button");
       tile.type = "button";
       tile.className = "token-tile";
@@ -1165,7 +1165,7 @@ async function renderTokensPanel(deck) {
       row.className = "token-source-row";
       const label = document.createElement("span");
       label.className = "token-source-label";
-      label.textContent = tr(t.name) || t.name;
+      label.textContent = cardDisplayName(t.name, tr);
       row.appendChild(label);
       const list = document.createElement("span");
       sources.forEach((c, i) => {
@@ -1173,7 +1173,7 @@ async function renderTokensPanel(deck) {
         const link = document.createElement("button");
         link.type = "button";
         link.className = "sim-card-link";
-        link.textContent = tr(c.name) || c.name;
+        link.textContent = cardDisplayName(c.name, tr);
         link.addEventListener("click", () => showModal(c, []));
         list.appendChild(link);
       });

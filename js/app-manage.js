@@ -11,39 +11,47 @@
  * renderSideBracket — split out when this file passed 1300 lines),
  * after pure modules, before app.js. */
 
-const MANAGE_LANG_KEY = "mtg-hand-sim:manage-lang";
+// Kept literal across the rename to the global card-language preference
+// so existing users' saved choice isn't orphaned.
+const CARD_LANG_KEY = "mtg-hand-sim:manage-lang";
 
 /* Set of English card names whose French translation is currently
  * being fetched. Drives the per-row "is-translating" spinner so the
  * user sees feedback on each card individually as batches land. */
 const pendingTranslations = new Set();
 
-/* Resolve an entry's display name to its French translation when the
- * manage-language toggle is on FR and a translation is cached.
- * Falls back silently to the English name. */
+/* Single-name display helper for the manage view (no bulk closure):
+ * delegates to the shared `cardDisplayName`, which honors the global
+ * card-language preference. Falls back silently to the English name. */
 function getDisplayName(entry) {
-  if (state.manageLang === "fr") {
-    const fr = getTranslation(entry.name);
-    if (fr) return fr;
-  }
-  return entry.name;
+  return cardDisplayName(entry.name, null);
 }
 
-/* Toggle the manage view between EN and FR card names. The first
- * switch to FR may take a second or two while we batch-fetch
- * translations from Scryfall — subsequent toggles are instant since
- * everything's in localStorage. */
-async function setManageLanguage(lang) {
-  if (lang !== "en" && lang !== "fr") return;
-  if (state.manageLang === lang) return;
-  state.manageLang = lang;
-  try { localStorage.setItem(MANAGE_LANG_KEY, lang); } catch (e) { /* non-fatal */ }
+/* Reflect the active card language on the Gérer EN/FR switch. Shared by
+ * the boot restore and `setCardLanguage` so the two stay in lockstep. */
+function applyCardLangButtons(lang) {
   els.langSwitchEn.classList.toggle("active", lang === "en");
   els.langSwitchFr.classList.toggle("active", lang === "fr");
   els.langSwitchEn.setAttribute("aria-pressed", String(lang === "en"));
   els.langSwitchFr.setAttribute("aria-pressed", String(lang === "fr"));
+}
 
-  if (!els.viewManage.hidden) renderManageView();
+/* Switch the global card-name language (EN/FR). Persists locally + to
+ * Firestore (alongside the theme), updates the Gérer switch, and
+ * re-renders every deck view so Analyser/Galerie follow too — not just
+ * Gérer. The first switch to FR may take a second or two while we
+ * batch-fetch translations from Scryfall; subsequent toggles are instant
+ * since everything's in localStorage. */
+async function setCardLanguage(lang) {
+  if (lang !== "en" && lang !== "fr") return;
+  if (state.cardLang === lang) return;
+  state.cardLang = lang;
+  try { localStorage.setItem(CARD_LANG_KEY, lang); } catch (e) { /* non-fatal */ }
+  if (window.sync && typeof window.sync.savePreference === "function") {
+    window.sync.savePreference("cardLang", lang).catch(() => { /* offline / rules — silent */ });
+  }
+  applyCardLangButtons(lang);
+  rerenderDeckViews();
   if (lang === "fr") await ensureFrenchTranslationsForCurrentDeck();
 }
 
@@ -53,7 +61,7 @@ async function setManageLanguage(lang) {
  * spinner on the FR button so the user knows something's happening
  * (Scryfall search batches take ~1–2 s for a 100-card deck). */
 async function ensureFrenchTranslationsForCurrentDeck() {
-  if (state.manageLang !== "fr") return;
+  if (state.cardLang !== "fr") return;
   const def = findDeck(state.currentDeckId);
   if (!def) return;
   const names = [
@@ -83,7 +91,7 @@ async function ensureFrenchTranslationsForCurrentDeck() {
       // Each completed batch clears its names from pending and
       // re-renders so those rows get their FR text + lose the spinner.
       for (const n of batch) pendingTranslations.delete(n);
-      if (state.manageLang === "fr" && !els.viewManage.hidden) renderManageView();
+      if (state.cardLang === "fr" && !els.viewManage.hidden) renderManageView();
     });
   } finally {
     pendingTranslations.clear();
@@ -91,7 +99,7 @@ async function ensureFrenchTranslationsForCurrentDeck() {
     els.translationBanner.hidden = true;
     els.langSwitchFr.classList.remove("is-loading");
   }
-  if (state.manageLang === "fr" && !els.viewManage.hidden) renderManageView();
+  if (state.cardLang === "fr" && !els.viewManage.hidden) renderManageView();
 }
 
 /* Inline rename for the active deck. Triggered by the kebab menu's
@@ -246,7 +254,7 @@ function makeManageCardRow(entry, resolvedCard, opts) {
   /* Per-render displayName closure (bulk-translation-aware) so a
    * 100-card render doesn't read localStorage 100 times. */
   const labelText = opts.displayName ? opts.displayName(entry) : getDisplayName(entry);
-  const isTranslating = state.manageLang === "fr" && pendingTranslations.has(entry.name);
+  const isTranslating = state.cardLang === "fr" && pendingTranslations.has(entry.name);
   if (isTranslating) row.classList.add("is-translating");
 
   row.appendChild(_buildCardRowThumb(entry, resolvedCard));
@@ -403,7 +411,7 @@ function renderManageView(ctx = null) {
   renderSideBracket();
 
   const cacheReader = ctx?.cacheReader || cardCacheReader();
-  const translate = state.manageLang === "fr" ? bulkTranslationLookup() : null;
+  const translate = state.cardLang === "fr" ? bulkTranslationLookup() : null;
 
   // Two layers for thumbnails:
   //   1. card-cache (per-printing) — picks up brand-new printings the
@@ -703,8 +711,19 @@ async function openPrintingPicker(entry, kind) {
   els.modal.focus();
 
   let printings;
+  let rendered = false;
   try {
-    printings = await searchPrintings(entry.name);
+    // Stream printings page-by-page: clear the loader on the first page,
+    // then append each later page's tiles to the bottom of the grid.
+    // Results stay in release-desc order, so the user scrolls down into
+    // older sets (Dominaria & earlier) as they arrive — no second loader.
+    printings = await searchPrintings(entry.name, (page) => {
+      if (!rendered) {
+        grid.replaceChildren();
+        rendered = true;
+      }
+      for (const p of page) grid.appendChild(buildPrintingTile(p, entry, kind));
+    });
   } catch (err) {
     grid.replaceChildren(placeholderText(`Erreur Scryfall : ${err.message}`));
     return;
@@ -716,59 +735,58 @@ async function openPrintingPicker(entry, kind) {
   // Cache the freshly fetched printings — they'll be useful next time
   // the deck is resolved on the play view too.
   cacheCards(printings);
+}
 
-  grid.replaceChildren();
-  for (const p of printings) {
-    /* `<div role="button">` rather than `<button>` because Chromium
-     * doesn't let a real `<button>` grow to contain the ::before
-     * padding-bottom block we use to reserve the card's aspect ratio
-     * (button's content area is an "intrinsic" rendering context).
-     * Accessibility: same `role`, `tabindex`, Enter/Space activation
-     * as a button, plus the aria-label. */
-    const tile = document.createElement("div");
-    tile.className = "printing-tile";
-    tile.setAttribute("role", "button");
-    tile.tabIndex = 0;
-    tile.title = `${p.set_name || p.set?.toUpperCase()} · #${p.collector_number}`;
-    tile.setAttribute(
-      "aria-label",
-      `Choisir ${p.name} ${p.set_name || p.set?.toUpperCase()} #${p.collector_number}`,
-    );
-    // Use "normal" (488×680) instead of "small" — at 280-320 px tile
-    // width the small version visibly blurs.
-    const src = cardImage(p, "normal");
-    if (src) {
-      /* Tiles start in `.is-loading` (shimmer animation), drop it on
-       * the image's load/error so the flat surface bg takes over. With
-       * 100+ printings of basic lands, images stream in over a few
-       * seconds — the shimmer signals progress per tile. */
-      tile.classList.add("is-loading");
-      const img = document.createElement("img");
-      img.src = src;
-      img.alt = `${p.name} (${p.set?.toUpperCase()} #${p.collector_number})`;
-      img.loading = "lazy";
-      const stopShimmer = () => tile.classList.remove("is-loading");
-      img.addEventListener("load", stopShimmer);
-      img.addEventListener("error", stopShimmer);
-      tile.appendChild(img);
-    }
-    const cap = document.createElement("span");
-    cap.className = "printing-tile-cap";
-    cap.textContent = `${(p.set || "?").toUpperCase()} · #${p.collector_number}`;
-    tile.appendChild(cap);
-    const activate = () => {
-      applyPrintingChange(entry, kind, p.set, p.collector_number);
-      closeModal();
-    };
-    tile.addEventListener("click", activate);
-    tile.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        activate();
-      }
-    });
-    grid.appendChild(tile);
+/* Build one selectable card tile for the printing picker grid.
+ * `<div role="button">` rather than `<button>` because Chromium doesn't
+ * let a real `<button>` grow to contain the ::before padding-bottom
+ * block we use to reserve the card's aspect ratio (button's content area
+ * is an "intrinsic" rendering context). Accessibility: same `role`,
+ * `tabindex`, Enter/Space activation as a button, plus the aria-label. */
+function buildPrintingTile(p, entry, kind) {
+  const tile = document.createElement("div");
+  tile.className = "printing-tile";
+  tile.setAttribute("role", "button");
+  tile.tabIndex = 0;
+  tile.title = `${p.set_name || p.set?.toUpperCase()} · #${p.collector_number}`;
+  tile.setAttribute(
+    "aria-label",
+    `Choisir ${p.name} ${p.set_name || p.set?.toUpperCase()} #${p.collector_number}`,
+  );
+  // Use "normal" (488×680) instead of "small" — at 280-320 px tile
+  // width the small version visibly blurs.
+  const src = cardImage(p, "normal");
+  if (src) {
+    /* Tiles start in `.is-loading` (shimmer animation), drop it on
+     * the image's load/error so the flat surface bg takes over. With
+     * 100+ printings of basic lands, images stream in over a few
+     * seconds — the shimmer signals progress per tile. */
+    tile.classList.add("is-loading");
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = `${p.name} (${p.set?.toUpperCase()} #${p.collector_number})`;
+    img.loading = "lazy";
+    const stopShimmer = () => tile.classList.remove("is-loading");
+    img.addEventListener("load", stopShimmer);
+    img.addEventListener("error", stopShimmer);
+    tile.appendChild(img);
   }
+  const cap = document.createElement("span");
+  cap.className = "printing-tile-cap";
+  cap.textContent = `${(p.set || "?").toUpperCase()} · #${p.collector_number}`;
+  tile.appendChild(cap);
+  const activate = () => {
+    applyPrintingChange(entry, kind, p.set, p.collector_number);
+    closeModal();
+  };
+  tile.addEventListener("click", activate);
+  tile.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activate();
+    }
+  });
+  return tile;
 }
 
 function applyPrintingChange(entry, kind, newSet, newCn) {
@@ -970,12 +988,15 @@ function openAddCardDraft(name) {
   /* Fetch printings asynchronously. If the user cancels or picks
    * another card before the response, discard via the token check. */
   const myToken = ++_draftPrintingsToken;
-  searchPrintings(name)
-    .then((printings) => {
-      if (myToken !== _draftPrintingsToken || _draftName !== name) return;
-      cacheCards(printings);
-      populateDraftPrintings(printings);
-    })
+  searchPrintings(name, (page, all) => {
+    // Progressive: render page 1 immediately, then re-render as later
+    // pages stream in (basic lands span 800+ prints across 5 pages). The
+    // <select> is rebuilt each time but keeps the user's pick — see
+    // populateDraftPrintings.
+    if (myToken !== _draftPrintingsToken || _draftName !== name) return;
+    cacheCards(page);
+    populateDraftPrintings(all);
+  })
     .catch((err) => {
       if (myToken !== _draftPrintingsToken || _draftName !== name) return;
       console.warn("Printings fetch failed", err);
@@ -990,6 +1011,10 @@ function populateDraftPrintings(printings) {
    * when no set/cn is stored). The <select> options are sorted
    * alphabetically by set name though — way easier to scan when a
    * card has 50+ printings spanning two decades. */
+  // Preserve any pick across progressive re-renders: as later pagination
+  // pages arrive the <select> is rebuilt, but the user may already have
+  // chosen an edition from page 1 — don't snap them back to default.
+  const prevValue = els.addCardDraftPrinting.value;
   _draftPrintings = printings;
   els.addCardDraftPrinting.replaceChildren();
   const def = document.createElement("option");
@@ -1027,9 +1052,14 @@ function populateDraftPrintings(printings) {
     els.addCardDraftPrinting.appendChild(opt);
   }
   els.addCardDraftPrinting.disabled = false;
-  // Initial preview = "Édition par défaut" → falls back to the first
+  // Restore a prior pick if it survived the re-render; otherwise the
+  // empty "Édition par défaut" value falls back to the first
   // _draftPrintings entry (released-desc, so the most recent print).
-  updateDraftPreview("");
+  const restore = prevValue && sorted.some(
+    (p) => `${p.set}:${p.collector_number}` === prevValue,
+  ) ? prevValue : "";
+  els.addCardDraftPrinting.value = restore;
+  updateDraftPreview(restore);
 }
 
 /* Swap the preview <img> to the art of the chosen printing. Looks

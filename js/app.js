@@ -53,10 +53,11 @@ const state = {
   // Set in dragstart and read in dragover (where dataTransfer.getData is
   // unavailable for security reasons), so we can validate transitions live.
   dragSourceZone: null,
-  // Card-name display language for the manage view ("en" | "fr").
-  // Persisted in localStorage. Translations themselves live in their
-  // own cache (see js/translations.js).
-  manageLang: "en",
+  // Global card-name display language ("en" | "fr"), honored by every
+  // view that shows a card name (manage, analyze, gallery). Persisted in
+  // localStorage and synced to Firestore prefs alongside the theme.
+  // Translations themselves live in their own cache (js/translations.js).
+  cardLang: "fr",
   // Type-buckets the user collapsed in the manage view (string keys
   // like "Land", "Creature"). Survives re-renders within a session
   // so editing a card doesn't reopen a closed group. Not persisted
@@ -429,6 +430,21 @@ function showModal(card, actions) {
 
   els.modal.classList.add("open");
   els.modal.focus();
+}
+
+/* Card-name display, honoring the global card-language preference
+ * (state.cardLang, "en" | "fr"). In FR mode returns the cached French
+ * translation when available, else the English name. `tr` is an optional
+ * bulk-lookup closure (bulkTranslationLookup()) so callers rendering many
+ * names read the translation cache once instead of per-name; pass null
+ * to fall back to a single getTranslation() read. Single source of truth
+ * for every view that displays a card name (manage, analyze, gallery). */
+function cardDisplayName(englishName, tr) {
+  if (state.cardLang === "fr") {
+    const fr = tr ? tr(englishName) : getTranslation(englishName);
+    if (fr) return fr;
+  }
+  return englishName;
 }
 
 function closeModal() {
@@ -1109,7 +1125,7 @@ function switchView(view) {
    * layout's two-column grid collapses to one. Toggling a body class
    * keeps the CSS aware without forcing every view to know about it. */
   document.body.classList.toggle("gallery-active", view === "gallery");
-  if (view === "manage" && state.manageLang === "fr") {
+  if (view === "manage" && state.cardLang === "fr") {
     ensureFrenchTranslationsForCurrentDeck();
   }
 }
@@ -1144,7 +1160,7 @@ function rerenderDeckViews() {
    * deck. Pips depend on the resolved commanders, so we refresh
    * here whenever the resolved view is up to date. */
   refreshDeckPill();
-  if (state.manageLang === "fr" && !els.viewManage.hidden) {
+  if (state.cardLang === "fr" && !els.viewManage.hidden) {
     ensureFrenchTranslationsForCurrentDeck();
   }
 }
@@ -1254,8 +1270,8 @@ function bindEvents() {
   els.tabManage.addEventListener("click", () => switchView("manage"));
   els.tabAnalyze.addEventListener("click", () => switchView("analyze"));
   els.tabGallery.addEventListener("click", () => switchView("gallery"));
-  els.langSwitchEn.addEventListener("click", () => setManageLanguage("en"));
-  els.langSwitchFr.addEventListener("click", () => setManageLanguage("fr"));
+  els.langSwitchEn.addEventListener("click", () => setCardLanguage("en"));
+  els.langSwitchFr.addEventListener("click", () => setCardLanguage("fr"));
   /* Format edit dropdown: trigger toggles the menu, each item sets the
    * deck format. setupDropdown handles outside-click, Escape, and the
    * aria-expanded sync on the trigger. */
@@ -1399,18 +1415,15 @@ function init() {
   setupAddCardUI();
   setupNavIndicator();
 
-  // Restore the user's last manage-view language preference. Done
-  // before any render so the first paint is in the right language.
+  // Restore the user's card-language preference (defaults to FR). Done
+  // before any render so the first paint is in the right language. The
+  // Firestore-synced value, if any, is adopted later on the auth
+  // transition (js/app-settings.js) — localStorage is the instant seed.
   try {
-    const saved = localStorage.getItem(MANAGE_LANG_KEY);
-    if (saved === "en" || saved === "fr") {
-      state.manageLang = saved;
-      els.langSwitchEn.classList.toggle("active", saved === "en");
-      els.langSwitchFr.classList.toggle("active", saved === "fr");
-      els.langSwitchEn.setAttribute("aria-pressed", String(saved === "en"));
-      els.langSwitchFr.setAttribute("aria-pressed", String(saved === "fr"));
-    }
+    const saved = localStorage.getItem(CARD_LANG_KEY);
+    if (saved === "en" || saved === "fr") state.cardLang = saved;
   } catch (e) { /* localStorage blocked */ }
+  applyCardLangButtons(state.cardLang);
 
   // Login-obligatoire model: no default-deck seeding. The boot uses
   // a localStorage session hint (set by sync.js when Firebase confirms

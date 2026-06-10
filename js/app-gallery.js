@@ -161,7 +161,7 @@ function renderGalleryView(ctx = null) {
 
     if (filteredCommanders.length > 0) {
       els.galleryContent.appendChild(
-        makeGalleryGroup("Commandants", filteredCommanders, cardFor),
+        makeGalleryGroup("Commandants", filteredCommanders, cardFor, translate),
       );
     }
 
@@ -194,7 +194,7 @@ function renderGalleryView(ctx = null) {
     for (const [type, list] of buckets) {
       if (list.length === 0) continue;
       els.galleryContent.appendChild(
-        makeGalleryGroup(TYPE_LABELS_FR[type] || type, list, cardFor),
+        makeGalleryGroup(TYPE_LABELS_FR[type] || type, list, cardFor, translate),
       );
     }
 
@@ -361,7 +361,7 @@ function makeChip(chips, group, value, label, onChange) {
   return btn;
 }
 
-function makeGalleryGroup(label, entries, cardFor) {
+function makeGalleryGroup(label, entries, cardFor, translate) {
   const section = document.createElement("section");
   section.className = "panel gallery-group";
 
@@ -380,24 +380,27 @@ function makeGalleryGroup(label, entries, cardFor) {
   const grid = document.createElement("div");
   grid.className = "gallery-grid";
   for (const entry of entries) {
-    grid.appendChild(makeGalleryTile(entry, cardFor(entry)));
+    grid.appendChild(makeGalleryTile(entry, cardFor(entry), translate));
   }
   section.appendChild(grid);
   return section;
 }
 
-function makeGalleryTile(entry, card) {
+function makeGalleryTile(entry, card, translate) {
   const tile = document.createElement("button");
   tile.type = "button";
   tile.className = "gallery-tile";
-  tile.title = entry.name;
-  tile.setAttribute("aria-label", `Agrandir ${entry.name}`);
+  // Tooltip/a11y follow the card language; images stay in their print
+  // language. Canonicalise via the resolved card so the FR lookup hits.
+  const display = cardDisplayName(card?.name || entry.name, translate);
+  tile.title = display;
+  tile.setAttribute("aria-label", `Agrandir ${display}`);
 
   const src = card ? cardImage(card, "normal") : null;
   if (src) {
     const img = document.createElement("img");
     img.src = src;
-    img.alt = entry.name;
+    img.alt = display;
     img.loading = "lazy";
     img.decoding = "async";
     tile.appendChild(img);

@@ -8,6 +8,7 @@ const SCRYFALL_BATCH_SIZE = 75;        // API hard limit per request
 const SCRYFALL_TIMEOUT_MS = 10_000;    // abort hung requests after 10s
 const SCRYFALL_RETRIES = 2;            // 1 try + 2 retries on transient failures
 const SCRYFALL_RETRY_BASE_MS = 300;    // exponential backoff: 300ms, 900ms
+const SCRYFALL_PAGE_DELAY_MS = 120;    // polite gap between paginated search pages
 
 // Allow only Scryfall-hosted images. Defense in depth in case the API
 // response is ever tampered with (downgrade attack, MITM, compromise).
@@ -284,22 +285,44 @@ async function autocompleteCardNamesMultilingual(query) {
   return [...merged.values()].slice(0, 20);
 }
 
-/* List every printing of an exact card name. The `q=!"name"` syntax
- * is Scryfall's exact-name match; `unique=prints` returns one card per
- * printing rather than collapsing them. Pagination beyond 175 printings
- * is ignored — it's the Scryfall hard limit per page anyway, and we'd
- * have UX problems before that mattered. */
-async function searchPrintings(name) {
+/* List every printing of an exact card name. `q=!"name"` is Scryfall's
+ * exact-name match; `unique=prints` returns one card per printing rather
+ * than collapsing them. Scryfall paginates at 175/page and we follow
+ * `next_page` to the end: heavily-reprinted cards (basic lands have 800+
+ * prints) must surface ALL their sets, not just the 175 most recent —
+ * the old single-page fetch silently dropped everything older than the
+ * 175th newest print (Dominaria and earlier vanished on a basic land).
+ *
+ * The optional `onPage(pageCards, all)` callback fires after each page,
+ * letting callers render page 1 instantly and stream the rest in with no
+ * visible loading. Resolves with the complete list. */
+async function searchPrintings(name, onPage) {
   const q = `!"${name.replace(/"/g, '\\"')}"`;
-  const url = `${SCRYFALL_SEARCH}?q=${encodeURIComponent(q)}&unique=prints&order=released&dir=desc`;
-  try {
-    const json = await getJson(url);
-    return Array.isArray(json.data) ? json.data : [];
-  } catch (err) {
-    // 404 = no prints found (Scryfall returns 404 for empty searches).
-    if (/\b404\b/.test(err.message)) return [];
-    throw err;
+  let url = `${SCRYFALL_SEARCH}?q=${encodeURIComponent(q)}&unique=prints&order=released&dir=desc`;
+  const all = [];
+  while (url) {
+    let json;
+    try {
+      json = await getJson(url);
+    } catch (err) {
+      // 404 = no prints found (Scryfall returns 404 for empty searches).
+      // A failure on a later page must not discard the pages already
+      // delivered to the caller — stop and keep what we have. Only a
+      // first-page failure (nothing rendered yet) propagates.
+      if (/\b404\b/.test(err.message)) return all;
+      if (all.length > 0) {
+        console.warn("Printings pagination stopped early", err);
+        return all;
+      }
+      throw err;
+    }
+    const page = Array.isArray(json.data) ? json.data : [];
+    all.push(...page);
+    if (onPage) onPage(page, all.slice());
+    url = json.has_more ? json.next_page : null;
+    if (url) await new Promise((r) => setTimeout(r, SCRYFALL_PAGE_DELAY_MS));
   }
+  return all;
 }
 
 function deckProducedColors(resolved) {

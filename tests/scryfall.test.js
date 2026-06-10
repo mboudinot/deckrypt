@@ -460,10 +460,76 @@ describe("searchPrintings", () => {
     expect(await searchPrintings("Nonexistent Card")).toEqual([]);
   });
 
-  it("propagates non-404 HTTP errors", async () => {
+  it("propagates a first-page non-404 HTTP error", async () => {
     globalThis.fetch.mockResolvedValue({
       ok: false, status: 500, statusText: "Internal",
     });
     await expect(searchPrintings("X")).rejects.toThrow(/Scryfall 500/);
+  });
+
+  it("follows next_page and concatenates every page", async () => {
+    globalThis.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [{ set: "a", collector_number: "1" }],
+          has_more: true,
+          next_page: "https://api.scryfall.com/cards/search?page=2",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [{ set: "b", collector_number: "2" }],
+          has_more: false,
+        }),
+      });
+    const out = await searchPrintings("Plains");
+    expect(out.map((c) => c.set)).toEqual(["a", "b"]);
+    expect(globalThis.fetch.mock.calls[1][0]).toBe(
+      "https://api.scryfall.com/cards/search?page=2",
+    );
+  });
+
+  it("invokes onPage after each page with the cumulative list", async () => {
+    globalThis.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [{ set: "a", collector_number: "1" }],
+          has_more: true,
+          next_page: "https://api.scryfall.com/cards/search?page=2",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [{ set: "b", collector_number: "2" }],
+          has_more: false,
+        }),
+      });
+    const pages = [];
+    await searchPrintings("Plains", (page, all) => {
+      pages.push({ page: page.map((c) => c.set), all: all.map((c) => c.set) });
+    });
+    expect(pages).toEqual([
+      { page: ["a"], all: ["a"] },
+      { page: ["b"], all: ["a", "b"] },
+    ]);
+  });
+
+  it("keeps earlier pages when a later page fails", async () => {
+    globalThis.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [{ set: "a", collector_number: "1" }],
+          has_more: true,
+          next_page: "https://api.scryfall.com/cards/search?page=2",
+        }),
+      })
+      .mockResolvedValue({ ok: false, status: 500, statusText: "Internal" });
+    const out = await searchPrintings("Plains");
+    expect(out.map((c) => c.set)).toEqual(["a"]);
   });
 });

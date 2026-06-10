@@ -243,9 +243,17 @@ export async function mockAuth(page, user = {
   displayName: "Test User",
   photoURL: null,
   providers: ["password"],
-}) {
-  await page.addInitScript((u) => {
+}, { cardLang = "en" } = {}) {
+  await page.addInitScript(({ u, cardLang }) => {
     window.__deckryptTestUser = u;
+    /* Pin the card-name language for a deterministic English baseline —
+     * most specs assert canonical English card names. Seed only when
+     * unset so a test that sets "fr" itself (then reloads) isn't
+     * clobbered by this init script re-running on every navigation.
+     * Pass { cardLang: null } to exercise the real product default (FR). */
+    if (cardLang !== null && !localStorage.getItem("mtg-hand-sim:manage-lang")) {
+      localStorage.setItem("mtg-hand-sim:manage-lang", cardLang);
+    }
     /* Bypass the one-shot legacy wipe in tests — we want presetStorage
      * decks to survive into the rendered app. The migration flag is
      * already set, so app.js's init() leaves localStorage alone. */
@@ -273,7 +281,7 @@ export async function mockAuth(page, user = {
       name: u.displayName || u.email || "Mon compte",
       initial: initialsOf(src),
     }));
-  }, user);
+  }, { u: user, cardLang });
 }
 
 /* Test fixture: a representative Commander deck (the formerly-seeded

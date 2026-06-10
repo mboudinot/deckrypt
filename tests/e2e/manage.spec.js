@@ -78,7 +78,9 @@ test("removing the last deck shows the empty selector", async ({ page }) => {
 });
 
 test("FR switch translates card names; EN switch restores them", async ({ page }) => {
-  // Initial state: EN is active, names are English.
+  // Tests run on the EN baseline pinned by mockAuth (the product default
+  // is FR; see card-language.spec.js). Initial state: EN active, English
+  // names.
   await expect(page.locator("#lang-switch-en")).toHaveClass(/active/);
   const firstNameEn = await page.locator("#manage-cards .card-row-name").first().textContent();
   expect(firstNameEn).not.toMatch(/^\[FR\]/);
