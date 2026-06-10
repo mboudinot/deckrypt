@@ -195,6 +195,31 @@ test("token grid dedupes printings of the same token (regression)", async ({ pag
   await expect(page.locator(".token-tile")).toHaveCount(1);
 });
 
+test("token sources list names the card that generates each token", async ({ page }) => {
+  // Krenko's mocked all_parts attach a Goblin token, so the "Qui les
+  // produit" list under the grid must credit the commander, and the
+  // source name must be a clickable .sim-card-link (zoom modal).
+  await page.evaluate(() => {
+    localStorage.setItem("mtg-hand-sim:user-decks-v1", JSON.stringify([{
+      id: "krenko-deck", name: "Krenko",
+      commanders: [{ name: "Krenko, Mob Boss" }],
+      cards: [{ name: "Forest", qty: 1 }],
+    }]));
+    localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
+  });
+  await page.reload();
+  await page.locator("#commander-zone .card").first().waitFor();
+  await page.click("#tab-analyze");
+  await expect(page.locator(".token-tile").first()).toBeVisible({ timeout: 5000 });
+  const sourceLink = page.locator("#analyze-token-sources .sim-card-link", {
+    hasText: "Krenko, Mob Boss",
+  });
+  await expect(sourceLink).toBeVisible();
+  // Clicking the source name opens the shared zoom modal.
+  await sourceLink.click();
+  await expect(page.locator("#modal")).toHaveClass(/open/);
+});
+
 test("token fetch by Scryfall ID doesn't crash on identifier dedup (regression)", async ({ page }) => {
   // Regression for "Erreur Scryfall : can't access property toLowerCase,
   // id.name is undefined". Token fetch sends {id: "<uuid>"} identifiers

@@ -205,6 +205,7 @@ function _cacheAnalyzeElements() {
   els.analyzeSubtypesInfo = document.getElementById("analyze-subtypes-info");
   els.analyzeTokens = document.getElementById("analyze-tokens");
   els.analyzeTokensInfo = document.getElementById("analyze-tokens-info");
+  els.analyzeTokenSources = document.getElementById("analyze-token-sources");
   els.analyzeManaBase = document.getElementById("analyze-mana-base");
   els.analyzeManaBaseInfo = document.getElementById("analyze-mana-base-info");
   els.analyzeSim = document.getElementById("analyze-sim");
@@ -1163,7 +1164,7 @@ function showAnalyzeSkeleton() {
     els.analyzeBracket, els.analyzeLegality, els.analyzeArchetypes,
     els.analyzeSuggestions, els.analyzeThemes, els.analyzeCurve,
     els.analyzeTypes, els.analyzeManaBase, els.analyzeSim,
-    els.analyzeSubtypes, els.analyzeTokens,
+    els.analyzeSubtypes, els.analyzeTokens, els.analyzeTokenSources,
   ]) {
     el.replaceChildren(makeSkeletonBlock());
   }

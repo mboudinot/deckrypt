@@ -1573,6 +1573,35 @@
   pointer-events: none;
 }
 
+/* "Qui les produit" — one row per token mapping it back to the deck
+ * cards that generate it. Mirrors the simulator's turn-line layout
+ * (label column + flowing card-links) and reuses `.sim-card-link` for
+ * the clickable card names. */
+.token-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.token-sources:empty { display: none; }
+.token-sources-head {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.token-source-row {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) 1fr;
+  gap: 10px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.token-source-label { font-weight: 600; }
+
 /* Graveyard "open the pile" modal — same width as the printing
    picker so the layout stays consistent. Each tile has two action
    buttons sized to fit the column. */

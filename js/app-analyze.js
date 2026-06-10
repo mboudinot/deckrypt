@@ -1048,6 +1048,7 @@ function renderSubtypesPanel(deck) {
 async function renderTokensPanel(deck) {
   const ids = extractTokenIds(deck);
   els.analyzeTokens.replaceChildren();
+  els.analyzeTokenSources.replaceChildren();
   if (ids.length === 0) {
     els.analyzeTokensInfo.textContent = "—";
     els.analyzeTokens.appendChild(placeholderText("Aucun jeton produit."));
@@ -1068,9 +1069,9 @@ async function renderTokensPanel(deck) {
     else missingIds.push(id);
   }
 
-  let tokens;
+  let resolved;
   if (missingIds.length === 0) {
-    tokens = dedupeByOracle(fromCache);
+    resolved = fromCache;
   } else {
     /* `ids.length` over-counts when several cards point at different
      * printings of the same token — show a neutral placeholder until
@@ -1087,12 +1088,17 @@ async function renderTokensPanel(deck) {
     }
     const fetched = [...result.byKey.values()];
     cacheCards(fetched);
-    // Multiple cards can reference different printings of the same
-    // token (e.g. five Meren cards each pointing at a different Zombie
-    // printing). Their Scryfall IDs differ but they share an oracle_id
-    // — collapse so the panel shows one tile per distinct token.
-    tokens = dedupeByOracle([...fromCache, ...fetched]);
+    resolved = [...fromCache, ...fetched];
   }
+
+  // Multiple cards can reference different printings of the same token
+  // (e.g. five Meren cards each pointing at a different Zombie printing).
+  // Their Scryfall IDs differ but they share an oracle_id — collapse so
+  // the panel shows one tile per distinct token. `resolved` keeps the
+  // pre-dedup set so `tokenSources` can map each printing id back to the
+  // cards that generate it.
+  const tokens = dedupeByOracle(resolved);
+  const sourcesByToken = tokenSources(deck, resolved);
 
   /* Counter follows the panel: tiles are deduped by oracle_id, so the
    * meta count must use `tokens.length`, not `ids.length`. */
@@ -1108,8 +1114,10 @@ async function renderTokensPanel(deck) {
   /* Pull French names from the shared translations cache (same Scryfall
    * `lang:fr` pipeline as the manage view's EN/FR switch). Async fetch
    * resolves names not yet cached; we render with whatever's available
-   * now and re-render once translations land. */
-  const tokenNames = tokens.map((t) => t.name);
+   * now and re-render once translations land. Source-card names need the
+   * same translation, so they ride along in the fetch batch. */
+  const sourceNames = [...sourcesByToken.values()].flat().map((c) => c.name);
+  const tokenNames = [...tokens.map((t) => t.name), ...sourceNames];
   const renderTokens = () => {
     const tr = bulkTranslationLookup();
     els.analyzeTokens.replaceChildren();
@@ -1133,6 +1141,44 @@ async function renderTokensPanel(deck) {
       cap.textContent = frName;
       tile.appendChild(cap);
       els.analyzeTokens.appendChild(tile);
+    }
+    renderTokenSources(tr);
+  };
+  /* "Qui les produit": one row per token → the deck cards that generate
+   * it, mirroring the simulator's turn-line layout (label + flowing
+   * `.sim-card-link` buttons). Card names are clickable and open the same
+   * zoom modal as everywhere else in the analyze view. */
+  const renderTokenSources = (tr) => {
+    els.analyzeTokenSources.replaceChildren();
+    if (tokens.every((t) => (sourcesByToken.get(cardIdentityKey(t)) || []).length === 0)) {
+      return;
+    }
+    const head = document.createElement("div");
+    head.className = "token-sources-head";
+    head.textContent = "Qui les produit";
+    els.analyzeTokenSources.appendChild(head);
+
+    for (const t of tokens) {
+      const sources = sourcesByToken.get(cardIdentityKey(t)) || [];
+      if (sources.length === 0) continue;
+      const row = document.createElement("div");
+      row.className = "token-source-row";
+      const label = document.createElement("span");
+      label.className = "token-source-label";
+      label.textContent = tr(t.name) || t.name;
+      row.appendChild(label);
+      const list = document.createElement("span");
+      sources.forEach((c, i) => {
+        if (i > 0) list.append(", ");
+        const link = document.createElement("button");
+        link.type = "button";
+        link.className = "sim-card-link";
+        link.textContent = tr(c.name) || c.name;
+        link.addEventListener("click", () => showModal(c, []));
+        list.appendChild(link);
+      });
+      row.appendChild(list);
+      els.analyzeTokenSources.appendChild(row);
     }
   };
   renderTokens();

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   manaCurve, cardTypeBreakdown, primaryTypeOf, isLandCard,
   creatureSubtypes, subtypesOf,
-  extractTokenIds, dedupeByOracle, gameChangers, bracketEstimate,
+  extractTokenIds, tokenSources, cardIdentityKey, dedupeByOracle, gameChangers, bracketEstimate,
   detectThemes,
 } from "../js/deck-analytics.js";
 
@@ -143,6 +143,63 @@ describe("extractTokenIds", () => {
   });
   it("handles cards with no all_parts gracefully", () => {
     expect(extractTokenIds([card({}), card({ all_parts: null })])).toEqual([]);
+  });
+});
+
+describe("cardIdentityKey", () => {
+  it("prefers oracle_id, then id, then name", () => {
+    expect(cardIdentityKey({ oracle_id: "o", id: "i", name: "n" })).toBe("o");
+    expect(cardIdentityKey({ id: "i", name: "n" })).toBe("i");
+    expect(cardIdentityKey({ name: "n" })).toBe("n");
+    expect(cardIdentityKey({})).toBeUndefined();
+  });
+});
+
+describe("tokenSources", () => {
+  const part = (component, id) => ({ object: "related_card", component, id });
+
+  it("maps each token oracle_id to the cards that generate it", () => {
+    const deck = [
+      card({ name: "Krenko", all_parts: [part("token", "gob-p1")] }),
+      card({ name: "Goblin Rabblemaster", all_parts: [part("token", "gob-p1")] }),
+      card({ name: "Avenger", all_parts: [part("token", "plant-p1")] }),
+    ];
+    const resolved = [
+      { id: "gob-p1", oracle_id: "goblin", name: "Goblin" },
+      { id: "plant-p1", oracle_id: "plant", name: "Plant" },
+    ];
+    const map = tokenSources(deck, resolved);
+    expect(map.get("goblin").map((c) => c.name)).toEqual(["Krenko", "Goblin Rabblemaster"]);
+    expect(map.get("plant").map((c) => c.name)).toEqual(["Avenger"]);
+  });
+
+  it("folds different token printings onto one oracle_id", () => {
+    // Two Meren cards reference different Zombie printings (distinct ids,
+    // shared oracle_id) — their sources merge under one entry.
+    const deck = [
+      card({ name: "Meren A", all_parts: [part("token", "zomb-p1")] }),
+      card({ name: "Meren B", all_parts: [part("token", "zomb-p2")] }),
+    ];
+    const resolved = [
+      { id: "zomb-p1", oracle_id: "zombie", name: "Zombie" },
+      { id: "zomb-p2", oracle_id: "zombie", name: "Zombie" },
+    ];
+    const map = tokenSources(deck, resolved);
+    expect(map.get("zombie").map((c) => c.name)).toEqual(["Meren A", "Meren B"]);
+  });
+
+  it("dedups source cards sharing an oracle_id (multiple printings)", () => {
+    const deck = [
+      card({ name: "Avenger", oracle_id: "av", id: "av-p1", all_parts: [part("token", "plant-p1")] }),
+      card({ name: "Avenger", oracle_id: "av", id: "av-p2", all_parts: [part("token", "plant-p1")] }),
+    ];
+    const resolved = [{ id: "plant-p1", oracle_id: "plant", name: "Plant" }];
+    expect(tokenSources(deck, resolved).get("plant")).toHaveLength(1);
+  });
+
+  it("returns an empty map when no resolved token matches", () => {
+    const deck = [card({ name: "X", all_parts: [part("token", "a")] })];
+    expect(tokenSources(deck, []).size).toBe(0);
   });
 });
 

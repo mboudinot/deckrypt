@@ -107,6 +107,56 @@ function extractTokenIds(deck) {
   return [...seen];
 }
 
+/* Stable identity for a (token or source) card: `oracle_id` is the
+ * card-identity key shared across printings; we fall back to `id` then
+ * `name` for the rare card without one (defensive — real Scryfall always
+ * provides an oracle_id). Single source of truth so the dedup, the
+ * source-mapping and the render lookup all key cards identically — a
+ * mismatch would make the lookup silently return nothing. */
+function cardIdentityKey(card) {
+  return card.oracle_id || card.id || card.name;
+}
+
+/* Reverse of `extractTokenIds`: for each distinct token (keyed by its
+ * `oracle_id`), the deck cards that generate it. `resolvedTokens` are
+ * the fetched/cached token card objects — they carry the printing-id →
+ * oracle-id link that the deck's `all_parts` entries only reference by
+ * printing id. Source cards are deduped by their own `oracle_id` so
+ * several printings of the same generator (e.g. two Avenger of Zendikar)
+ * collapse to one. Returns Map<tokenOracleId, sourceCard[]>. */
+function tokenSources(deck, resolvedTokens) {
+  // printingId → Map(sourceKey → sourceCard)
+  const byPrinting = new Map();
+  for (const c of deck) {
+    const parts = Array.isArray(c.all_parts) ? c.all_parts : [];
+    for (const p of parts) {
+      if (p.component !== "token" || !p.id) continue;
+      if (!byPrinting.has(p.id)) byPrinting.set(p.id, new Map());
+      const srcKey = cardIdentityKey(c);
+      const bucket = byPrinting.get(p.id);
+      if (srcKey && !bucket.has(srcKey)) bucket.set(srcKey, c);
+    }
+  }
+
+  // Fold the per-printing buckets onto the token's oracle_id so all
+  // printings of one token share a single source list.
+  const byOracle = new Map();
+  for (const t of resolvedTokens) {
+    const oid = cardIdentityKey(t);
+    const sources = byPrinting.get(t.id);
+    if (!sources) continue;
+    if (!byOracle.has(oid)) byOracle.set(oid, new Map());
+    const bucket = byOracle.get(oid);
+    for (const [k, card] of sources) {
+      if (!bucket.has(k)) bucket.set(k, card);
+    }
+  }
+
+  const result = new Map();
+  for (const [oid, bucket] of byOracle) result.set(oid, [...bucket.values()]);
+  return result;
+}
+
 /* Collapse cards that share the same `oracle_id`. Different printings
  * of the same token have distinct Scryfall `id`s but a shared
  * `oracle_id` — without this dedup the tokens panel would show e.g.
@@ -116,7 +166,7 @@ function extractTokenIds(deck) {
 function dedupeByOracle(cards) {
   const seen = new Map();
   for (const c of cards) {
-    const key = c.oracle_id || c.id || c.name;
+    const key = cardIdentityKey(c);
     if (!key) continue;
     if (!seen.has(key)) seen.set(key, c);
   }
@@ -393,7 +443,7 @@ if (typeof module !== "undefined" && module.exports) {
     PRIMARY_TYPES,
     manaCurve, cardTypeBreakdown, primaryTypeOf, isLandCard,
     creatureSubtypes, subtypesOf,
-    extractTokenIds, dedupeByOracle, gameChangers, bracketEstimate,
+    extractTokenIds, tokenSources, cardIdentityKey, dedupeByOracle, gameChangers, bracketEstimate,
     detectThemes, THEME_RULES,
   };
 }
