@@ -364,9 +364,7 @@
       set: c.set_name || c.set,
       setcode: c.set,
       cn: c.collector_number,
-      thumb: (c.image_uris && c.image_uris.small)
-        || (c.card_faces && c.card_faces[0] && c.card_faces[0].image_uris && c.card_faces[0].image_uris.small)
-        || null,
+      thumb: cardImage(c, "small"),
     };
   }
 
@@ -380,6 +378,11 @@
     return c && c.name ? sfCard(c) : null;
   }
 
+  /* Candidates resolve through ONE batched /cards/collection, not a
+   * /named?fuzzy per name: that fires 5 extra parallel requests per scan,
+   * which Scryfall's 50-100 ms rate-limit policy doesn't tolerate over a
+   * deck-scanning session — and getJson swallows failures, so the 429s
+   * would read as bad OCR instead of surfacing. */
   async function lookupName(name) {
     if (!name || name.length < 3) return [];
     const [best, auto] = await Promise.all([
@@ -387,12 +390,23 @@
       getJson(SF + "/cards/autocomplete?q=" + encodeURIComponent(name)),
     ]);
     const out = [], seen = new Set();
-    if (best && best.name) { out.push(sfCard(best)); seen.add(best.name); }
-    const names = (auto && auto.data) || [];
-    const extra = await Promise.all(
-      names.filter((n) => !seen.has(n)).slice(0, 5).map((n) => getJson(SF + "/cards/named?fuzzy=" + encodeURIComponent(n)))
-    );
-    extra.forEach((c) => { if (c && c.name && !seen.has(c.name)) { out.push(sfCard(c)); seen.add(c.name); } });
+    if (best && best.name) { out.push(sfCard(best)); seen.add(best.name.toLowerCase()); }
+
+    const names = ((auto && auto.data) || [])
+      .filter((n) => !seen.has(n.toLowerCase()))
+      .slice(0, 5);
+    if (!names.length) return out;
+
+    // Unlike getJson, fetchScryfallCards throws once its retries are
+    // spent; candidates are a nice-to-have, so degrade to the best guess.
+    const { byName } = await fetchScryfallCards(names.map((n) => ({ name: n })))
+      .catch(() => ({ byName: new Map() }));
+    for (const n of names) {
+      const c = byName.get(n.toLowerCase());
+      if (!c || !c.name || seen.has(c.name.toLowerCase())) continue;
+      out.push(sfCard(c));
+      seen.add(c.name.toLowerCase());
+    }
     return out;
   }
 
