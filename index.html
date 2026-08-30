@@ -28,14 +28,22 @@
        gstatic.com when DevTools is open. Firefox silently skips both,
        which is why the violations only show in Chrome. Neither
        affects production users, but allowing them keeps the console
-       clean for anyone debugging. -->
+       clean for anyone debugging.
+     frame-src + 'self' — the camera card-scanner runs inside a
+       same-origin iframe (scan.html). OpenCV.js and Tesseract.js both need
+       'unsafe-eval' (Emscripten uses new Function), which we REFUSE to
+       grant on this main document — it would gut the app-wide
+       defense-in-depth.
+       Isolating the scanner in scan.html lets that one page carry its own
+       relaxed CSP (its <meta>), while index.html keeps default-src 'none'.
+       The iframe is loaded lazily and only on mobile. -->
 <!-- `frame-ancestors` is intentionally NOT in this meta CSP: the
      directive is spec'd to work only via an HTTP response header
      (per the CSP spec) and the browser warns when it sees it in a
      <meta>. Static GitHub Pages can't set custom headers, so true
      clickjacking protection would require a server in front. Left
      out to keep the console clean. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src 'self' https://api.scryfall.com https://www.gstatic.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src https://deckrypt-f8718.firebaseapp.com https://accounts.google.com https://apis.google.com; form-action 'none'; base-uri 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self'; font-src 'self'; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com https://*.googleusercontent.com; connect-src 'self' https://api.scryfall.com https://www.gstatic.com https://*.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src 'self' https://deckrypt-f8718.firebaseapp.com https://accounts.google.com https://apis.google.com; form-action 'none'; base-uri 'none';">
 <meta name="referrer" content="no-referrer">
 <title>Deckrypt</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -81,6 +89,7 @@
 <script defer src="js/app-play.js"></script>
 <script defer src="js/app-manage-side.js"></script>
 <script defer src="js/app-manage.js"></script>
+<script defer src="js/card-scanner.js"></script>
 <script defer src="js/app-analyze.js"></script>
 <script defer src="js/app-gallery.js"></script>
 <script defer src="js/app-login.js"></script>
@@ -528,6 +537,16 @@
             </div>
             <div class="panel-head">
               <h3>Ajouter une carte</h3>
+              <!-- Camera scanner trigger. Hidden by default; setupAddCardUI()
+                   reveals it only when navigator.mediaDevices.getUserMedia
+                   exists (desktops without a camera never see it). -->
+              <button id="scan-card-btn" type="button" class="btn btn-sm panel-head-action" hidden>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Scanner
+              </button>
             </div>
             <div class="add-card-block">
               <div class="add-card-search">
@@ -788,6 +807,15 @@
     <img id="modal-img" alt="">
     <div class="modal-actions" id="modal-actions"></div>
   </div>
+</div>
+
+<!-- Camera card-scanner overlay. The scanner UI + OpenCV run inside a
+     same-origin iframe (scan.html) so its eval-requiring CSP stays
+     quarantined off this strict document — see the CSP note at the top.
+     js/card-scanner.js sets the iframe src lazily on open (mobile only)
+     and receives the recognized card via postMessage. -->
+<div id="scanner-overlay" class="scanner-overlay" role="dialog" aria-modal="true" aria-label="Scanner une carte" tabindex="-1" hidden>
+  <iframe id="scanner-frame" class="scanner-frame" title="Scanner une carte" allow="camera"></iframe>
 </div>
 
 <div class="ie-modal" id="ie-modal" role="dialog" aria-modal="true" aria-labelledby="ie-modal-title" tabindex="-1" hidden>

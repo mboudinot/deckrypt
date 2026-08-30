@@ -1031,6 +1031,12 @@ button.icon-btn svg { display: block; }
   transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.06s;
   white-space: nowrap;
 }
+/* `display: inline-flex` above beats the UA `[hidden]{display:none}` by
+ * origin precedence, so the `hidden` attribute alone wouldn't hide a
+ * .btn — restore it. Matters for buttons toggled at runtime (#scan-card-btn
+ * when no camera, the scanner's lock-state controls). Same pattern as
+ * .add-card-draft[hidden] / .dropdown-menu[hidden]. */
+.btn[hidden] { display: none; }
 /* `.btn:hover` etc. need `:not(:disabled)` to beat the global
  * `button:hover:not(:disabled)` (0,2,1) on specificity — otherwise
  * every secondary .btn flipped to accent on hover (in Editorial

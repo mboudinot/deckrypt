@@ -805,6 +805,9 @@ function applyPrintingChange(entry, kind, newSet, newCn) {
 let _autocompleteToken = 0;     // discard responses from stale input
 let _autocompleteTimer = null;
 let _draftName = null;           // name held in the draft slot, or null
+let _draftPreferredPrinting = ""; // "set:cn" to pre-select once printings
+                                 // land (set by the camera scanner); ""
+                                 // means "let the default win"
 let _draftPrintingsToken = 0;    // discard stale searchPrintings responses
 let _draftPrintings = [];        // last loaded printings, kept so the
                                  // preview <img> can swap art on
@@ -860,6 +863,33 @@ function setupAddCardUI() {
       submitAddCardDraft();
     }
   });
+
+  /* Camera scanner: the button is hidden unless this device exposes a
+   * camera (desktops without one never see it). On a confident match the
+   * scanner hands back { name, setcode, cn } and we open the draft slot
+   * pre-set to that exact edition — the scanner's setcode is uppercase
+   * (e.g. "WOC") while the printing <option> values are lowercase Scryfall
+   * codes, hence the toLowerCase(). */
+  if (els.scanCardBtn) {
+    const hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    // Mobile-only: a desktop webcam also exposes getUserMedia, but the
+    // scanner is a phone feature (hold the card to the rear camera). Gate
+    // on a coarse pointer so laptops/desktops with a mouse never see it.
+    const isTouch = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+    const canScan = hasCamera && isTouch;
+    els.scanCardBtn.hidden = !canScan;
+    if (canScan) {
+      els.scanCardBtn.addEventListener("click", () => {
+        if (!window.cardScanner) return;
+        window.cardScanner.open({
+          onPick: ({ name, setcode, cn }) => {
+            const preferred = setcode && cn ? `${setcode.toLowerCase()}:${cn}` : "";
+            openAddCardDraft(name, preferred);
+          },
+        });
+      });
+    }
+  }
 }
 
 function onAutocompleteInput() {
@@ -954,8 +984,13 @@ function renderSuggestions(entries) {
  * Scryfall responds; the user can submit before that (the entry then
  * lands without a specific printing, which is fine — `addCard` lets
  * Scryfall pick a default on next resolve). */
-function openAddCardDraft(name) {
+/* `preferredPrinting` (optional, "set:cn") pre-selects a specific edition
+ * once the printings list lands — used by the camera scanner, which
+ * recognizes the exact edition. Typing a card name leaves it empty, so
+ * the most-recent print wins as before. */
+function openAddCardDraft(name, preferredPrinting = "") {
   _draftName = name;
+  _draftPreferredPrinting = preferredPrinting || "";
   _draftPrintings = [];
   els.addCardSuggestions.hidden = true;
   els.addCardSuggestions.replaceChildren();
@@ -1052,12 +1087,21 @@ function populateDraftPrintings(printings) {
     els.addCardDraftPrinting.appendChild(opt);
   }
   els.addCardDraftPrinting.disabled = false;
-  // Restore a prior pick if it survived the re-render; otherwise the
-  // empty "Édition par défaut" value falls back to the first
-  // _draftPrintings entry (released-desc, so the most recent print).
-  const restore = prevValue && sorted.some(
-    (p) => `${p.set}:${p.collector_number}` === prevValue,
-  ) ? prevValue : "";
+  // Selection priority: scanner-preferred edition > a prior pick that
+  // survived the re-render > the empty "Édition par défaut" (falls back
+  // to the first _draftPrintings entry = most recent print). The
+  // preferred value is consumed once so a later manual change isn't
+  // snapped back by progressive pagination re-renders.
+  const has = (val) => val && sorted.some(
+    (p) => `${p.set}:${p.collector_number}` === val,
+  );
+  let restore = "";
+  if (has(_draftPreferredPrinting)) {
+    restore = _draftPreferredPrinting;
+    _draftPreferredPrinting = "";
+  } else if (has(prevValue)) {
+    restore = prevValue;
+  }
   els.addCardDraftPrinting.value = restore;
   updateDraftPreview(restore);
 }
@@ -1109,6 +1153,7 @@ function updateDraftPreview(printingValue) {
 
 function cancelAddCardDraft() {
   _draftName = null;
+  _draftPreferredPrinting = "";
   _draftPrintings = [];
   _draftPrintingsToken++;   // discard any in-flight printings fetch
   els.addCardDraft.hidden = true;

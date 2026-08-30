@@ -4757,3 +4757,30 @@ html.auth-locked .app-footer { display: none; }
   color: var(--text-2);
 }
 .legal-list li::marker { color: var(--text-muted); }
+
+/* ============================================================
+   Camera card-scanner overlay (js/card-scanner.js)
+   Thin full-screen frame around the scan.html iframe — the scanner
+   UI + OpenCV live in that isolated same-origin page (its own CSP).
+   z-index 1000 keeps it above the app shell but below the login
+   overlay (1100). The black backing shows during the iframe's first
+   paint so there's no white flash.
+   ============================================================ */
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+}
+/* Author `display` (none here, but the box still establishes one) would
+ * otherwise beat the UA `[hidden]{display:none}` once any display is set
+ * — restore the hide explicitly, same pattern as .add-card-draft[hidden].
+ * See feedback_dom_changes_need_integration_tests. */
+.scanner-overlay[hidden] { display: none; }
+.scanner-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}

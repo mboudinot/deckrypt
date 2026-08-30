@@ -170,6 +170,7 @@ function _cacheManageElements() {
   els.addCardPasteFileBtn = document.getElementById("add-card-paste-file-btn");
   els.addCardPasteFileName = document.getElementById("add-card-paste-file-name");
   els.addCardSection = document.getElementById("add-card-section");
+  els.scanCardBtn = document.getElementById("scan-card-btn");
   els.addCardDraft = document.getElementById("add-card-draft");
   els.addCardDraftName = document.getElementById("add-card-draft-name");
   els.addCardDraftPreview = document.getElementById("add-card-draft-preview");

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- ISOLATED scanner document. OpenCV.js + Tesseract.js (both Emscripten)
+     need 'unsafe-eval', which we refuse to grant on the main app (index.html
+     keeps default-src 'none'). Quarantining it here, embedded as a
+     same-origin <iframe>, contains the relaxation to this one page.
+       script-src 'unsafe-eval' + 'wasm-unsafe-eval' — OpenCV + Tesseract.
+       worker-src 'self' blob: — Tesseract spawns a Web Worker for OCR.
+       style-src 'unsafe-inline' — the inline <style> below (this page is
+         standalone, it doesn't load the app stylesheets; inline style is
+         not script execution, so the risk delta is nil).
+       img-src/connect-src scryfall — candidate thumbnails + lookups;
+         connect-src 'self' also covers the self-hosted OCR core + model. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.scryfall.io https://*.scryfall.com; connect-src 'self' https://api.scryfall.com; base-uri 'none'; form-action 'none';">
+<meta name="referrer" content="no-referrer">
+<title>Scanner une carte — Deckrypt</title>
+<!-- Same-origin with the app, so localStorage is shared: reuse the app's
+     synchronous theme bootstrap to land data-direction (studio/editorial)
+     BEFORE theme.css evaluates — no flash, and the scanner tracks whatever
+     theme the user picked in Settings. boot-theme.js also flips an inert
+     auth-locked class (no CSS for it here, this page isn't gated). -->
+<script src="js/boot-theme.js"></script>
+<link rel="stylesheet" href="theme.css">
+<style>
+  /* theme.css (loaded above) supplies all tokens via [data-direction] on
+     <html>; this sheet only consumes them. Two surface classes follow:
+     opaque chrome (intro, buttons, candidate chips) is fully themed, while
+     the HUD that sits OVER the live camera feed (status bar + results
+     gradient) keeps a dark scrim + light text on purpose — legibility over
+     an arbitrary photographic image is a constant, not a theme choice. */
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--text);
+    font-size: 15px; line-height: 1.4; overflow: hidden; }
+  [hidden] { display: none !important; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 12px 18px;
+    border-radius: var(--radius-pill); border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text); font-weight: 600;
+    box-shadow: var(--shadow); cursor: pointer; }
+  .btn.primary, .btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+
+  #scanner-video, #scanner-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #scanner-video { object-fit: cover; background: #000; } /* camera area: black while frames load, theme-agnostic */
+  #scanner-canvas { pointer-events: none; }
+
+  #scanner-intro { position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center;
+    background: var(--bg); }
+  #scanner-intro h2 { margin: 0; font-size: 20px; font-weight: 600; font-family: var(--font-display); }
+  .scanner-badge { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 3px 10px; border-radius: var(--radius-pill); color: var(--accent);
+    background: transparent; border: 1px solid var(--accent); }
+  #scanner-loadinfo, .scanner-tip { margin: 0; color: var(--text-muted); max-width: 340px; }
+  .scanner-tip { font-size: 12px; }
+  #scanner-err { color: var(--error); font-size: 13px; max-width: 340px; margin: 0; min-height: 1em; }
+  #scanner-spinner { width: 26px; height: 26px; border: 3px solid var(--border-strong);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #scanner-spinner { animation: none; } }
+
+  /* --- camera HUD: over the live feed, intentionally dark scrim + light text --- */
+  #scanner-status { position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+    display: flex; align-items: center; gap: 8px; color: #f0f0f0;
+    padding: max(10px, env(safe-area-inset-top)) 14px 10px; font-size: 13px;
+    background: linear-gradient(rgba(0, 0, 0, 0.7), transparent); }
+  .scanner-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex: none; }
+  #scanner-status.live .scanner-status-dot { background: var(--accent); }
+  #scanner-status.locked .scanner-status-dot { background: var(--success); }
+  #scanner-reading { font-family: var(--font-mono); opacity: 0.92;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  #scanner-results { position: absolute; left: 0; right: 0; bottom: 78px; z-index: 3;
+    padding: 30px 12px 12px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.9) 30%); }
+  .scanner-results-title { margin: 0 0 8px 4px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: rgba(240, 240, 240, 0.7); } /* over dark scrim */
+  #scanner-cands { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  /* candidate chips are opaque cards floating on the scrim → fully themed */
+  .scanner-cand { flex: 0 0 104px; border: 2px solid transparent; border-radius: var(--radius);
+    overflow: hidden; background: var(--surface-2); color: var(--text); text-align: center; }
+  .scanner-cand.best { border-color: var(--success); }
+  .scanner-cand-img { width: 100%; display: block; min-height: 60px; background: var(--surface-3); }
+  .scanner-cand-name { font-size: 11px; padding: 3px 4px 0; }
+  .scanner-cand-meta { font-size: 10px; color: var(--text-muted); padding: 0 4px 4px; font-family: var(--font-mono); }
+
+  #scanner-controls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
+</style>
+</head>
+<body>
+  <video id="scanner-video" playsinline muted autoplay hidden></video>
+  <canvas id="scanner-canvas" hidden></canvas>
+
+  <div id="scanner-intro">
+    <span class="scanner-badge">Expérimental</span>
+    <h2 id="scanner-intro-title">Scanner une carte</h2>
+    <div id="scanner-spinner" aria-hidden="true"></div>
+    <p id="scanner-loadinfo">Chargement du moteur de reconnaissance…</p>
+    <button class="btn primary" id="scanner-start" hidden>Ouvrir la caméra</button>
+    <p id="scanner-err" role="alert"></p>
+    <p class="scanner-tip">Pose la carte sur un fond <strong>contrasté</strong> (table sombre pour une carte claire). Le contour vert = carte détectée.</p>
+    <button class="btn" id="scanner-intro-close" type="button">Annuler</button>
+  </div>
+
+  <div id="scanner-status" hidden>
+    <span class="scanner-status-dot" aria-hidden="true"></span>
+    <span id="scanner-reading">…</span>
+  </div>
+
+  <div id="scanner-results" hidden>
+    <p class="scanner-results-title">Correspondances</p>
+    <div id="scanner-cands"></div>
+  </div>
+
+  <div id="scanner-controls" hidden>
+    <button id="scanner-torch" class="btn" type="button" hidden>Lampe</button>
+    <button id="scanner-snap" class="btn primary" type="button">Capturer</button>
+    <button id="scanner-add" class="btn primary" type="button" hidden>Ajouter au deck</button>
+    <button id="scanner-resume" class="btn" type="button" hidden>Scanner une autre</button>
+    <button id="scanner-close" class="btn" type="button">Fermer</button>
+  </div>
+
+  <script async src="assets/scanner/opencv.js"></script>
+  <script src="assets/scanner/tesseract/tesseract.min.js"></script>
+  <script src="js/scan-parse.js"></script>
+  <script src="js/scan-page.js"></script>
+</body>
+</html>
