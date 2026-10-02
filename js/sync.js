@@ -17,7 +17,7 @@
  * then is queued + pushed to Firestore on a best-effort basis.
  */
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -35,7 +35,7 @@ import {
   sendPasswordResetEmail as fbSendPasswordResetEmail,
   verifyPasswordResetCode as fbVerifyPasswordResetCode,
   confirmPasswordReset as fbConfirmPasswordReset,
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
   getFirestore,
   doc,
@@ -44,7 +44,7 @@ import {
   getDoc,
   getDocs,
   deleteDoc,
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAE7mPmXOdLpn_tLdZfjOM4Yj2WqkPoEVE",
