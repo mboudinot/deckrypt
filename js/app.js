@@ -113,6 +113,9 @@ function _cacheNavElements() {
   els.viewManage = document.getElementById("view-manage");
   els.viewAnalyze = document.getElementById("view-analyze");
   els.viewGallery = document.getElementById("view-gallery");
+  els.viewDecks = document.getElementById("view-decks");
+  els.decksGrid = document.getElementById("decks-grid");
+  els.decksCount = document.getElementById("decks-count");
 }
 
 function _cachePlayElements() {
@@ -599,6 +602,7 @@ function clearActiveView() {
   if (typeof renderManageView === "function") renderManageView();
   if (typeof renderAnalyzeView === "function") renderAnalyzeView();
   if (typeof renderGalleryView === "function") renderGalleryView();
+  renderDecksView();
 }
 
 /* Neutral "we don't yet know if you have decks" state, used between
@@ -621,6 +625,8 @@ function setHydratingView() {
   els.viewManage.classList.remove("view-empty");
   els.viewAnalyze.classList.remove("view-empty");
   els.viewGallery.classList.remove("view-empty");
+  els.viewDecks.classList.remove("view-empty");
+  els.decksGrid.replaceChildren(placeholderText("Chargement…"));
   els.commanderZone.replaceChildren(placeholderText("Chargement…"));
   els.hand.replaceChildren(placeholderText("Chargement…"));
   els.battlefield.replaceChildren(placeholderText("Chargement…"));
@@ -1102,26 +1108,34 @@ function _findUniqueDeckName(base) {
 // ============================================================
 // View toggle (Jouer / Gérer)
 // ============================================================
+/* View shown when the tab reloads (F5). Session-scoped on purpose: a new
+ * tab or session still opens on the "default view" preference. */
+const LAST_VIEW_KEY = "deckrypt-last-view";
+const VIEWS = ["play", "manage", "analyze", "gallery", "decks"];
+
 /* Tab switching is now a pure visibility toggle — content is
  * pre-rendered by switchDeck (and on every commitDeckChange) so the
  * panels are always populated when the user clicks the tab. The
  * only async hook here is the FR translation fetch on first entry
- * to the manage view (cheap if cached, banner if not). */
+ * to the manage view (cheap if cached, banner if not). Exception:
+ * « Mes decks » spans every deck, so it renders on entry. */
 function switchView(view) {
+  try { sessionStorage.setItem(LAST_VIEW_KEY, view); } catch (e) { /* storage blocked */ }
   const tabs = [
     { name: "play", tab: els.tabPlay, panel: els.viewPlay },
     { name: "manage", tab: els.tabManage, panel: els.viewManage },
     { name: "analyze", tab: els.tabAnalyze, panel: els.viewAnalyze },
     { name: "gallery", tab: els.tabGallery, panel: els.viewGallery },
+    { name: "decks", tab: null, panel: els.viewDecks },
   ];
-  let activeTab = null;
   for (const t of tabs) {
     const active = t.name === view;
     t.panel.hidden = !active;
+    if (!t.tab) continue;
     t.tab.classList.toggle("active", active);
     t.tab.setAttribute("aria-selected", String(active));
-    if (active) activeTab = t.tab;
   }
+  if (view === "decks") renderDecksView();
   /* The gallery is a full-width template — sidebar disappears and the
    * layout's two-column grid collapses to one. Toggling a body class
    * keeps the CSS aware without forcing every view to know about it. */
@@ -1271,6 +1285,10 @@ function bindEvents() {
   els.tabManage.addEventListener("click", () => switchView("manage"));
   els.tabAnalyze.addEventListener("click", () => switchView("analyze"));
   els.tabGallery.addEventListener("click", () => switchView("gallery"));
+  document.getElementById("btn-open-decks").addEventListener("click", () => {
+    if (deckDropdown) deckDropdown.close();
+    switchView("decks");
+  });
   els.langSwitchEn.addEventListener("click", () => setCardLanguage("en"));
   els.langSwitchFr.addEventListener("click", () => setCardLanguage("fr"));
   /* Format edit dropdown: trigger toggles the menu, each item sets the
@@ -1295,7 +1313,7 @@ function bindEvents() {
   if (els.btnNewDeck) els.btnNewDeck.addEventListener("click", createEmptyDeck);
   /* Single delegated handler for the empty-state CTA buttons (one
    * pair per view — `#view-play / view-manage / view-analyze /
-   * view-gallery`). Both `[data-action="open-import"]` and
+   * view-gallery / view-decks`). Both `[data-action="open-import"]` and
    * `[data-action="new-deck"]` go through here. The dropdown
    * entries have their own listeners above because they live inside
    * a dropdown menu (autoclose semantics differ). */
@@ -1484,15 +1502,14 @@ function init() {
     setHydratingView();
   }
 
-  /* Honour the user's "default view at open" preference set in
-   * Settings → Préférences. Falls through to the markup's default
-   * (Play) when no preference is saved. */
+  /* A reload stays on the view the tab was showing; otherwise honour the
+   * "default view at open" preference (Settings → Préférences). Falls
+   * through to the markup's default (Play) when neither is set. */
   try {
-    const defaultView = localStorage.getItem("deckrypt-default-view");
-    if (["play", "manage", "analyze", "gallery"].includes(defaultView) && defaultView !== "play") {
-      switchView(defaultView);
-    }
-  } catch (e) { /* localStorage blocked */ }
+    const startView = sessionStorage.getItem(LAST_VIEW_KEY)
+      || localStorage.getItem("deckrypt-default-view");
+    if (VIEWS.includes(startView) && startView !== "play") switchView(startView);
+  } catch (e) { /* storage blocked */ }
 
   // Cache eviction is amortised once per session, scheduled off the
   // critical render path so F5 doesn't pay for it. resolveDeck used

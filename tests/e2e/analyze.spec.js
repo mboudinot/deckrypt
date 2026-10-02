@@ -162,7 +162,7 @@ test("switching deck from the sidebar refreshes the analyze view", async ({ page
     localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-analyze");
 
   // Initial state: deck-a has no all_parts → no tokens. deck-b has
@@ -189,7 +189,7 @@ test("token grid dedupes printings of the same token (regression)", async ({ pag
     localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-analyze");
   await expect(page.locator(".token-tile").first()).toBeVisible({ timeout: 5000 });
   await expect(page.locator(".token-tile")).toHaveCount(1);
@@ -208,7 +208,7 @@ test("token sources list names the card that generates each token", async ({ pag
     localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-analyze");
   await expect(page.locator(".token-tile").first()).toBeVisible({ timeout: 5000 });
   const sourceLink = page.locator("#analyze-token-sources .sim-card-link", {
@@ -238,7 +238,7 @@ test("token fetch by Scryfall ID doesn't crash on identifier dedup (regression)"
     localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-analyze");
 
   // Either the token tile appears (success path) or the error

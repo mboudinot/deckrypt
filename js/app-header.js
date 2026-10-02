@@ -59,6 +59,7 @@ function populateDeckSelect() {
   renderDeckDropdown(decks);
   refreshDeckPill();
   updateDeleteButton();
+  if (!els.viewDecks.hidden) renderDecksView();
 }
 
 /* Commander colours per deck from the card cache, no network. A deck
@@ -106,7 +107,7 @@ async function _fetchDropdownCommanders(missing) {
 function renderDeckDropdown(decks) {
   if (!els.deckDropdownList) return;
   els.deckDropdownList.replaceChildren();
-  els.deckDropdownCount.textContent = `${decks.length} actif${decks.length > 1 ? "s" : ""}`;
+  els.deckDropdownCount.textContent = String(decks.length);
   if (decks.length === 0) {
     const empty = document.createElement("div");
     empty.className = "dropdown-item";
@@ -146,11 +147,13 @@ function renderDeckDropdown(decks) {
     btn.appendChild(col);
 
     btn.addEventListener("click", () => {
+      if (deckDropdown) deckDropdown.close();
+      // « Mes decks » has no single-deck content: picking a deck opens it, like a tile.
+      if (!els.viewDecks.hidden) { openDeckFromDecksView(d.id); return; }
       if (els.deckSelect.value !== d.id) {
         els.deckSelect.value = d.id;
         els.deckSelect.dispatchEvent(new Event("change", { bubbles: true }));
       }
-      if (deckDropdown) deckDropdown.close();
     });
     els.deckDropdownList.appendChild(btn);
   }

@@ -32,6 +32,8 @@ function setupSlidingIndicator(container, opts = {}) {
   container.classList.add("has-indicator");
 
   function positionOn(item) {
+    // No active item (e.g. the tab-less "Mes decks" view): hide, don't park on a stale tab.
+    indicator.style.opacity = item ? "" : "0";
     if (!item) return;
     const cRect = container.getBoundingClientRect();
     const iRect = item.getBoundingClientRect();

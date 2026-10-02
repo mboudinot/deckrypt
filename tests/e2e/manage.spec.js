@@ -111,7 +111,7 @@ test("FR switch surfaces a visible loading banner during the fetch", async ({ pa
     localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-manage");
 
   // Slow down lang:fr searches so the 200 ms debounce has time to
@@ -152,7 +152,7 @@ test("per-card spinners appear during the FR fetch and clear once translated", a
     localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-manage");
 
   // Slow the FR search so we can observe the pending-state UI.
@@ -195,7 +195,7 @@ test("switching deck while FR is active translates the new deck (regression)", a
     localStorage.setItem("mtg-hand-sim:manage-lang", "fr");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-manage");
 
   // Already in FR → first deck's names get translated on load.

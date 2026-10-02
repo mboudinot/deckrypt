@@ -93,6 +93,7 @@
 <script defer src="js/card-scanner.js"></script>
 <script defer src="js/app-analyze.js"></script>
 <script defer src="js/app-gallery.js"></script>
+<script defer src="js/app-decks.js"></script>
 <script defer src="js/app-login.js"></script>
 <script defer src="js/app-settings.js"></script>
 <script defer src="js/app-legal.js"></script>
@@ -150,10 +151,13 @@
           </span>
         </button>
         <div class="dropdown-menu deck-dropdown-menu" id="deck-dropdown-menu" role="menu" hidden>
-          <div class="dropdown-head">
-            <div class="name">Tes decks</div>
-            <div class="email" id="deck-dropdown-count">0 actifs</div>
-          </div>
+          <button type="button" id="btn-open-decks" class="dropdown-item" role="menuitem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+            </svg>
+            Voir tous mes decks
+            <span class="dropdown-item-meta" id="deck-dropdown-count"></span>
+          </button>
           <div class="dropdown-sep" role="separator"></div>
           <div class="dropdown-list" id="deck-dropdown-list" role="none"></div>
           <div class="dropdown-sep" role="separator"></div>
@@ -795,6 +799,28 @@
       </div>
       <div class="gallery-toolbar" id="gallery-toolbar"></div>
       <div id="gallery-content"></div>
+    </div>
+
+    <!-- "Mes decks": no nav tab, opened from the deck-pill dropdown. -->
+    <div class="decks-area" id="view-decks" role="region" aria-labelledby="decks-title" hidden>
+      <div class="view-empty-state empty-deck-cta">
+        <svg class="empty-deck-cta-icon" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="empty-deck-cta-title">Aucun deck pour le moment</div>
+        <div class="empty-deck-cta-sub">Crée un deck vide pour partir de zéro, ou importe une liste MTGA / Moxfield existante.</div>
+        <div class="empty-deck-cta-buttons">
+          <button type="button" class="btn primary empty-deck-cta-btn" data-action="open-import">Importer une liste</button>
+          <button type="button" class="btn empty-deck-cta-btn" data-action="new-deck">+ Nouveau deck</button>
+        </div>
+      </div>
+      <div class="decks-head">
+        <h2 id="decks-title">Mes decks</h2>
+        <span class="decks-count" id="decks-count"></span>
+      </div>
+      <div class="decks-grid" id="decks-grid"></div>
     </div>
 
   </main>

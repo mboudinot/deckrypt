@@ -63,7 +63,7 @@ test("placeholder when the deck has fewer than 7 cards", async ({ page }) => {
     localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-analyze");
   await expect(page.locator("#analyze-sim")).toContainText(/au moins 7 cartes/);
   await expect(page.locator("#analyze-sim-reshuffle")).toBeHidden();
@@ -81,7 +81,7 @@ test("the showcase run explains its mulligans", async ({ page }) => {
     localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
   });
   await page.reload();
-  await page.locator("#commander-zone .card").first().waitFor();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
   await page.click("#tab-analyze");
   await expect(page.locator(".sim-mulligans")).toContainText("3 mulligans");
   await expect(page.locator(".sim-mulligans")).toContainText("aucun terrain");
