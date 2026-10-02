@@ -33,9 +33,11 @@ test("typing an English word still works (no French label when absent)", async (
   /* "sol" returns Sol Ring, Sol, Solar Tide from English autocomplete.
    * None of those are in the FR dictionary so .suggestion-secondary
    * shouldn't appear. */
+  // Retrying assertions only: the list first shows a loading <li>, so a
+  // one-shot count() taken mid-render can see a single item (flaky in CI).
+  await expect(page.locator("#add-card-suggestions .suggestion-loading")).toHaveCount(0);
   const items = page.locator("#add-card-suggestions li");
-  await expect(items.first()).toBeVisible();
-  expect(await items.count()).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => items.count()).toBeGreaterThanOrEqual(2);
   // No secondary line on any of these suggestions.
   await expect(items.locator(".suggestion-secondary")).toHaveCount(0);
 });
