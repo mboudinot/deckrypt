@@ -68,3 +68,22 @@ test("placeholder when the deck has fewer than 7 cards", async ({ page }) => {
   await expect(page.locator("#analyze-sim")).toContainText(/au moins 7 cartes/);
   await expect(page.locator("#analyze-sim-reshuffle")).toBeHidden();
 });
+
+test("the showcase run explains its mulligans", async ({ page }) => {
+  // The Scryfall mock types non-basic names as creatures: a deck without
+  // basics never has a land, so every hand goes back until the forced keep.
+  await page.evaluate(() => {
+    localStorage.setItem("mtg-hand-sim:user-decks-v1", JSON.stringify([{
+      id: "no-land-deck", name: "No lands",
+      commanders: [{ name: "Atraxa, Praetors' Voice" }],
+      cards: [{ name: "Grizzly Bears", qty: 20 }],
+    }]));
+    localStorage.setItem("mtg-hand-sim:defaults-seeded-v1", "1");
+  });
+  await page.reload();
+  await page.locator("#commander-zone .card").first().waitFor();
+  await page.click("#tab-analyze");
+  await expect(page.locator(".sim-mulligans")).toContainText("3 mulligans");
+  await expect(page.locator(".sim-mulligans")).toContainText("aucun terrain");
+  await expect(page.locator(".sim-mulligans")).toContainText("main gardée à 5 cartes");
+});

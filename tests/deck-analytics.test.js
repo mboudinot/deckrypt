@@ -575,10 +575,18 @@ describe("detectThemes", () => {
       oracle("You draw that many cards."),
       oracle("Whenever this attacks, you draw a card."),
       oracle("Draw two cards, then discard one."),
-      oracle("Each opponent draws a card."),
+      oracle("Each player draws a card."),
       oracle("Draws a card whenever a creature dies."),
     ];
     expect(detectThemes(deck).find((t) => t.key === "card-draw")).toMatchObject({ count: 8 });
+  });
+
+  it("card-draw: an opponent drawing isn't your draw", () => {
+    const deck = [
+      ...Array.from({ length: 7 }, () => oracle("Draw a card.")),
+      oracle("Each opponent draws a card."),
+    ];
+    expect(detectThemes(deck).find((t) => t.key === "card-draw")).toBeUndefined();
   });
 
   it("card-draw: respects the high threshold (8 — every deck has some draw)", () => {

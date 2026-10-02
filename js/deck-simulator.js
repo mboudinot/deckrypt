@@ -4,11 +4,14 @@
  * stats across N goldfish runs.
  *
  * Approximations the model makes (these get surfaced in the UI):
- *   - No mulligans. We report `% mains gardables` (2-5 lands) instead.
+ *   - London mulligan, first one free (multiplayer rule); a hand is
+ *     judged like a player would — see evaluateHand.
  *   - No combat, no opponent — pure goldfish.
- *   - Mana rocks tap T-entry; mana dorks tap T-entry+1 (summon sickness).
- *   - On-cast / ETB effects are NOT resolved: impulse draws, extra land
- *     drops, treasure tokens, cascade, free spells… all ignored.
+ *   - Mana rocks tap T-entry (unless they enter tapped); mana dorks tap
+ *     T-entry+1 (summon sickness).
+ *   - Land-search ramp (Cultivate, Rampant Growth, Wood Elves) resolves.
+ *     Other on-cast / ETB effects don't: impulse draws, treasure tokens,
+ *     cascade, free spells… all ignored.
  *   - Generic mana is filled greedily from any unused source. Per-spell
  *     mana assignment is most-restricted-first — exact for any case a
  *     normal EDH deck will hit at 7 turns deep.
@@ -20,7 +23,7 @@
 
 // Browser: global from card-text.js. Node (vitest): no shared scope.
 if (typeof oracleText === "undefined" && typeof require === "function") {
-  globalThis.oracleText = require("./card-text.js").oracleText;
+  Object.assign(globalThis, require("./card-text.js"));
 }
 
 const SIM_COLORS = ["W", "U", "B", "R", "G"];
@@ -81,15 +84,49 @@ function _isDork(card) {
   if (!_producesMana(card)) return false;
   return (card.cmc ?? 99) <= 3;
 }
+const _BASIC_TYPES = ["Plains", "Island", "Swamp", "Mountain", "Forest"];
+const _COUNT_WORDS = { a: 1, an: 1, one: 1, two: 2, three: 3 };
+
+/* What a land-search card fetches: how many lands, to the battlefield
+ * (tapped or not) and/or to hand, and which lands qualify. null when
+ * the card doesn't search for lands. Memoised per card. */
+const _rampCache = new WeakMap();
+function _landSearch(card) {
+  if (_rampCache.has(card)) return _rampCache.get(card);
+  const text = oracleText(card);
+  const m = text.match(/search your library for (?:up to )?(a|an|one|two|three)\b([^.]*)/i);
+  let out = null;
+  if (m && /\b(?:lands?|plains|islands?|swamps?|mountains?|forests?)\b/i.test(m[2])) {
+    const count = _COUNT_WORDS[m[1].toLowerCase()];
+    const basicOnly = /\bbasic\b/i.test(m[2]);
+    const types = _BASIC_TYPES.filter((ty) => new RegExp(`\\b${ty}`, "i").test(m[2]));
+    const toBattlefield = /onto the battlefield/i.test(text)
+      ? (/the other into your hand/i.test(text) ? 1 : count) : 0;
+    const toHand = /the other into your hand/i.test(text) ? 1
+      : toBattlefield === 0 && /into your hand/i.test(text) ? count : 0;
+    out = {
+      toBattlefield, toHand,
+      tapped: /onto the battlefield tapped/i.test(text),
+      matches: (land) => _isLand(land)
+        && (!basicOnly || /\bbasic\b/i.test(land.type_line || ""))
+        && (types.length === 0 || types.some((ty) => (land.type_line || "").includes(ty))),
+    };
+  }
+  _rampCache.set(card, out);
+  return out;
+}
+
+/* Ramp = puts a land onto the battlefield (Cultivate, Nature's Lore,
+ * Wood Elves). Land tutors to hand don't accelerate, so they don't count. */
 function _isRampSpell(card) {
   if (_isLand(card) || _isRock(card) || _isDork(card)) return false;
   if ((card.cmc ?? 99) > 5) return false;
-  return /search your library for (a|up to (two|three)) (basic )?land/i.test(oracleText(card));
+  return (_landSearch(card)?.toBattlefield ?? 0) > 0;
 }
 function _isDrawSpell(card) {
   if (_isLand(card)) return false;
   if ((card.cmc ?? 99) > 6) return false;
-  return /draw (a|two|three|four|five) cards?/i.test(oracleText(card));
+  return drawsCards(card);
 }
 
 /* For a permanent that taps for mana, returns the source descriptor
@@ -255,10 +292,11 @@ function _battlefieldSources(battlefield, t) {
   const sources = [];
   for (const p of battlefield) {
     if (p.type === "land") {
-      if (p.enteredTurn === t && _isSlowTap(p.card)) continue;
+      if (p.enteredTurn === t && (p.tapped || _isSlowTap(p.card))) continue;
       const src = _cardSource(p.card);
       if (src) sources.push(src);
     } else if (p.type === "rock") {
+      if (p.enteredTurn === t && _isSlowTap(p.card)) continue;
       const src = _cardSource(p.card);
       if (src) sources.push(src);
     } else if (p.type === "dork") {
@@ -353,15 +391,115 @@ function _categorize(card) {
   return cat;
 }
 
+/* Would a player keep this hand? 2–5 lands (1 with two cheap mana
+ * sources) AND a spell castable early: 3 lands + four 7-drops is a mull,
+ * so are cheap spells whose colours the hand can't make. */
+function evaluateHand(hand) {
+  const lands = hand.filter(_isLand);
+  const spells = hand.filter((c) => !_isLand(c));
+  const cheapSources = spells.filter((c) => {
+    const cat = _categorize(c);
+    return (cat === "rock" || cat === "dork") && (c.cmc ?? 99) <= 2;
+  });
+  if (lands.length === 0) return { keep: false, reason: "aucun terrain" };
+  if (lands.length >= 6) return { keep: false, reason: "trop de terrains" };
+  if (lands.length === 1 && cheapSources.length < 2) return { keep: false, reason: "un seul terrain" };
+
+  const sources = [...lands, ...cheapSources].map(_cardSource).filter(Boolean);
+  const early = spells.filter((c) => (c.cmc ?? 99) <= 3);
+  if (early.length === 0) return { keep: false, reason: "aucun sort jouable avant le tour 4" };
+  const colorsOnly = (c) => (c.mana_cost || "").replace(/\{\d+\}/g, "");
+  if (!early.some((c) => _canCast(colorsOnly(c), _expandUnits(sources)))) {
+    return { keep: false, reason: "couleurs manquantes pour les sorts bon marché" };
+  }
+  return { keep: true, reason: null };
+}
+
+/* London-mulligan bottoming: shed lands while the hand is land-heavy,
+ * otherwise the most expensive spell. */
+function _bottomCards(hand, n) {
+  const kept = hand.slice();
+  const bottomed = [];
+  for (let k = 0; k < n; k++) {
+    const lands = kept.filter(_isLand).length;
+    let idx;
+    if (lands > Math.ceil((kept.length - 1) / 2)) {
+      idx = kept.findIndex(_isLand);
+    } else {
+      idx = -1;
+      for (let i = 0; i < kept.length; i++) {
+        if (_isLand(kept[i])) continue;
+        if (idx === -1 || (kept[i].cmc ?? 0) > (kept[idx].cmc ?? 0)) idx = i;
+      }
+      if (idx === -1) idx = kept.findIndex(_isLand);
+    }
+    bottomed.push(kept.splice(idx, 1)[0]);
+  }
+  return { kept, bottomed };
+}
+
+/* Max draws before the hand is kept whatever it looks like: the 4th
+ * hand (3 mulligans, first free) keeps 5 cards. */
+const MAX_MULLIGANS = 3;
+
+/* Shuffle-draw-evaluate until a keep. Returns the kept hand, the
+ * remaining library (bottomed cards at the end) and each mulliganed
+ * hand with the reason it went back. */
+function _drawOpeningHand(deckCards, rng, mulligan) {
+  const mulligans = [];
+  for (let k = 0; ; k++) {
+    const library = _shuffle(deckCards, rng);
+    const drawn = library.splice(0, 7);
+    const verdict = evaluateHand(drawn);
+    if (!mulligan || verdict.keep || k === MAX_MULLIGANS) {
+      const { kept, bottomed } = _bottomCards(drawn, Math.max(0, k - 1));
+      return { hand: kept, library: library.concat(bottomed), mulligans, keptAt7: k === 0 && verdict.keep };
+    }
+    mulligans.push({ hand: drawn, reason: verdict.reason });
+  }
+}
+
+/* Puts the lands a ramp card fetches into play / hand, best colour fit
+ * first, then shuffles the library like a real search. Returns the
+ * fetched cards; untapped ones feed `units` right away. */
+function _resolveLandSearch(search, library, hand, battlefield, units, t, neededPips, rng) {
+  const fetched = [];
+  const take = () => {
+    let best = -1;
+    for (let i = 0; i < library.length; i++) {
+      if (!search.matches(library[i])) continue;
+      if (best === -1 || _landColorScore(library[i], neededPips) > _landColorScore(library[best], neededPips)) best = i;
+    }
+    return best === -1 ? null : library.splice(best, 1)[0];
+  };
+  for (let i = 0; i < search.toBattlefield; i++) {
+    const land = take();
+    if (!land) break;
+    const tapped = search.tapped || _isSlowTap(land);
+    battlefield.push({ card: land, type: "land", enteredTurn: t, tapped });
+    if (!tapped) {
+      const src = _cardSource(land);
+      if (src) units.push(..._expandUnits([src]));
+    }
+    fetched.push(land);
+  }
+  for (let i = 0; i < search.toHand; i++) {
+    const land = take();
+    if (!land) break;
+    hand.push(land);
+    fetched.push(land);
+  }
+  const shuffled = _shuffle(library, rng);
+  library.splice(0, library.length, ...shuffled);
+  return fetched;
+}
+
 function simulateGame(deckCards, commanders = [], opts = {}) {
-  const { seed = Math.floor(Math.random() * 0xFFFFFFFF), onPlay = true, numTurns = 7 } = opts;
+  const { seed = Math.floor(Math.random() * 0xFFFFFFFF), onPlay = true, numTurns = 7, mulligan = true } = opts;
   const rng = _seededRng(seed);
   const neededPips = _aggPips(deckCards);
-  const library = _shuffle(deckCards.slice(), rng);
-  const hand = library.splice(0, 7);
+  const { hand, library, mulligans, keptAt7 } = _drawOpeningHand(deckCards, rng, mulligan);
   const openingHand = hand.slice();
-  const lands = hand.filter(_isLand).length;
-  const keepable = lands >= 2 && lands <= 5;
 
   /* Battlefield items keep their enteredTurn so summon-sick dorks and
    * fresh slow taplands can skip the mana pool on entry. */
@@ -437,13 +575,15 @@ function simulateGame(deckCards, commanders = [], opts = {}) {
       /* Rocks have no summon sickness for tap abilities — Sol Ring cast
        * on T1 produces 2 mana on T1. Dorks are creatures, sick the turn
        * they enter. */
-      if (pickCat === "rock") {
+      if (pickCat === "rock" && !_isSlowTap(pick)) {
         const src = _cardSource(pick);
-        if (src) for (let i = 0; i < src.amount; i++) {
-          units.push({ colors: new Set(src.colors), used: false });
-        }
+        if (src) units.push(..._expandUnits([src]));
       }
-      cast.push({ card: pick, fromCommand: false });
+      const search = pickCat === "ramp" ? _landSearch(pick) : null;
+      const fetched = search
+        ? _resolveLandSearch(search, library, hand, battlefield, units, t, neededPips, rng)
+        : [];
+      cast.push({ card: pick, fromCommand: false, fetched });
       if ((pick.cmc ?? 0) >= 5 && firstFiveCmcTurn === null) firstFiveCmcTurn = t;
     }
 
@@ -456,7 +596,8 @@ function simulateGame(deckCards, commanders = [], opts = {}) {
     seed,
     onPlay,
     openingHand,
-    keepable,
+    mulligans,
+    keptAt7,
     turns,
     battlefield,
     hand: hand.slice(),
@@ -473,7 +614,8 @@ function simulateGame(deckCards, commanders = [], opts = {}) {
  * lands, when the first big spell hits, and how often a turn whiffs. */
 function runSimulations(deckCards, commanders = [], n = 500, opts = {}) {
   const baseSeed = opts.seed ?? Math.floor(Math.random() * 0xFFFFFFFF);
-  let keepable = 0;
+  let keptAt7 = 0;
+  let mulliganSum = 0;
   let commanderCast = 0;
   let commanderCastSum = 0;
   let bigSpell = 0;
@@ -483,7 +625,8 @@ function runSimulations(deckCards, commanders = [], n = 500, opts = {}) {
   const manaByT = [0, 0, 0, 0, 0, 0, 0, 0];
   for (let i = 0; i < n; i++) {
     const run = simulateGame(deckCards, commanders, { ...opts, seed: baseSeed + i });
-    if (run.keepable) keepable++;
+    if (run.keptAt7) keptAt7++;
+    mulliganSum += run.mulligans.length;
     if (run.commanderCastTurn !== null) {
       commanderCast++;
       commanderCastSum += run.commanderCastTurn;
@@ -502,7 +645,8 @@ function runSimulations(deckCards, commanders = [], n = 500, opts = {}) {
   }
   return {
     runs: n,
-    keepablePct: n > 0 ? keepable / n : 0,
+    keptAt7Pct: n > 0 ? keptAt7 / n : 0,
+    avgMulligans: n > 0 ? mulliganSum / n : 0,
     commanderCastPct: n > 0 ? commanderCast / n : 0,
     commanderAvgTurn: commanderCast > 0 ? commanderCastSum / commanderCast : null,
     bigSpellPct: n > 0 ? bigSpell / n : 0,
@@ -518,7 +662,8 @@ if (typeof module !== "undefined" && module.exports) {
     SIM_COLORS,
     _parseCost: _parseCost,
     _attemptCast, _canCast, _expandUnits,
-    _isRock, _isDork, _isRampSpell, _isDrawSpell, _isSlowTap, _isCreatureAura,
+    _isRock, _isDork, _isRampSpell, _isDrawSpell, _isSlowTap, _isCreatureAura, _landSearch,
+    evaluateHand, _bottomCards,
     _cardSource, _producedAmount, _categorize,
     _seededRng, _shuffle,
     simulateGame, runSimulations,

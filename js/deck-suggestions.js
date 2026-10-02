@@ -13,7 +13,7 @@
 
 // Browser: global from card-text.js. Node (vitest): no shared scope.
 if (typeof oracleText === "undefined" && typeof require === "function") {
-  globalThis.oracleText = require("./card-text.js").oracleText;
+  Object.assign(globalThis, require("./card-text.js"));
 }
 
 const COMMANDER_TARGETS = {
@@ -92,20 +92,8 @@ function countRamp(cards) {
   return n;
 }
 
-/* A card draws if its oracle text says so. Catches:
- *   "draw a card", "draws a card",
- *   "draw two cards", "draw three cards",
- *   "draws cards equal to …",
- *   "Investigate" → not (specific keyword)
- * False positives include "discard X, draw Y" cycling effects, which
- * is fine — they ARE a form of card filtering. */
 function isDrawCard(card) {
-  if (_isLand(card)) return false;
-  const text = oracleText(card);
-  if (!text) return false;
-  if (/\bdraws? a card\b/i.test(text)) return true;
-  if (/\bdraws? \w+ cards?\b/i.test(text)) return true;
-  return false;
+  return !_isLand(card) && drawsCards(card);
 }
 
 function countDraw(cards) {
@@ -368,17 +356,20 @@ function _assess(current, target) {
   return "ok";
 }
 
-function _build(key, label, current, target, advice) {
+/* `cards`: the distinct cards behind the count (one per name — 30
+ * Forests show once), empty for metrics that aren't a card count. */
+function _build(key, label, current, target, advice, matching = []) {
+  const cards = [...new Map(matching.map((c) => [c.name, c])).values()];
   if (!target) {
     return {
-      key, label, current,
+      key, label, current, cards,
       target: null,
       status: "info",
       advice: "Format non-Commander — cibles variables, à toi de juger.",
     };
   }
   const status = _assess(current, target);
-  return { key, label, current, target: target.ideal, status, advice: advice[status] };
+  return { key, label, current, cards, target: target.ideal, status, advice: advice[status] };
 }
 
 /* Public entry point. Returns an array of suggestion objects:
@@ -393,45 +384,50 @@ function suggestions(resolved) {
   const isEdh = deckFormatOf(resolved) === "commander";
   const out = [];
 
-  out.push(_build("lands", "Terrains", countLands(cards),
+  const lands = cards.filter(_isLand);
+  out.push(_build("lands", "Terrains", lands.length,
     isEdh ? COMMANDER_TARGETS.lands : null,
     {
       low:  "Trop peu — vise 35–40 pour stabiliser tes drops.",
       high: "Beaucoup de terrains ; 35–40 suffit en EDH classique.",
       ok:   "Bon ratio pour un deck Commander.",
-    }));
+    }, lands));
 
-  out.push(_build("ramp", "Accélération de mana", countRamp(cards),
+  const ramp = cards.filter(isRampCard);
+  out.push(_build("ramp", "Accélération de mana", ramp.length,
     isEdh ? COMMANDER_TARGETS.ramp : null,
     {
       low:  "Pas assez de ramp (mana rocks, mana dorks, land tutors). Vise 8–12.",
       high: "Beaucoup de ramp ; tu peux le diluer en interaction ou en pioche.",
       ok:   "Ramp dans la fourchette EDH habituelle.",
-    }));
+    }, ramp));
 
-  out.push(_build("draw", "Pioche", countDraw(cards),
+  const draw = cards.filter(isDrawCard);
+  out.push(_build("draw", "Pioche", draw.length,
     isEdh ? COMMANDER_TARGETS.draw : null,
     {
       low:  "Peu de pioche détectée — un EDH a besoin de 8–12 sources de cartes.",
       high: "Beaucoup de pioche, c'est rarement un défaut.",
       ok:   "Pioche dans la fourchette.",
-    }));
+    }, draw));
 
-  out.push(_build("interaction", "Interaction ciblée", countInteraction(cards),
+  const interaction = cards.filter(isInteractionCard);
+  out.push(_build("interaction", "Interaction ciblée", interaction.length,
     isEdh ? COMMANDER_TARGETS.interaction : null,
     {
       low:  "Peu de removal / contre-sorts. Vise 8–14 réponses ponctuelles.",
       high: "Beaucoup d'interaction — assure-toi d'avoir aussi des conditions de victoire.",
       ok:   "Bon volume d'interaction ciblée.",
-    }));
+    }, interaction));
 
-  out.push(_build("wipes", "Board wipes", countBoardWipes(cards),
+  const wipes = cards.filter(isBoardWipe);
+  out.push(_build("wipes", "Board wipes", wipes.length,
     isEdh ? COMMANDER_TARGETS.wipes : null,
     {
       low:  "Aucun reset board — ajoute 2–4 wraths pour les situations désespérées.",
       high: "Beaucoup de wipes ; risque de casser ta propre board sans win con derrière.",
       ok:   "Volume de wraths confortable.",
-    }));
+    }, wipes));
 
   // Average CMC only makes sense if there's a non-trivial number of
   // spells — a 5-card "Test deck" would report nonsense.

@@ -11,7 +11,7 @@
 
 // Browser: global from card-text.js. Node (vitest): no shared scope.
 if (typeof oracleText === "undefined" && typeof require === "function") {
-  globalThis.oracleText = require("./card-text.js").oracleText;
+  Object.assign(globalThis, require("./card-text.js"));
 }
 
 const PRIMARY_TYPES = [
@@ -314,11 +314,9 @@ const THEME_RULES = [
   },
   {
     key: "card-draw", label: "Pioche",
-    /* "Draws? <0-3 words> cards?" catches "draw a card", "draws three
-     * cards", "draws that many cards". Threshold is high (8) because
-     * every deck has some draw — flagging the theme means draw is a
-     * focus, not just present. */
-    match: (c) => /\bdraws?\b[^.]{0,30}\bcards?\b/i.test(oracleText(c)),
+    /* Threshold is high (8) because every deck has some draw — flagging
+     * the theme means draw is a focus, not just present. */
+    match: drawsCards,
     minCount: 8,
   },
   {

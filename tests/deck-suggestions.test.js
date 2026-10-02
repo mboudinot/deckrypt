@@ -486,6 +486,19 @@ describe("suggestions (Commander)", () => {
     expect(out.find((s) => s.key === "draw").status).toBe("ok");
   });
 
+  it("lists the distinct cards behind each count", () => {
+    const r = buildResolved({ lands: 0, rocks: 10, draws: 10 });
+    r.deck.push(land("Forest"), land("Forest"), land("Island"));
+    const lands = suggestions(r).find((s) => s.key === "lands");
+    expect(lands.current).toBe(3);
+    expect(lands.cards.map((c) => c.name)).toEqual(["Forest", "Island"]);
+    expect(suggestions(r).find((s) => s.key === "draw").cards).toHaveLength(10);
+  });
+
+  it("has no card list for the average-CMC metric", () => {
+    expect(suggestions(buildResolved()).find((s) => s.key === "avg-cmc").cards).toEqual([]);
+  });
+
   it("flags low land count", () => {
     const r = buildResolved({ lands: 28, rocks: 10, draws: 10 });
     expect(suggestions(r).find((s) => s.key === "lands").status).toBe("low");

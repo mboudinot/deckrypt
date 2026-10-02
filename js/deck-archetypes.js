@@ -14,7 +14,7 @@
 
 // Browser: global from card-text.js. Node (vitest): no shared scope.
 if (typeof oracleText === "undefined" && typeof require === "function") {
-  globalThis.oracleText = require("./card-text.js").oracleText;
+  Object.assign(globalThis, require("./card-text.js"));
 }
 
 function _isLand(card) {
@@ -92,7 +92,7 @@ function archetypeSignals(deck) {
     removal: _countByOracle(deck, /(destroy|exile) target/i),
     boardWipes: _countByOracle(deck, /(destroy|exile) all (creatures?|permanents?|nonland)/i),
     bounce: _countByOracle(deck, /return target.*to (its|their) owner['’]s hand/i),
-    cardDraw: _countByOracle(deck, /\bdraws? (a|\w+) cards?\b/i),
+    cardDraw: deck.filter(drawsCards).length,
     ramp: _countByOracle(deck, /search your library[^.]*\bland\b/i)
         + nonLands.filter((c) => Array.isArray(c.produced_mana) && c.produced_mana.length > 0).length,
 

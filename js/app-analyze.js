@@ -164,9 +164,9 @@ function _buildSimStats(stats) {
   const fmtPct = (p) => `${Math.round(p * 100)} %`;
   const tiles = [
     {
-      label: "Mains gardables",
-      value: fmtPct(stats.keepablePct),
-      tip: "Part des mains de 7 cartes avec 2 à 5 terrains (heuristique simple)",
+      label: "Mains gardées à 7",
+      value: fmtPct(stats.keptAt7Pct),
+      tip: `Mains de départ gardées sans mulligan (terrains, sources bon marché, sorts jouables tôt, couleurs). Sinon mulligan London, le premier gratuit — ${stats.avgMulligans.toFixed(1)} mulligan en moyenne par partie`,
     },
     {
       label: "Commandant lancé",
@@ -209,6 +209,13 @@ function _buildSimTimeline(run, tr) {
   head.className = "sim-timeline-head";
   head.textContent = "Run vitrine — sur le jeu, 7 tours";
   wrap.appendChild(head);
+  if (run.mulligans.length > 0) {
+    const mull = document.createElement("p");
+    mull.className = "sim-mulligans";
+    const reasons = run.mulligans.map((m, i) => `main ${i + 1} : ${m.reason}`).join(" · ");
+    mull.textContent = `${pluralFr(run.mulligans.length, "mulligan")} (${reasons}) — main gardée à ${run.openingHand.length} cartes.`;
+    wrap.appendChild(mull);
+  }
 
   for (const turn of run.turns) {
     const row = document.createElement("div");
@@ -264,6 +271,13 @@ function _buildSimAction(label, cards, castInfo, tr) {
       const tag = document.createElement("span");
       tag.className = "sim-tag";
       tag.textContent = "commandant";
+      list.appendChild(tag);
+    }
+    const fetched = castInfo?.[i]?.fetched ?? [];
+    if (fetched.length > 0) {
+      const tag = document.createElement("span");
+      tag.className = "sim-fetched";
+      tag.textContent = ` → ${fetched.map((f) => cardDisplayName(f.name, tr)).join(", ")}`;
       list.appendChild(tag);
     }
   });
@@ -329,7 +343,7 @@ function _buildSimFinalState(run, tr) {
 function _buildSimNote() {
   const note = document.createElement("p");
   note.className = "sim-note";
-  note.textContent = "Simulation goldfish (sans adversaire) : on pioche, on pose une terre, on lance le sort le plus pertinent à chaque tour (rocks/dorks/ramp avant les gros sorts). Pas de mulligan, pas de cascade, pas d'effets résolus — la simulation teste la cohérence de la base de mana et de la courbe, pas les combos.";
+  note.textContent = "Simulation goldfish (sans adversaire) : mulligan London si la main n'est pas jouable (le premier est gratuit), puis on pioche, on pose une terre et on lance le sort le plus pertinent à chaque tour (rocks/dorks/ramp avant les gros sorts). Les sorts de rampe vont chercher leur terrain ; les autres effets (pioche, trésors, cascade) ne sont pas résolus — la simulation teste la cohérence de la base de mana et de la courbe, pas les combos.";
   return note;
 }
 
@@ -753,6 +767,37 @@ function renderSuggestionsPanel(resolved) {
      * Skipped only when (a) there's no oracle filter for the category
      * (avg-cmc), or (b) the deck has no commander to derive an
      * identity from. */
+    const actions = document.createElement("div");
+    actions.className = "suggestion-actions";
+    let grid = null;
+    if (s.cards.length > 0) {
+      /* Same reveal-on-demand as the themes pills: the grid is built on
+       * first open, then only toggled. */
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "suggestion-toggle";
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.textContent = `Voir les cartes (${s.cards.length})`;
+      toggle.addEventListener("click", () => {
+        if (!grid) {
+          grid = document.createElement("div");
+          grid.className = "cards suggestion-cards";
+          for (const c of s.cards) {
+            grid.appendChild(makeCardEl(c, {
+              ariaLabel: `${c.name}, agrandir`,
+              onActivate: () => showModal(c, []),
+            }));
+          }
+          body.appendChild(grid);
+        } else {
+          grid.hidden = !grid.hidden;
+        }
+        const open = !grid.hidden;
+        toggle.setAttribute("aria-expanded", String(open));
+        toggle.textContent = open ? "Masquer les cartes" : `Voir les cartes (${s.cards.length})`;
+      });
+      actions.appendChild(toggle);
+    }
     const href = _scryfallSuggestionUrl(s.key, resolved?.commanders);
     const linkLabel = SCRYFALL_LINK_LABELS[s.key];
     if (href && linkLabel) {
@@ -762,8 +807,9 @@ function renderSuggestionsPanel(resolved) {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.textContent = `${linkLabel} ↗`;
-      body.appendChild(link);
+      actions.appendChild(link);
     }
+    if (actions.childElementCount > 0) body.appendChild(actions);
 
     row.appendChild(body);
     els.analyzeSuggestions.appendChild(row);

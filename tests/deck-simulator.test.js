@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   _parseCost, _attemptCast, _canCast, _expandUnits,
-  _isRock, _isDork, _isRampSpell, _isDrawSpell, _isSlowTap, _isCreatureAura,
-  _cardSource, _producedAmount, _categorize,
+  _isRock, _isDork, _isRampSpell, _isDrawSpell, _isSlowTap, _isCreatureAura, _landSearch,
+  _cardSource, _producedAmount, _categorize, evaluateHand, _bottomCards,
   _seededRng,
   simulateGame, runSimulations,
 } from "../js/deck-simulator.js";
@@ -415,8 +415,9 @@ describe("runSimulations", () => {
   it("returns stat shape", () => {
     const stats = runSimulations(tinyDeck(), [], 50, { seed: 5 });
     expect(stats.runs).toBe(50);
-    expect(stats.keepablePct).toBeGreaterThanOrEqual(0);
-    expect(stats.keepablePct).toBeLessThanOrEqual(1);
+    expect(stats.keptAt7Pct).toBeGreaterThanOrEqual(0);
+    expect(stats.keptAt7Pct).toBeLessThanOrEqual(1);
+    expect(stats.avgMulligans).toBeGreaterThanOrEqual(0);
     expect(stats.avgSpellsByTurn).toHaveLength(8);  // indices 0..7
     expect(stats.avgManaByTurn).toHaveLength(8);
   });
@@ -424,5 +425,138 @@ describe("runSimulations", () => {
     const stats = runSimulations(tinyDeck(), [], 20, { seed: 11 });
     expect(stats.commanderAvgTurn).toBeNull();
     expect(stats.commanderCastPct).toBe(0);
+  });
+});
+
+const forest = () => land(["G"]);
+const island = () => land(["U"], "Basic Land — Island");
+const spell = (cmc, mana_cost, name = `S${cmc}`) => card({ name, type_line: "Sorcery", cmc, mana_cost });
+const solRing = () => card({
+  name: "Sol Ring", type_line: "Artifact", cmc: 1, mana_cost: "{1}",
+  produced_mana: ["C"], oracle_text: "{T}: Add {C}{C}.",
+});
+const signet = () => card({
+  name: "Signet", type_line: "Artifact", cmc: 2, mana_cost: "{2}",
+  produced_mana: ["G", "U"], oracle_text: "{1}, {T}: Add {G}{U}.",
+});
+
+describe("evaluateHand", () => {
+  it("mulligans 3 lands + four 7-drops — nothing to do before turn 4", () => {
+    const hand = [forest(), forest(), forest(), ...Array.from({ length: 4 }, () => spell(7, "{6}{G}"))];
+    expect(evaluateHand(hand)).toEqual({ keep: false, reason: "aucun sort jouable avant le tour 4" });
+  });
+  it("keeps 3 lands + a castable 2-drop", () => {
+    const hand = [forest(), forest(), forest(), spell(2, "{1}{G}"), spell(7, "{6}{G}"), spell(6, "{5}{G}"), spell(5, "{4}{G}")];
+    expect(evaluateHand(hand).keep).toBe(true);
+  });
+  it("keeps 2 lands when the cheap spells only need a land drop to come online", () => {
+    const hand = [forest(), forest(), ...Array.from({ length: 5 }, () => spell(3, "{2}{G}"))];
+    expect(evaluateHand(hand).keep).toBe(true);
+  });
+  it("mulligans when the cheap spells' colours aren't in the hand", () => {
+    const hand = [forest(), forest(), forest(), spell(2, "{U}{U}"), spell(3, "{1}{U}{U}"), spell(7, "{7}"), spell(7, "{7}")];
+    expect(evaluateHand(hand)).toEqual({ keep: false, reason: "couleurs manquantes pour les sorts bon marché" });
+  });
+  it("mulligans 0 lands and 6+ lands", () => {
+    expect(evaluateHand(Array.from({ length: 7 }, () => spell(2, "{2}"))).reason).toBe("aucun terrain");
+    expect(evaluateHand([...Array.from({ length: 6 }, forest), spell(2, "{1}{G}")]).reason).toBe("trop de terrains");
+  });
+  it("keeps a 1-lander only with two cheap mana sources", () => {
+    const base = [forest(), solRing(), spell(2, "{1}{G}"), spell(5, "{5}"), spell(5, "{5}"), spell(6, "{6}")];
+    expect(evaluateHand([...base, spell(4, "{4}")]).reason).toBe("un seul terrain");
+    expect(evaluateHand([...base, signet()]).keep).toBe(true);
+  });
+});
+
+describe("_bottomCards", () => {
+  it("bottoms a land when the hand is land-heavy", () => {
+    const hand = [forest(), forest(), forest(), forest(), forest(), spell(2, "{1}{G}"), spell(3, "{2}{G}")];
+    const { kept, bottomed } = _bottomCards(hand, 1);
+    expect(bottomed[0].type_line).toMatch(/Land/);
+    expect(kept).toHaveLength(6);
+  });
+  it("otherwise bottoms the most expensive spell", () => {
+    const hand = [forest(), forest(), forest(), spell(2, "{1}{G}"), spell(8, "{8}", "Big"), spell(3, "{2}{G}"), spell(4, "{4}")];
+    expect(_bottomCards(hand, 1).bottomed[0].name).toBe("Big");
+  });
+});
+
+describe("London mulligan", () => {
+  const noLands = () => Array.from({ length: 40 }, () => spell(2, "{2}"));
+
+  it("keeps the 4th hand whatever it is, at 5 cards (first mulligan free)", () => {
+    const run = simulateGame(noLands(), [], { seed: 3 });
+    expect(run.mulligans).toHaveLength(3);
+    expect(run.mulligans[0].reason).toBe("aucun terrain");
+    expect(run.openingHand).toHaveLength(5);
+    expect(run.keptAt7).toBe(false);
+    expect(run.libraryLeft + run.hand.length + run.turns.reduce((n, t) => n + t.cast.length, 0)).toBe(40);
+  });
+  it("can be switched off", () => {
+    const run = simulateGame(noLands(), [], { seed: 3, mulligan: false });
+    expect(run.mulligans).toHaveLength(0);
+    expect(run.openingHand).toHaveLength(7);
+  });
+});
+
+describe("tapped mana rocks", () => {
+  it("a rock that enters tapped doesn't pay for anything on its entry turn", () => {
+    const idol = card({
+      name: "Idol", type_line: "Artifact", cmc: 2, mana_cost: "{2}",
+      produced_mana: ["C"], oracle_text: "This artifact enters tapped.\n{T}: Add {C}.",
+    });
+    const deck = [forest(), forest(), forest(), idol, idol, spell(1, "{1}", "One"), spell(1, "{1}", "One")];
+    for (let seed = 1; seed < 40; seed++) {
+      const run = simulateGame(deck, [], { seed, mulligan: false });
+      const t2 = run.turns[1].cast.map((c) => c.card.name);
+      // T2: 2 lands → Idol, and the tapped Idol can't add the 1 mana a One would need.
+      if (t2.includes("Idol")) expect(t2).not.toContain("One");
+    }
+  });
+});
+
+describe("land-search ramp", () => {
+  const rampantGrowth = () => card({
+    name: "Rampant Growth", type_line: "Sorcery", cmc: 2, mana_cost: "{1}{G}",
+    oracle_text: "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+  });
+  const cultivate = () => card({
+    name: "Cultivate", type_line: "Sorcery", cmc: 3, mana_cost: "{2}{G}",
+    oracle_text: "Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand, then shuffle.",
+  });
+
+  it("parses what Cultivate fetches", () => {
+    const s = _landSearch(cultivate());
+    expect(s).toMatchObject({ toBattlefield: 1, toHand: 1, tapped: true });
+    expect(s.matches(forest())).toBe(true);
+    expect(s.matches(land(["G", "U"], "Land — Forest Island"))).toBe(false);  // not basic
+  });
+  it("reads basic-type searches (Nature's Lore) as untapped ramp", () => {
+    const lore = card({ type_line: "Sorcery", cmc: 2, mana_cost: "{1}{G}",
+      oracle_text: "Search your library for a Forest card, put that card onto the battlefield, then shuffle." });
+    expect(_landSearch(lore)).toMatchObject({ toBattlefield: 1, toHand: 0, tapped: false });
+    expect(_isRampSpell(lore)).toBe(true);
+  });
+  it("doesn't call a land tutor to hand ramp", () => {
+    const layOfTheLand = card({ type_line: "Sorcery", cmc: 1, mana_cost: "{G}",
+      oracle_text: "Search your library for a basic land card, reveal it, put it into your hand, then shuffle." });
+    expect(_landSearch(layOfTheLand)).toMatchObject({ toBattlefield: 0, toHand: 1 });
+    expect(_isRampSpell(layOfTheLand)).toBe(false);
+  });
+  it("puts the fetched land onto the battlefield, tapped, when Rampant Growth resolves", () => {
+    const deck = [...Array.from({ length: 12 }, forest), ...Array.from({ length: 4 }, rampantGrowth), ...Array.from({ length: 8 }, () => spell(6, "{6}"))];
+    let resolved = 0;
+    for (let seed = 1; seed < 30; seed++) {
+      const run = simulateGame(deck, [], { seed });
+      for (const t of run.turns) {
+        for (const c of t.cast.filter((x) => x.card.name === "Rampant Growth")) {
+          expect(c.fetched).toHaveLength(1);
+          const entry = run.battlefield.find((p) => p.card === c.fetched[0]);
+          expect(entry).toMatchObject({ type: "land", enteredTurn: t.turn, tapped: true });
+          resolved++;
+        }
+      }
+    }
+    expect(resolved).toBeGreaterThan(0);
   });
 });

@@ -12,7 +12,7 @@
 
 // Browser: global from card-text.js. Node (vitest): no shared scope.
 if (typeof oracleText === "undefined" && typeof require === "function") {
-  globalThis.oracleText = require("./card-text.js").oracleText;
+  Object.assign(globalThis, require("./card-text.js"));
 }
 
 const COLORS = ["W", "U", "B", "R", "G"];

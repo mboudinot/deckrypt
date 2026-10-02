@@ -995,10 +995,38 @@
 /* Scryfall search link. Neutral, not --accent: the editorial accent is
  * crimson and made every row read as an error — status lives on the
  * border/icon. */
+.suggestion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-top: 4px;
+}
+.suggestion-toggle,
+.suggestion-toggle:hover:not(:disabled) {
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+.suggestion-toggle:hover:not(:disabled) { color: var(--text); }
+.suggestion-toggle::after { content: " ▾"; }
+.suggestion-toggle[aria-expanded="true"]::after { content: " ▴"; }
+.suggestion-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.suggestion-cards { margin-top: 10px; justify-content: flex-start; }
+/* Keep the icon by the title once the row grows with its card grid. */
+.suggestion-row:has(.suggestion-cards:not([hidden])) .suggestion-icon { align-self: flex-start; }
+.suggestion-cards[hidden] { display: none; }
 .suggestion-link {
   display: inline-flex;
   align-items: center;
-  margin-top: 4px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text);
@@ -1462,6 +1490,11 @@
   letter-spacing: 0.5px;
   margin-bottom: 4px;
 }
+.sim-mulligans {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
 .sim-turn {
   display: grid;
   grid-template-columns: 36px 1fr;
@@ -1543,6 +1576,7 @@
   background: var(--accent);
   border-radius: var(--radius-pill);
 }
+.sim-fetched { color: var(--text-muted); }
 .sim-note {
   color: var(--text-muted);
   font-size: 0.85rem;
