@@ -1323,6 +1323,7 @@ function renderDeckSummary(def) {
   const rlCountEl = document.getElementById("manage-deck-rl-count");
   const syncTagEl = document.getElementById("manage-deck-sync-tag");
   const syncLabelEl = document.getElementById("manage-deck-sync-label");
+  const legalityAlertEl = document.getElementById("manage-deck-legality-alert");
 
   if (!def) {
     artEl.replaceChildren();
@@ -1333,6 +1334,7 @@ function renderDeckSummary(def) {
     pipsEl.replaceChildren();
     archEl.textContent = "—";
     if (bracketEl) bracketEl.hidden = true;
+    if (legalityAlertEl) legalityAlertEl.hidden = true;
     if (countTagEl) countTagEl.hidden = true;
     if (rlTagEl) rlTagEl.hidden = true;
     if (syncTagEl) syncTagEl.hidden = true;
@@ -1357,6 +1359,7 @@ function renderDeckSummary(def) {
   _renderCommanderArt(artEl, resolved);
   _renderCommanderPips(pipsEl, resolved);
   _renderArchetypeLabel(archEl, resolved);
+  _renderLegalityAlert(legalityAlertEl, def, resolved);
   _renderCountTag(countTagEl, def, cmdrCount, deckCount);
   _renderBracketTag(bracketEl, bracketNumEl, bracketLabelEl, resolved);
   _renderRlTag(rlTagEl, rlCountEl, resolved);
@@ -1388,22 +1391,9 @@ function _renderCommanderArt(artEl, resolved) {
   }
 }
 
-/* Color pips: union of commanders' color_identity, rendered in
- * canonical WUBRG order. */
+/* Color pips: union of commanders' color_identity. */
 function _renderCommanderPips(pipsEl, resolved) {
-  pipsEl.replaceChildren();
-  if (!resolved) return;
-  const colors = new Set();
-  for (const c of resolved.commanders) {
-    if (Array.isArray(c.color_identity)) for (const cid of c.color_identity) colors.add(cid);
-  }
-  for (const c of ["W", "U", "B", "R", "G"]) {
-    if (!colors.has(c)) continue;
-    const p = document.createElement("span");
-    p.className = `pip-dot dot-${c.toLowerCase()}`;
-    p.setAttribute("aria-label", c);
-    pipsEl.appendChild(p);
-  }
+  renderColorPips(pipsEl, resolved ? colorIdentityOf(resolved.commanders) : []);
 }
 
 /* Top archetype label, when one stands out (≥ 35 % confidence).
@@ -1427,6 +1417,33 @@ function _renderCountTag(countTagEl, def, cmdrCount, deckCount) {
     ? `${deckCount} + ${cmdrCount} commandant${cmdrCount > 1 ? "s" : ""}`
     : `${deckCount} / ${target}`;
   countTagEl.hidden = false;
+}
+
+/* Commander-conformity alert: failing rules of commanderRuleChecks (the
+ * same source as the analyze legality panel). Warning-only (singleton)
+ * gets the softer headline and colour. */
+function _renderLegalityAlert(alertEl, def, resolved) {
+  if (!alertEl) return;
+  if (!resolved || def.format === "limited" || typeof commanderRuleChecks !== "function") {
+    alertEl.hidden = true;
+    return;
+  }
+  const failing = commanderRuleChecks(resolved).filter((r) => r.severity !== "ok");
+  if (failing.length === 0) {
+    alertEl.hidden = true;
+    return;
+  }
+  const hasError = failing.some((r) => r.severity === "error");
+  alertEl.classList.toggle("is-error", hasError);
+  const title = hasError
+    ? "Deck non conforme au format Commander"
+    : "Deck à vérifier pour le format Commander";
+  document.getElementById("manage-deck-legality-title").textContent = title;
+  document.getElementById("manage-deck-legality-rules").textContent =
+    failing.map((r) => `${r.label} : ${r.detail}`).join("\n");
+  alertEl.setAttribute("aria-label",
+    `${title} : ${failing.map((r) => r.label).join(", ")}. Voir le détail dans Analyser.`);
+  alertEl.hidden = false;
 }
 
 /* Bracket tag — needs resolved (Scryfall flags + analytics). Hidden

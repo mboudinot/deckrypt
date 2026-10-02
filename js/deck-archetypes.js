@@ -12,6 +12,11 @@
  * archetypes — and that's an honest answer.
  */
 
+// Browser: global from card-text.js. Node (vitest): no shared scope.
+if (typeof oracleText === "undefined" && typeof require === "function") {
+  globalThis.oracleText = require("./card-text.js").oracleText;
+}
+
 function _isLand(card) {
   return /\bland\b/i.test(card.type_line || "");
 }
@@ -30,7 +35,7 @@ function _isEquipment(card) {
 
 function _countByOracle(cards, regex) {
   let n = 0;
-  for (const c of cards) if (c.oracle_text && regex.test(c.oracle_text)) n++;
+  for (const c of cards) if (regex.test(oracleText(c))) n++;
   return n;
 }
 

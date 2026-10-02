@@ -11,6 +11,11 @@
  * fields (`produced_mana`, `type_line`) and `oracle_text` patterns.
  */
 
+// Browser: global from card-text.js. Node (vitest): no shared scope.
+if (typeof oracleText === "undefined" && typeof require === "function") {
+  globalThis.oracleText = require("./card-text.js").oracleText;
+}
+
 const COMMANDER_TARGETS = {
   lands:       { min: 35,  max: 40,  ideal: "35–40"   },
   ramp:        { min: 8,   max: 12,  ideal: "8–12"    },
@@ -71,7 +76,7 @@ function countLands(cards) {
 function isRampCard(card) {
   if (_isLand(card)) return false;
   if (Array.isArray(card.produced_mana) && card.produced_mana.length > 0) return true;
-  const text = card.oracle_text || "";
+  const text = oracleText(card);
   if (/search your library[^.]*\bland\b/i.test(text)) return true;
   // "Forest or Plains" / "two basic land cards" style — covers Three
   // Visits, Nature's Lore, etc. without requiring "basic" verbatim.
@@ -96,7 +101,7 @@ function countRamp(cards) {
  * is fine — they ARE a form of card filtering. */
 function isDrawCard(card) {
   if (_isLand(card)) return false;
-  const text = card.oracle_text || "";
+  const text = oracleText(card);
   if (!text) return false;
   if (/\bdraws? a card\b/i.test(text)) return true;
   if (/\bdraws? \w+ cards?\b/i.test(text)) return true;
@@ -109,33 +114,64 @@ function countDraw(cards) {
   return n;
 }
 
-/* Mass removal: "destroy/exile all creatures/permanents/nonland" or
- * a mass -X/-X. Counted separately from single-target interaction so
- * the user sees both numbers (a deck can be heavy on board wipes but
- * light on targeted answers). */
+/* Mass removal, counted apart from targeted interaction. Scope is
+ * creatures / permanents / nonland: artifact- or enchantment-only
+ * sweepers are hate pieces, not resets. Pings (1 damage, -X/-1) excluded. */
+const _MASS_SUBJECT =
+  String.raw`(?:all|each)\s+(?:[\w-]+\s+){0,2}?(?:creatures?|permanents?|nonland)(?!\s+(?:permanent\s+)?cards?)`;
+const _LETHAL_N = String.raw`(?:X|[2-9]|\d{2,})`;
+const _BOARD_WIPE_PATTERNS = [
+  new RegExp(String.raw`\b(?:destroy|exile)\s+${_MASS_SUBJECT}`, "i"),
+  new RegExp(String.raw`\b${_MASS_SUBJECT}[^.]*?\bgets?\s+-(?:\d+|X)\/-${_LETHAL_N}\b`, "i"),
+  new RegExp(String.raw`\bcreatures your opponents control get -(?:\d+|X)\/-${_LETHAL_N}\b`, "i"),
+  new RegExp(String.raw`\bdeals ${_LETHAL_N} damage to each (?:other )?(?:[\w-]+ )?creature`, "i"),
+  /\bdeals damage equal to [^.]*? to each (?:other )?(?:[\w-]+ )?creature/i,
+  new RegExp(String.raw`\breturn\s+${_MASS_SUBJECT}[^.]*?\bto\s+(?:its|their)\s+owner(?:['’]s|s['’])\s+hands?`, "i"),
+  /\beach (?:player|opponent) sacrifices all (?:creatures|permanents|nonland)/i,
+];
+const _OVERLOAD_REMOVAL = new RegExp(String.raw`\b(?:destroy|exile|return) target (?:creature|nonland permanent|permanent)|\bdeals ${_LETHAL_N} damage to target creature`, "i");
+
 function isBoardWipe(card) {
   if (_isLand(card)) return false;
-  const t = card.oracle_text || "";
-  if (/destroy all (creatures?|permanents?|nonland)/i.test(t)) return true;
-  if (/exile all (creatures?|permanents?|nonland)/i.test(t)) return true;
-  if (/destroy each (creature|permanent)/i.test(t)) return true;
-  if (/exile each (creature|permanent)/i.test(t)) return true;
-  if (/all (creatures?|permanents?) get -\d+\/-\d+/i.test(t)) return true;
+  const t = oracleText(card);
+  if (!t) return false;
+  if (_BOARD_WIPE_PATTERNS.some((re) => re.test(t))) return true;
+  if (/\bOverload\b/.test(t) && _OVERLOAD_REMOVAL.test(t)) return true;
   return false;
 }
 
-/* Single-target interaction: removal, counterspells, bounce. We
- * intentionally exclude board wipes (they have their own counter)
- * and "tap target" (rarely a real answer). */
+/* Single-target interaction, board wipes excluded (own counter). Each
+ * pattern captures what follows "target" so blink / self-bounce ("…you
+ * control") and graveyard hate ("target card") can be rejected. */
+const _TARGET = String.raw`(?:up to (?:one|two|three|X) )?(?:other |another )?target`;
+const _TARGETED_INTERACTION_PATTERNS = [
+  new RegExp(String.raw`\b(?:destroy|exile|counter) ${_TARGET} ([^.;,\n]*)`, "gi"),
+  new RegExp(String.raw`\breturn ${_TARGET} ([^.;,\n]*?) to (?:its|their) owner(?:['’]s|s['’]) hands?`, "gi"),
+  new RegExp(String.raw`\bput ${_TARGET} ([^.;,\n]*?) on (?:the )?(?:top|bottom) of its owner['’]s library`, "gi"),
+  new RegExp(String.raw`\bowner of ${_TARGET} ([^.;,\n]*?) shuffles it into`, "gi"),
+  new RegExp(String.raw`\bdeals ${_LETHAL_N} damage to (?:any target()|${_TARGET} ([^.;,\n]*))`, "gi"),
+  new RegExp(String.raw`\bdamage equal to [^.]*? to (?:any target()|${_TARGET} ([^.;,\n]*))`, "gi"),
+  new RegExp(String.raw`\bfights? ${_TARGET} ([^.;,\n]*)`, "gi"),
+  new RegExp(String.raw`\b${_TARGET} ([^.;,\n]*?)\bgets? -(?:\d+|X)\/-${_LETHAL_N}\b`, "gi"),
+];
+const _NOT_AN_ANSWER = /\byou control\b|\bcards?\b|\bgraveyard\b/i;
+const _EDICT =
+  /\b(?:target (?:player|opponent)|each opponent|each player) sacrifices (?:a|an|one|two|three|X) (?:[\w-]+ )?(?:creature|permanent|planeswalker|artifact|enchantment)/i;
+const _CONTROL_STEAL = /\bgain control of target (?![^.]*until end of turn)|\byou control enchanted (?:creature|permanent|artifact|planeswalker)/i;
+
 function isInteractionCard(card) {
   if (_isLand(card)) return false;
   if (isBoardWipe(card)) return false;
-  const t = card.oracle_text || "";
-  if (/destroy target/i.test(t)) return true;
-  if (/exile target/i.test(t)) return true;
-  if (/counter target/i.test(t)) return true;
-  if (/return target.*to (its|their) owner['’]s hand/i.test(t)) return true;
-  return false;
+  const t = oracleText(card);
+  if (!t) return false;
+  if (_EDICT.test(t) || _CONTROL_STEAL.test(t)) return true;
+  return _TARGETED_INTERACTION_PATTERNS.some((re) => {
+    for (const m of t.matchAll(re)) {
+      const object = m.slice(1).find((g) => g !== undefined) ?? "";
+      if (!_NOT_AN_ANSWER.test(object)) return true;
+    }
+    return false;
+  });
 }
 
 function countBoardWipes(cards) {
@@ -236,7 +272,7 @@ function invalidCommanders(resolved) {
     const isCreature = t.includes("creature");
     const isPlaneswalker = t.includes("planeswalker");
     const isBackground = t.includes("background");
-    const hasCommanderClause = /can be your commander/i.test(c.oracle_text || "");
+    const hasCommanderClause = /can be your commander/i.test(oracleText(c));
     if (isLegendary && (isCreature
       || (isPlaneswalker && hasCommanderClause)
       || isBackground)) {
@@ -245,6 +281,85 @@ function invalidCommanders(resolved) {
     out.push(c.name);
   }
   return out;
+}
+
+/* Commander conformity, one { key, label, severity: ok|warning|error,
+ * detail } per rule in a stable order. Shared by the analyze legality
+ * panel (every row) and the manage alert (failing rows only). */
+function commanderRuleChecks(resolved) {
+  const pl = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
+  const list = (names) => `${names.slice(0, 5).join(", ")}${names.length > 5 ? "…" : ""}`;
+  const rules = [];
+  const commanders = resolved.commanders || [];
+  const deck = resolved.deck || [];
+  const cmdN = commanders.length;
+  const deckN = deck.length;
+  const total = cmdN + deckN;
+
+  // 1. Card count: commander(s) + rest of the deck = 100.
+  if (total === 100) {
+    rules.push({ key: "count", label: "Compte de cartes", severity: "ok",
+      detail: `${total} cartes (${pl(cmdN, "commandant")} + ${deckN}).` });
+  } else {
+    const diff = total - 100;
+    rules.push({ key: "count", label: "Compte de cartes", severity: "error",
+      detail: diff > 0
+        ? `${total} cartes — ${diff} en trop (cible 100).`
+        : `${total} cartes — ${-diff} manquante${-diff > 1 ? "s" : ""} (cible 100).` });
+  }
+
+  // 2. Commander zone: at least one, each one eligible.
+  const badCmds = invalidCommanders(resolved);
+  if (cmdN === 0) {
+    rules.push({ key: "commander", label: "Commander valide", severity: "error",
+      detail: "Aucun commandant déclaré." });
+  } else if (badCmds.length === 0) {
+    rules.push({ key: "commander", label: "Commander valide", severity: "ok",
+      detail: `${pl(cmdN, "commandant")} légendaire${cmdN > 1 ? "s" : ""}.` });
+  } else {
+    rules.push({ key: "commander", label: "Commander valide", severity: "error",
+      detail: `${pl(badCmds.length, "carte")} ne peut pas servir de commandant : ${badCmds.join(", ")}.` });
+  }
+
+  // 3. Format legality (banned / not legal, from Scryfall legalities).
+  const { banned, notLegal } = commanderLegalityIssues([...commanders, ...deck]);
+  if (banned.length === 0 && notLegal.length === 0) {
+    rules.push({ key: "legality", label: "Légalité en Commander", severity: "ok",
+      detail: "Toutes les cartes sont légales." });
+  } else {
+    const parts = [];
+    if (banned.length > 0) {
+      parts.push(`${pl(banned.length, "carte")} bannie${banned.length > 1 ? "s" : ""} : ${list(banned)}`);
+    }
+    if (notLegal.length > 0) {
+      parts.push(`${pl(notLegal.length, "non-légale")} : ${list(notLegal)}`);
+    }
+    rules.push({ key: "legality", label: "Légalité en Commander", severity: "error",
+      detail: parts.join(" · ") });
+  }
+
+  // 4. Color identity: every card within the commanders' identity.
+  const offColor = colorIdentityIssues(resolved);
+  if (offColor.length === 0) {
+    rules.push({ key: "identity", label: "Identité de couleur", severity: "ok",
+      detail: "Toutes les cartes respectent l'identité du commandant." });
+  } else {
+    rules.push({ key: "identity", label: "Identité de couleur", severity: "error",
+      detail: `${pl(offColor.length, "carte")} hors identité : ${list(offColor)}` });
+  }
+
+  // 5. Singleton (basic lands exempt).
+  const dups = singletonViolations(deck);
+  if (dups.length === 0) {
+    rules.push({ key: "singleton", label: "Singleton", severity: "ok",
+      detail: "Aucune carte non-basique en double." });
+  } else {
+    const txt = dups.slice(0, 5).map((d) => `${d.name} ×${d.qty}`).join(", ");
+    rules.push({ key: "singleton", label: "Singleton", severity: "warning",
+      detail: `${pl(dups.length, "carte non-basique")} en double : ${txt}${dups.length > 5 ? "…" : ""}` });
+  }
+
+  return rules;
 }
 
 function _assess(current, target) {
@@ -343,7 +458,7 @@ if (typeof module !== "undefined" && module.exports) {
     countInteraction, countBoardWipes, averageCmcOfSpells,
     isRampCard, isDrawCard, isInteractionCard, isBoardWipe,
     singletonViolations, colorIdentityIssues,
-    commanderLegalityIssues, invalidCommanders,
+    commanderLegalityIssues, invalidCommanders, commanderRuleChecks,
     suggestions,
   };
 }

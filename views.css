@@ -978,21 +978,24 @@
   color: var(--text-muted);
   line-height: 1.45;
 }
-/* Actionable next step — Scryfall search link, color-scoped to the
- * deck's commander identity. Aligned under the advice line, subtle
- * accent color + small arrow glyph so the row reads as "warn → here's
- * where to fix it" rather than just "warn". */
+/* Scryfall search link. Neutral, not --accent: the editorial accent is
+ * crimson and made every row read as an error — status lives on the
+ * border/icon. */
 .suggestion-link {
   display: inline-flex;
   align-items: center;
   margin-top: 4px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--accent);
-  text-decoration: none;
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--text-muted);
+  text-underline-offset: 2px;
   align-self: flex-start;
 }
-.suggestion-link:hover { text-decoration: underline; }
+.suggestion-link:hover { text-decoration-color: currentColor; }
+/* Green row: nothing to fix, fade the link so it doesn't compete. */
+.suggestion-row.suggestion-ok .suggestion-link { color: var(--text-muted); }
 .suggestion-link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -3912,6 +3915,69 @@ select.is-invalid:focus {
  * pattern as the May 2026 view-toggle regression (see CLAUDE.md). */
 .tag[hidden] { display: none; }
 
+/* Commander-conformity alert: amber when only singleton fails, red on
+ * any hard rule. A <button> (jumps to Analyser), hence the UA reset. */
+.deck-legality-alert {
+  --alert: var(--warning);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 14px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--alert) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--alert) 55%, transparent);
+  border-left: 4px solid var(--alert);
+  border-radius: var(--radius);
+  transition: background-color .15s ease;
+}
+.deck-legality-alert.is-error { --alert: var(--error); }
+.deck-legality-alert[hidden] { display: none; }
+/* `:not(:disabled)` to beat the global `button:hover:not(:disabled)`
+ * (0,2,1), which would repaint the whole alert in --accent. Colour
+ * and borders are restated so none of its defaults leak through. */
+.deck-legality-alert:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--alert) 24%, var(--surface));
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--alert) 55%, transparent);
+  border-left-color: var(--alert);
+}
+.deck-legality-alert:focus-visible { outline: 2px solid var(--alert); outline-offset: 2px; }
+.deck-legality-alert-icon {
+  flex: 0 0 auto;
+  color: var(--alert);
+  font-size: 20px;
+  line-height: 1;
+}
+.deck-legality-alert-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.deck-legality-alert-text strong {
+  color: var(--alert);
+  font-size: 14px;
+  font-weight: 700;
+}
+.deck-legality-alert-rules {
+  color: var(--text-2);
+  font-size: 12.5px;
+  white-space: pre-line;  /* one failing rule per line */
+}
+.deck-legality-alert-cta {
+  flex: 0 0 auto;
+  color: var(--alert);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* Sync indicator — three states keyed by classes on the wrapper.
  *   default (no extra class) : synchronisé → green dot.
  *   .is-pending              : queue has entries → amber dot.
@@ -4060,6 +4126,7 @@ select.is-invalid:focus {
     padding-right: 44px;
   }
   .deck-summary:has(.deck-art > img:only-child) .deck-meta-row,
+  .deck-summary:has(.deck-art > img:only-child) .deck-legality-alert,
   .deck-summary:has(.deck-art > img:only-child) .deck-summary-tags,
   .deck-summary:has(.deck-art > img:only-child) .deck-summary-actions {
     grid-column: 1 / -1;
@@ -4077,6 +4144,7 @@ select.is-invalid:focus {
    * + panel-head action so they keep their visual order without
    * wrapping awkwardly. */
   .deck-sync-tag, .panel-head-action { margin-left: 0; }
+  .deck-legality-alert-cta { display: none; }
 }
 
 /* --- Add-card panel layout adapts to the new 2-col grid --- */

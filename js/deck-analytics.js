@@ -9,6 +9,11 @@
  * extracts the IDs to fetch.
  */
 
+// Browser: global from card-text.js. Node (vitest): no shared scope.
+if (typeof oracleText === "undefined" && typeof require === "function") {
+  globalThis.oracleText = require("./card-text.js").oracleText;
+}
+
 const PRIMARY_TYPES = [
   "Creature", "Artifact", "Enchantment", "Instant",
   "Sorcery", "Planeswalker", "Battle", "Land",
@@ -240,7 +245,7 @@ const THEME_RULES = [
     // Anything that touches the graveyard zone. Mill is its own verb
     // in modern Magic ("Mill 3."); count it separately so milling
     // strategies without explicit "graveyard" mention still register.
-    match: (c) => /\bgraveyard\b|\bmills?\b/i.test(c.oracle_text || ""),
+    match: (c) => /\bgraveyard\b|\bmills?\b/i.test(oracleText(c)),
     minCount: 6,
   },
   {
@@ -250,14 +255,14 @@ const THEME_RULES = [
     // Bumped to {0,120} which covers every standard token template
     // without catching unrelated sentences (oracle_text is rules
     // text only — no flavor — so ". " ends one clause cleanly).
-    match: (c) => /\bcreate\b[^.]{0,120}\btokens?\b/i.test(c.oracle_text || "")
-      || /\bpopulate\b/i.test(c.oracle_text || ""),
+    match: (c) => /\bcreate\b[^.]{0,120}\btokens?\b/i.test(oracleText(c))
+      || /\bpopulate\b/i.test(oracleText(c)),
     minCount: 4,
   },
   {
     key: "counters", label: "Compteurs +1/+1",
     match: (c) => hasAnyKeyword(c, PLUS1_KEYWORDS)
-      || /\+1\/\+1 counters?\b/i.test(c.oracle_text || ""),
+      || /\+1\/\+1 counters?\b/i.test(oracleText(c)),
     minCount: 5,
   },
   {
@@ -266,14 +271,14 @@ const THEME_RULES = [
     // (land / enchantment / nonland / nontoken) catch sac-everything
     // boardwipes and "sacrifice a land: …" engines.
     match: (c) => /\bsacrifices?\s+(a|an|another|two|three|each|all|your|target)\s+(creature|permanent|artifact|land|enchantment|nonland|nontoken)/i
-      .test(c.oracle_text || ""),
+      .test(oracleText(c)),
     minCount: 4,
   },
   {
     key: "spellslinger", label: "Sortilèges & instants",
     match: (c) => hasAnyKeyword(c, SPELLSLINGER_KEYWORDS)
       || /\b(instant|sorcery) (spell|card)\b|whenever you cast (an? )?(instant|sorcery)/i
-        .test(c.oracle_text || ""),
+        .test(oracleText(c)),
     minCount: 5,
   },
   {
@@ -288,13 +293,13 @@ const THEME_RULES = [
       // flying") never has Flying in its own keywords, so the
       // keyword path is immune to that false positive.
       if (primaryTypeOf(c) !== "Creature") return false;
-      return /\bcan[’']t be blocked\b/i.test(c.oracle_text || "");
+      return /\bcan[’']t be blocked\b/i.test(oracleText(c));
     },
     minCount: 8,
   },
   {
     key: "combat-triggers", label: "Triggers de dégâts de combat",
-    match: (c) => /deals combat damage to a player/i.test(c.oracle_text || ""),
+    match: (c) => /deals combat damage to a player/i.test(oracleText(c)),
     minCount: 4,
   },
   {
@@ -304,7 +309,7 @@ const THEME_RULES = [
      * a number) — and intentionally NOT "lose life" / "pay life",
      * which are a separate axis (life-as-resource decks). */
     match: (c) => hasAnyKeyword(c, LIFEGAIN_KEYWORDS)
-      || /\bgains?\s+(\w+\s+)?life\b/i.test(c.oracle_text || ""),
+      || /\bgains?\s+(\w+\s+)?life\b/i.test(oracleText(c)),
     minCount: 5,
   },
   {
@@ -313,7 +318,7 @@ const THEME_RULES = [
      * cards", "draws that many cards". Threshold is high (8) because
      * every deck has some draw — flagging the theme means draw is a
      * focus, not just present. */
-    match: (c) => /\bdraws?\b[^.]{0,30}\bcards?\b/i.test(c.oracle_text || ""),
+    match: (c) => /\bdraws?\b[^.]{0,30}\bcards?\b/i.test(oracleText(c)),
     minCount: 8,
   },
   {
@@ -323,7 +328,7 @@ const THEME_RULES = [
      * to dilute the signal). Madness/Hellbent keywords double-check
      * for stripped-reminder edge cases. */
     match: (c) => hasAnyKeyword(c, DISCARD_KEYWORDS)
-      || /\bdiscards?\b/i.test(c.oracle_text || ""),
+      || /\bdiscards?\b/i.test(oracleText(c)),
     minCount: 4,
   },
   {
@@ -342,7 +347,7 @@ const THEME_RULES = [
       if (!isLand && Array.isArray(c.produced_mana) && c.produced_mana.length > 0) {
         return true;
       }
-      const text = c.oracle_text || "";
+      const text = oracleText(c);
       if (/search your library for[^.]*\bland\b/i.test(text)) return true;
       if (/search your library for[^.]*\b(forest|island|swamp|mountain|plains|basic)\b/i.test(text)) return true;
       if (/\btreasure tokens?\b/i.test(text)) return true;

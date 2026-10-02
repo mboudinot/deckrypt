@@ -77,6 +77,7 @@
 <script defer src="js/card-cache.js"></script>
 <script defer src="js/translations.js"></script>
 <script defer src="js/deck-edit.js"></script>
+<script defer src="js/card-text.js"></script>
 <script defer src="js/deck-analytics.js"></script>
 <script defer src="js/deck-archetypes.js"></script>
 <script defer src="js/deck-suggestions.js"></script>
@@ -456,6 +457,18 @@
                    through the controllers; the visible meta lives in
                    .deck-meta-row above. -->
               <div id="manage-meta" hidden aria-hidden="true"></div>
+              <!-- Commander-conformity alert. Its own full-width row
+                   (not a pill among the tags) so a broken deck can't
+                   blend in with the informational badges. Clicking
+                   jumps to the analyze legality panel. -->
+              <button id="manage-deck-legality-alert" type="button" class="deck-legality-alert" hidden>
+                <span class="deck-legality-alert-icon" aria-hidden="true">⚠</span>
+                <span class="deck-legality-alert-text">
+                  <strong id="manage-deck-legality-title">Deck non conforme au format Commander</strong>
+                  <span id="manage-deck-legality-rules" class="deck-legality-alert-rules"></span>
+                </span>
+                <span class="deck-legality-alert-cta" aria-hidden="true">Voir le détail →</span>
+              </button>
               <div class="deck-summary-tags">
                 <span id="manage-deck-bracket" class="bracket-badge" hidden>
                   <span class="bracket-badge-num" id="manage-deck-bracket-num">—</span>

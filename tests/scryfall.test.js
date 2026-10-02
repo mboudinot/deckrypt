@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  isLand, cardImage, manaSourcesOf, deckProducedColors,
+  isLand, cardImage, manaSourcesOf, deckProducedColors, colorIdentityOf,
   makeIdentifier, identifierKey, cardKey, makePlaceholder,
   resolveEntry, fetchScryfallCards,
   autocompleteCardName, searchPrintings,
@@ -531,5 +531,15 @@ describe("searchPrintings", () => {
       .mockResolvedValue({ ok: false, status: 500, statusText: "Internal" });
     const out = await searchPrintings("Plains");
     expect(out.map((c) => c.set)).toEqual(["a"]);
+  });
+});
+
+describe("colorIdentityOf", () => {
+  it("unions the identities in WUBRG order", () => {
+    const cards = [{ color_identity: ["G", "B"] }, { color_identity: ["U", "B"] }];
+    expect(colorIdentityOf(cards)).toEqual(["U", "B", "G"]);
+  });
+  it("returns [] for colourless cards or missing identities", () => {
+    expect(colorIdentityOf([{ color_identity: [] }, {}, null])).toEqual([]);
   });
 });

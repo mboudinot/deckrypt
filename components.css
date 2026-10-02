@@ -468,7 +468,7 @@ html.has-session-hint .account.account-anon .account-name {
   place-items: center;
 }
 
-/* Color identity pips — used by deck-pill + manage view */
+/* Color identity pips — used by deck-pill, its dropdown + manage view */
 .color-pips {
   display: inline-flex;
   gap: 2px;
@@ -553,11 +553,18 @@ html.has-session-hint .account.account-anon .account-name {
   flex: 1; min-width: 0;
 }
 .deck-dropdown-menu .dropdown-list .dropdown-item .name-col .deck-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 500;
+}
+.deck-dropdown-menu .dropdown-list .dropdown-item .name-col .deck-name-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.deck-dropdown-menu .dropdown-list .dropdown-item .name-col .color-pips { flex: 0 0 auto; }
 .deck-dropdown-menu .dropdown-list .dropdown-item .name-col .deck-meta-row {
   color: var(--text-muted);
   font-size: 11px;

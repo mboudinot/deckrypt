@@ -20,6 +20,18 @@ function placeholderText(text) {
   return div;
 }
 
+/* One dot per colour of an already WUBRG-ordered array. Shared by the
+ * header deck-pill, its dropdown and the manage deck-summary. */
+function renderColorPips(container, colors) {
+  container.replaceChildren();
+  for (const c of colors) {
+    const pip = document.createElement("span");
+    pip.className = `pip-dot dot-${c.toLowerCase()}`;
+    pip.setAttribute("aria-label", c);
+    container.appendChild(pip);
+  }
+}
+
 /* X (close/remove) SVG built via DOM APIs rather than innerHTML —
  * avoids the pattern of "innerHTML with template literal" that's only
  * safe when the content is fully static, and trivially copy-pasted

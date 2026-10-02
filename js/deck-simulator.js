@@ -18,6 +18,11 @@
  *     on type_line + oracle_text; see _is* helpers.
  */
 
+// Browser: global from card-text.js. Node (vitest): no shared scope.
+if (typeof oracleText === "undefined" && typeof require === "function") {
+  globalThis.oracleText = require("./card-text.js").oracleText;
+}
+
 const SIM_COLORS = ["W", "U", "B", "R", "G"];
 const BASIC_COLOR = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" };
 
@@ -47,7 +52,7 @@ function _producesMana(card) {
  * (oracle "Add {C}{C}" → 2), Llanowar Elves stays correct (1), Mind
  * Stone (1). The whole point is to not undercount Sol Ring. */
 function _producedAmount(card) {
-  const text = card.oracle_text || "";
+  const text = oracleText(card);
   const m = text.match(/Add ((?:\{[^}]+\})+)/i);
   if (m) return (m[1].match(/\{[^}]+\}/g) || []).length;
   if (/Add three mana/i.test(text)) return 3;
@@ -68,7 +73,7 @@ function _isRock(card) {
  * don't trip this check. */
 function _isCreatureAura(card) {
   if (!/\bAura\b/i.test(card.type_line || "")) return false;
-  return /Enchant creature/i.test(card.oracle_text || "");
+  return /Enchant creature/i.test(oracleText(card));
 }
 function _isDork(card) {
   if (_isLand(card)) return false;
@@ -79,12 +84,12 @@ function _isDork(card) {
 function _isRampSpell(card) {
   if (_isLand(card) || _isRock(card) || _isDork(card)) return false;
   if ((card.cmc ?? 99) > 5) return false;
-  return /search your library for (a|up to (two|three)) (basic )?land/i.test(card.oracle_text || "");
+  return /search your library for (a|up to (two|three)) (basic )?land/i.test(oracleText(card));
 }
 function _isDrawSpell(card) {
   if (_isLand(card)) return false;
   if ((card.cmc ?? 99) > 6) return false;
-  return /draw (a|two|three|four|five) cards?/i.test(card.oracle_text || "");
+  return /draw (a|two|three|four|five) cards?/i.test(oracleText(card));
 }
 
 /* For a permanent that taps for mana, returns the source descriptor
@@ -107,7 +112,7 @@ function _cardSource(card) {
  * with no unconditional untap clause. Can't tap on T-entry. Aligned
  * with deck-mana-base.js#isSlowLand but doesn't depend on it. */
 function _isSlowTap(card) {
-  const text = card.oracle_text || "";
+  const text = oracleText(card);
   if (!/enters (the battlefield )?tapped/i.test(text)) return false;
   if (/unless you (control|reveal|pay)/i.test(text)) return false;
   if (/may pay (\d+ )?(life|mana)/i.test(text)) return false;

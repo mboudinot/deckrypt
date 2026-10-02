@@ -1345,6 +1345,14 @@ function bindEvents() {
     startNewGame();
   });
 
+  /* Commander-conformity alert → jump to the analyze legality
+   * panel, where each failing rule gets its own detailed row. */
+  const legalityAlert = document.getElementById("manage-deck-legality-alert");
+  if (legalityAlert) legalityAlert.addEventListener("click", () => {
+    switchView("analyze");
+    els.analyzeLegality.scrollIntoView({ block: "center" });
+  });
+
   /* Kebab menu (⋮) — holds Renommer + Dupliquer + Exporter + Supprimer
    * + future deck-level actions. setupDropdown wires open/close/
    * outside-click/Escape. */

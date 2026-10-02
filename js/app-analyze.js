@@ -621,115 +621,11 @@ function renderLegalityPanel(resolved) {
     return;
   }
 
-  /* Three rules, always rendered for commander format. Each has its
-   * own status (ok / warning / error) and a one-line detail. The
-   * user wanted explicit per-rule visibility rather than a bundled
-   * "Identité et singleton OK" verdict, so a quick glance tells them
-   * exactly which criterion passes or fails. */
-  const rules = [];
-
-  // 1. Card-count rule. Commander = 1 commander + 99 cards = 100.
-  const cmdN = resolved.commanders.length;
-  const deckN = resolved.deck.length;
-  const total = cmdN + deckN;
-  if (total === 100) {
-    rules.push({
-      label: "Compte de cartes",
-      severity: "ok",
-      detail: `${total} cartes (${cmdN} commandant${cmdN > 1 ? "s" : ""} + ${deckN}).`,
-    });
-  } else {
-    const diff = total - 100;
-    rules.push({
-      label: "Compte de cartes",
-      severity: "error",
-      detail: diff > 0
-        ? `${total} cartes — ${diff} en trop (cible 100).`
-        : `${total} cartes — ${-diff} manquante${-diff > 1 ? "s" : ""} (cible 100).`,
-    });
-  }
-
-  // 2. Commander-zone validity. Each card declared as a commander must
-  // be a Legendary Creature, Legendary Planeswalker with the "can be
-  // your commander" clause, or a Background enchantment.
-  const badCmds = invalidCommanders(resolved);
-  if (badCmds.length === 0) {
-    rules.push({
-      label: "Commander valide",
-      severity: "ok",
-      detail: cmdN === 0
-        ? "Aucun commandant déclaré."
-        : `${pluralFr(cmdN, "commandant")} légendaire${cmdN > 1 ? "s" : ""}.`,
-    });
-  } else {
-    rules.push({
-      label: "Commander valide",
-      severity: "error",
-      detail: `${pluralFr(badCmds.length, "carte")} ne peut pas servir de commandant : ${badCmds.join(", ")}.`,
-    });
-  }
-
-  // 3. Format legality. Scryfall's `card.legalities.commander` tells us
-  // banned vs not-legal vs legal. Most decks have 0 issues here, but
-  // ban-list churn means it's worth a check — a deck saved months ago
-  // might run a now-banned card.
-  const { banned, notLegal } = commanderLegalityIssues([...resolved.commanders, ...resolved.deck]);
-  if (banned.length === 0 && notLegal.length === 0) {
-    rules.push({
-      label: "Légalité en Commander",
-      severity: "ok",
-      detail: "Toutes les cartes sont légales.",
-    });
-  } else {
-    const parts = [];
-    if (banned.length > 0) {
-      parts.push(`${pluralFr(banned.length, "carte")} bannie${banned.length > 1 ? "s" : ""} : ${banned.slice(0, 5).join(", ")}${banned.length > 5 ? "…" : ""}`);
-    }
-    if (notLegal.length > 0) {
-      parts.push(`${pluralFr(notLegal.length, "non-légale")}${notLegal.length > 1 ? "s" : ""} : ${notLegal.slice(0, 5).join(", ")}${notLegal.length > 5 ? "…" : ""}`);
-    }
-    rules.push({
-      label: "Légalité en Commander",
-      severity: "error",
-      detail: parts.join(" · "),
-    });
-  }
-
-  // 4. Color identity. Scryfall's `color_identity` array on each card
-  // makes this a clean structured check (see colorIdentityIssues in
-  // deck-suggestions.js). Passing = every deck card's identity is a
-  // subset of the commander's.
-  const offColor = colorIdentityIssues(resolved);
-  if (offColor.length === 0) {
-    rules.push({
-      label: "Identité de couleur",
-      severity: "ok",
-      detail: "Toutes les cartes respectent l'identité du commandant.",
-    });
-  } else {
-    rules.push({
-      label: "Identité de couleur",
-      severity: "error",
-      detail: `${pluralFr(offColor.length, "carte")} hors identité : ${offColor.slice(0, 5).join(", ")}${offColor.length > 5 ? "…" : ""}`,
-    });
-  }
-
-  // 5. Singleton (excluding basic lands, which are exempt).
-  const dups = singletonViolations(resolved.deck);
-  if (dups.length === 0) {
-    rules.push({
-      label: "Singleton",
-      severity: "ok",
-      detail: "Aucune carte non-basique en double.",
-    });
-  } else {
-    const txt = dups.slice(0, 5).map((d) => `${d.name} ×${d.qty}`).join(", ");
-    rules.push({
-      label: "Singleton",
-      severity: "warning",
-      detail: `${pluralFr(dups.length, "carte non-basique")} en double : ${txt}${dups.length > 5 ? "…" : ""}`,
-    });
-  }
+  /* Five rules, always rendered for commander format, each with its
+   * own status — the user wanted explicit per-rule visibility rather
+   * than a bundled verdict. The checks live in deck-suggestions.js
+   * (commanderRuleChecks) so the manage header warning stays in sync. */
+  const rules = commanderRuleChecks(resolved);
 
   for (const r of rules) {
     const row = document.createElement("div");
@@ -764,8 +660,8 @@ const SCRYFALL_QUERIES = {
   lands: 'f:commander id<={ci} t:land -t:basic',
   ramp: 'f:commander id<={ci} cmc<=3 (o:"add {C}" or o:"add one mana" or o:"add two mana" or o:"search your library for a basic land")',
   draw: 'f:commander id<={ci} (o:"draw two cards" or o:"draw three cards" or o:"draws a card" or o:"draw a card whenever")',
-  interaction: 'f:commander id<={ci} (o:"destroy target" or o:"exile target" or o:"counter target spell")',
-  wipes: 'f:commander id<={ci} (o:"destroy all creatures" or o:"exile all creatures" or o:"each creature deals" or o:"destroy all nonland")',
+  interaction: 'f:commander id<={ci} (o:"destroy target" or o:"exile target" or o:"counter target spell" or o:"damage to any target" or o:"fights target" or o:"sacrifices a creature" or o:"gain control of target" or o:"of its owner\'s library")',
+  wipes: 'f:commander id<={ci} (o:"destroy all creatures" or o:"exile all creatures" or o:"destroy all nonland" or o:"destroy each creature" or o:"damage to each creature" or o:"get -X/-X" or o:"gets -X/-X" or o:"return all creatures" or o:"sacrifices all")',
 };
 
 /* Per-category French labels for the Scryfall link — natural-reading

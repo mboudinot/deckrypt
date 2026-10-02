@@ -10,6 +10,11 @@
  * wrong: you never pay 70 black pips at once, you pay the cost of
  * one spell, and your bottleneck is the worst one. */
 
+// Browser: global from card-text.js. Node (vitest): no shared scope.
+if (typeof oracleText === "undefined" && typeof require === "function") {
+  globalThis.oracleText = require("./card-text.js").oracleText;
+}
+
 const COLORS = ["W", "U", "B", "R", "G"];
 
 function _isLand(card) {
@@ -85,7 +90,7 @@ function isMulticolorLand(card) {
  * Expanse, Prismatic Vista, Fabled Passage… */
 function isFetchLand(card) {
   if (!_isLand(card)) return false;
-  const text = card.oracle_text || "";
+  const text = oracleText(card);
   if (!/search your library/i.test(text)) return false;
   if (!/\bbattlefield\b/i.test(text)) return false;
   // Either explicitly searches for a "land" or names basic-land types.
@@ -113,7 +118,7 @@ function countFetchLands(deck) {
  * (Guildgates, bouncelands, tribal lands) are slow. */
 function isSlowLand(card) {
   if (!_isLand(card)) return false;
-  const text = card.oracle_text || "";
+  const text = oracleText(card);
   if (!/enters (the battlefield )?tapped/i.test(text)) return false;
   // Anything that allows an untapped entry under some condition →
   // treat as fast. Covers shocks, checks, fast lands, reveal lands.
@@ -130,7 +135,7 @@ function isSlowLand(card) {
 function isUtilityLand(card) {
   if (!_isLand(card)) return false;
   if (isFetchLand(card)) return false;
-  const text = card.oracle_text || "";
+  const text = oracleText(card);
   // Self-sacrifice for an effect (Strip Mine, Bojuka Bog, etc.)
   if (/sacrifice [^.]*?:/i.test(text)) return true;
   // Anti-graveyard hosers

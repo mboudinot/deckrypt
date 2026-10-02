@@ -5,7 +5,7 @@ import {
   countInteraction, countBoardWipes, averageCmcOfSpells,
   isRampCard, isDrawCard, isInteractionCard, isBoardWipe,
   singletonViolations, colorIdentityIssues,
-  commanderLegalityIssues, invalidCommanders,
+  commanderLegalityIssues, invalidCommanders, commanderRuleChecks,
   suggestions,
 } from "../js/deck-suggestions.js";
 
@@ -188,6 +188,39 @@ describe("isInteractionCard", () => {
   it("does not flag random non-interaction cards", () => {
     expect(isInteractionCard(card({ oracle_text: "Draw two cards." }))).toBe(false);
   });
+
+  it.each([
+    ["Lightning Bolt", "Lightning Bolt deals 3 damage to any target."],
+    ["Dismember", "Target creature gets -5/-5 until end of turn."],
+    ["Rabid Bite", "Target creature you control deals damage equal to its power to target creature you don't control."],
+    ["Prey Upon", "Target creature you control fights target creature you don't control."],
+    ["Diabolic Edict", "Target player sacrifices a creature of their choice."],
+    ["Accursed Marauder", "When this creature enters, each player sacrifices a nontoken creature of their choice."],
+    ["Control Magic", "Enchant creature\nYou control enchanted creature."],
+    ["Condemn", "Put target attacking creature on the bottom of its owner's library. Its controller gains life equal to its toughness."],
+    ["Chaos Warp", "The owner of target permanent shuffles it into their library, then reveals the top card of their library."],
+    ["Naturalize", "Destroy target artifact or enchantment."],
+    ["Swords to Plowshares", "Exile target creature. Its controller gains life equal to its power."],
+  ])("flags %s", (_name, text) => {
+    expect(isInteractionCard(card({ oracle_text: text }))).toBe(true);
+  });
+
+  it.each([
+    ["Ephemerate (self-blink)", "Exile target creature you control, then return it to the battlefield under its owner's control."],
+    ["graveyard hate", "Exile target card from a graveyard."],
+    ["self-bounce", "Return target creature you control to its owner's hand."],
+    ["Act of Treason (temporary steal)", "Gain control of target creature until end of turn. Untap that creature. It gains haste until end of turn."],
+    ["1-damage ping", "Deals 1 damage to any target."],
+    ["sacrifice as a cost", "As an additional cost to cast this spell, sacrifice a creature.\nDraw two cards."],
+  ])("doesn't flag %s", (_name, text) => {
+    expect(isInteractionCard(card({ oracle_text: text }))).toBe(false);
+  });
+
+  it("keeps a real answer even when an earlier clause targets your own stuff", () => {
+    expect(isInteractionCard(card({
+      oracle_text: "Exile target creature you control. Exile target creature an opponent controls.",
+    }))).toBe(true);
+  });
 });
 
 describe("isBoardWipe", () => {
@@ -207,6 +240,46 @@ describe("isBoardWipe", () => {
   });
   it("doesn't flag single-target removal", () => {
     expect(isBoardWipe(card({ oracle_text: "Destroy target creature." }))).toBe(false);
+  });
+
+  it("reads every face of a multi-face card (omen / adventure)", () => {
+    // Scavenger Regent // Exude Toxin — no top-level oracle_text.
+    const regent = card({
+      oracle_text: undefined,
+      type_line: "Creature — Dragon // Sorcery — Omen",
+      card_faces: [
+        { oracle_text: "Flying\nWard—Discard a card." },
+        { oracle_text: "Each non-Dragon creature gets -X/-X until end of turn. (Then shuffle this card into its owner's library.)" },
+      ],
+    });
+    expect(isBoardWipe(regent)).toBe(true);
+  });
+
+  it.each([
+    ["Toxic Deluge", "As an additional cost to cast this spell, pay X life.\nAll creatures get -X/-X until end of turn."],
+    ["Crux of Fate", "Choose one —\n• Destroy all Dragon creatures.\n• Destroy all non-Dragon creatures."],
+    ["Settle the Wreckage", "Exile all attacking creatures target player controls. That player may search their library for that many basic land cards."],
+    ["Blasphemous Act", "This spell costs {1} less to cast for each creature on the battlefield.\nBlasphemous Act deals 13 damage to each creature."],
+    ["Anger of the Gods", "Anger of the Gods deals 3 damage to each creature. If a creature dealt damage this way would die this turn, exile it instead."],
+    ["Earthquake", "Earthquake deals X damage to each creature without flying and each player."],
+    ["Evacuation", "Return all creatures to their owners' hands."],
+    ["Aetherize", "Return all attacking creatures to their owner's hand."],
+    ["All Is Dust", "Each player sacrifices all permanents they control that are one or more colors."],
+    ["Massacre Wurm", "When this creature enters, creatures your opponents control get -2/-2 until end of turn."],
+    ["Cyclonic Rift", "Return target nonland permanent you don't control to its owner's hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")"],
+  ])("flags %s", (_name, text) => {
+    expect(isBoardWipe(card({ oracle_text: text }))).toBe(true);
+  });
+
+  it.each([
+    ["1-damage ping", "When this creature enters, it deals 1 damage to each other creature with flying your opponents control."],
+    ["graveyard hate", "Exile all creature cards from all graveyards."],
+    ["non-lethal shrink", "Creatures your opponents control get -1/-0 until end of turn."],
+    ["artifact-only sweeper", "Destroy all artifacts."],
+    ["anthem", "All creatures you control get +1/+1."],
+    ["1-damage overload", "Electrickery deals 1 damage to target creature you don't control.\nOverload {1}{R}"],
+  ])("doesn't flag %s", (_name, text) => {
+    expect(isBoardWipe(card({ oracle_text: text }))).toBe(false);
   });
 });
 
@@ -449,5 +522,44 @@ describe("suggestions (Commander)", () => {
       expect(["ok", "low", "high", "info"]).toContain(s.status);
       expect(typeof s.advice).toBe("string");
     }
+  });
+});
+
+describe("commanderRuleChecks", () => {
+  const cmdr = { name: "Atraxa", type_line: "Legendary Creature — Angel", color_identity: ["W", "U", "B", "G"] };
+  const clean = () => ({
+    commanders: [cmdr],
+    deck: Array.from({ length: 99 }, () => land("Forest")),
+  });
+  const byKey = (rules) => Object.fromEntries(rules.map((r) => [r.key, r]));
+
+  it("returns the five rules in a stable order, all ok on a clean 1+99", () => {
+    const rules = commanderRuleChecks(clean());
+    expect(rules.map((r) => r.key)).toEqual(["count", "commander", "legality", "identity", "singleton"]);
+    expect(rules.every((r) => r.severity === "ok")).toBe(true);
+  });
+
+  it("flags a deck without any commander as an error", () => {
+    const r = clean();
+    r.commanders = [];
+    r.deck.push(land("Forest"));
+    expect(byKey(commanderRuleChecks(r)).commander.severity).toBe("error");
+  });
+
+  it("reports the count delta and off-colour cards", () => {
+    const r = clean();
+    r.deck.pop();
+    r.deck.pop();
+    r.deck.push(card({ name: "Lightning Bolt", color_identity: ["R"] }));
+    const rules = byKey(commanderRuleChecks(r));
+    expect(rules.count.detail).toMatch(/1 manquante/);
+    expect(rules.identity.severity).toBe("error");
+    expect(rules.identity.detail).toMatch(/Lightning Bolt/);
+  });
+
+  it("treats non-basic duplicates as a warning, not an error", () => {
+    const r = clean();
+    r.deck.splice(0, 2, card({ name: "Sol Ring" }), card({ name: "Sol Ring" }));
+    expect(byKey(commanderRuleChecks(r)).singleton.severity).toBe("warning");
   });
 });

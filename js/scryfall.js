@@ -334,6 +334,16 @@ function deckProducedColors(resolved) {
   return COLOR_ORDER.filter((c) => set.has(c));
 }
 
+/* Union of the cards' color identities in canonical WUBRG order —
+ * a deck's colours are its commanders' combined identity. */
+function colorIdentityOf(cards) {
+  const set = new Set();
+  for (const card of cards) {
+    if (Array.isArray(card?.color_identity)) for (const c of card.color_identity) set.add(c);
+  }
+  return COLOR_ORDER.filter((c) => set.has(c));
+}
+
 /* CommonJS export for tests — no-op in the browser. */
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -345,6 +355,6 @@ if (typeof module !== "undefined" && module.exports) {
     fetchScryfallCards, resolveEntry, makePlaceholder,
     autocompleteCardName, autocompleteCardNamesMultilingual,
     searchFrenchByPartialName, searchPrintings,
-    isLand, cardImage, manaSourcesOf, deckProducedColors,
+    isLand, cardImage, manaSourcesOf, deckProducedColors, colorIdentityOf,
   };
 }

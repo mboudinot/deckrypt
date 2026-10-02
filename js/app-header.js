@@ -61,6 +61,45 @@ function populateDeckSelect() {
   updateDeleteButton();
 }
 
+/* Commander colours per deck from the card cache, no network. A deck
+ * maps to null while any of its commanders is uncached; those land in
+ * `missing` for a background fetch. */
+function _deckColorsFromCache(decks) {
+  const commanderDecks = decks.filter((d) => d.format !== "limited" && d.commanders?.length);
+  const ids = commanderDecks.flatMap((d) => d.commanders.map(makeIdentifier));
+  const byKey = new Map();
+  const byName = new Map();
+  _populateMaps(lookupMany(ids).found, byKey, byName);
+  const colorsById = new Map();
+  const missing = [];
+  for (const d of commanderDecks) {
+    const cards = d.commanders.map((e) => resolveEntry(e, byKey, byName));
+    const uncached = d.commanders.filter((e, i) => !cards[i]);
+    colorsById.set(d.id, uncached.length ? null : colorIdentityOf(cards));
+    missing.push(...uncached.map(makeIdentifier));
+  }
+  return { colorsById, missing };
+}
+
+/* Identifiers already sent to Scryfall for the dropdown, so a card
+ * Scryfall doesn't know (typo'd commander) or a failed fetch doesn't
+ * trigger a new request on every re-render. */
+const _dropdownFetched = new Set();
+
+/* Background fetch of the commanders missing from the cache, then a
+ * re-render so their decks get their pips and sort position. */
+async function _fetchDropdownCommanders(missing) {
+  const fresh = missing.filter((id) => !_dropdownFetched.has(identifierKey(id)));
+  if (fresh.length === 0) return;
+  for (const id of fresh) _dropdownFetched.add(identifierKey(id));
+  try {
+    const { byKey } = await fetchScryfallCards(fresh);
+    if (cacheCards([...byKey.values()]) > 0) renderDeckDropdown(loadUserDecks());
+  } catch (err) {
+    console.warn("Deck dropdown: commander colours unavailable", err);
+  }
+}
+
 /* Rebuild the deck-pill dropdown's deck list. Each item is a button
  * carrying the deck id; clicking it pipes through the hidden select
  * + the existing change handler (which fires switchDeck). */
@@ -76,7 +115,8 @@ function renderDeckDropdown(decks) {
     els.deckDropdownList.appendChild(empty);
     return;
   }
-  for (const d of decks) {
+  const { colorsById, missing } = _deckColorsFromCache(decks);
+  for (const d of sortDecksByColors(decks, colorsById)) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "dropdown-item";
@@ -88,7 +128,14 @@ function renderDeckDropdown(decks) {
     col.className = "name-col";
     const nameRow = document.createElement("div");
     nameRow.className = "deck-name-row";
-    nameRow.textContent = d.name;
+    const pips = document.createElement("span");
+    pips.className = "color-pips";
+    pips.setAttribute("aria-hidden", "true");
+    renderColorPips(pips, colorsById.get(d.id) || []);
+    const nameText = document.createElement("span");
+    nameText.className = "deck-name-text";
+    nameText.textContent = d.name;
+    nameRow.append(pips, nameText);
     const metaRow = document.createElement("div");
     metaRow.className = "deck-meta-row";
     const fmt = d.format ? (d.format === "limited" ? "Limited" : "Commander") : "";
@@ -107,6 +154,7 @@ function renderDeckDropdown(decks) {
     });
     els.deckDropdownList.appendChild(btn);
   }
+  if (missing.length) _fetchDropdownCommanders(missing);
 }
 
 /* Update the visible pill — name + cards count + color pips —
@@ -119,7 +167,7 @@ function refreshDeckPill() {
   if (!def) {
     els.deckPillName.textContent = "Aucun deck";
     els.deckPillCount.textContent = "0 cartes";
-    els.deckPillPips.replaceChildren();
+    renderColorPips(els.deckPillPips, []);
     return;
   }
   els.deckPillName.textContent = def.name;
@@ -130,22 +178,8 @@ function refreshDeckPill() {
   /* Color pips from the resolved commanders, when we have them. The
    * deck def itself only has names; the color identity comes from
    * Scryfall, so the pips appear after the resolve lands. */
-  const colors = new Set();
-  if (state.resolved && state.resolved.def.id === def.id) {
-    for (const c of state.resolved.commanders) {
-      if (Array.isArray(c.color_identity)) {
-        for (const cid of c.color_identity) colors.add(cid);
-      }
-    }
-  }
-  els.deckPillPips.replaceChildren();
-  for (const c of ["W", "U", "B", "R", "G"]) {
-    if (!colors.has(c)) continue;
-    const pip = document.createElement("span");
-    pip.className = `pip-dot dot-${c.toLowerCase()}`;
-    pip.setAttribute("aria-label", c);
-    els.deckPillPips.appendChild(pip);
-  }
+  const resolved = state.resolved && state.resolved.def.id === def.id ? state.resolved : null;
+  renderColorPips(els.deckPillPips, resolved ? colorIdentityOf(resolved.commanders) : []);
 }
 
 /* Toggle the entire deck-summary kebab menu's trigger based on
