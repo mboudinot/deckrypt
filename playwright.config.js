@@ -9,7 +9,9 @@ export default defineConfig({
   timeout: 15_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
-  reporter: "list",
+  // CI also emits GitHub annotations: failing tests show up on the run
+  // (and via the public API) without needing the raw logs.
+  reporter: process.env.CI ? [["list"], ["github"]] : "list",
 
   use: {
     baseURL: "http://127.0.0.1:8765",

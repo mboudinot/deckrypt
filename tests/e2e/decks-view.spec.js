@@ -80,6 +80,9 @@ test("a partner deck shows both commanders' art side by side", async ({ page }) 
   await page.locator("#commander-zone .card").first().waitFor();
   await openDecksView(page);
   await expect(page.locator(".deck-tile").first().locator(".deck-tile-art img")).toHaveCount(2);
+  // A background card fetch can still be in flight: without this, its
+  // route.fetch() throws "Test ended" outside the test and fails the run.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("a deck with a card Scryfall doesn't know still renders its tile", async ({ page }) => {
