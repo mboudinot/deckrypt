@@ -17,10 +17,6 @@ if (typeof oracleText === "undefined" && typeof require === "function") {
 
 const COLORS = ["W", "U", "B", "R", "G"];
 
-function _isLand(card) {
-  return /\bland\b/i.test(card.type_line || "");
-}
-
 /* Parse a Scryfall mana_cost ("{2}{W}{W}{R/G}") into per-color
  * symbol counts. Hybrid mana ({W/U}) counts toward BOTH halves —
  * the spell *can* be paid with either, so a deck running it puts
@@ -51,7 +47,7 @@ function parseManaCost(cost) {
 function colorRequirements(deck) {
   const total = { W: 0, U: 0, B: 0, R: 0, G: 0 };
   for (const card of deck) {
-    if (_isLand(card)) continue;
+    if (isLandCard(card)) continue;
     const cost = parseManaCost(card.mana_cost || "");
     for (const c of COLORS) total[c] += cost[c];
   }
@@ -62,10 +58,11 @@ function colorRequirements(deck) {
  * for each colour (Hallowed Fountain → +1 W, +1 U). Same-colour
  * duplicates within a single card's produced_mana are deduped (rare
  * but defensive — Scryfall has cleaned this up but not always). */
+/* Spell // land MDFCs count as sources: they can be the land drop. */
 function manaSourcesByColor(deck) {
   const sources = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
   for (const card of deck) {
-    if (!_isLand(card)) continue;
+    if (!isLandDrop(card)) continue;
     const produced = Array.isArray(card.produced_mana) ? card.produced_mana : [];
     const seen = new Set();
     for (const c of produced) {
@@ -79,7 +76,7 @@ function manaSourcesByColor(deck) {
 }
 
 function isMulticolorLand(card) {
-  if (!_isLand(card)) return false;
+  if (!isLandCard(card)) return false;
   const produced = (card.produced_mana || []).filter((c) => COLORS.includes(c));
   return new Set(produced).size >= 2;
 }
@@ -89,7 +86,7 @@ function isMulticolorLand(card) {
  * Polluted Delta, Misty Rainforest, Evolving Wilds, Terramorphic
  * Expanse, Prismatic Vista, Fabled Passage… */
 function isFetchLand(card) {
-  if (!_isLand(card)) return false;
+  if (!isLandCard(card)) return false;
   const text = oracleText(card);
   if (!/search your library/i.test(text)) return false;
   if (!/\bbattlefield\b/i.test(text)) return false;
@@ -117,7 +114,7 @@ function countFetchLands(deck) {
  * playable lines on T1/T2 if conditions are met. Pure taplands
  * (Guildgates, bouncelands, tribal lands) are slow. */
 function isSlowLand(card) {
-  if (!_isLand(card)) return false;
+  if (!isLandCard(card)) return false;
   const text = oracleText(card);
   if (!/enters (the battlefield )?tapped/i.test(text)) return false;
   // Anything that allows an untapped entry under some condition →
@@ -133,7 +130,7 @@ function isSlowLand(card) {
  * a card than to miss obvious utilities (Bojuka Bog, Strip Mine,
  * Reliquary Tower, Maze of Ith, Cabal Coffers, etc.). */
 function isUtilityLand(card) {
-  if (!_isLand(card)) return false;
+  if (!isLandCard(card)) return false;
   if (isFetchLand(card)) return false;
   const text = oracleText(card);
   // Self-sacrifice for an effect (Strip Mine, Bojuka Bog, etc.)
@@ -209,7 +206,7 @@ function fixingVerdicts(sources, deck) {
   const usage = {};
   const deckSize = Math.max(deck.length, 1);
   for (const card of deck) {
-    if (_isLand(card)) continue;
+    if (isLandCard(card)) continue;
     const cost = parseManaCost(card.mana_cost || "");
     const cmc = typeof card.cmc === "number" ? card.cmc : 0;
     for (const c of COLORS) {
@@ -245,7 +242,7 @@ function fixingVerdicts(sources, deck) {
 }
 
 function analyzeManaBase(deck) {
-  const lands = deck.filter(_isLand).length;
+  const lands = deck.filter(isLandDrop).length;
   const sources = manaSourcesByColor(deck);
   const requirements = colorRequirements(deck);
   const multicolor = countMulticolorLands(deck);

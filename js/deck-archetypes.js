@@ -17,10 +17,6 @@ if (typeof oracleText === "undefined" && typeof require === "function") {
   Object.assign(globalThis, require("./card-text.js"));
 }
 
-function _isLand(card) {
-  return /\bland\b/i.test(card.type_line || "");
-}
-
 function _isCreature(card) {
   return /\bcreature\b/i.test(card.type_line || "");
 }
@@ -42,7 +38,7 @@ function _countByOracle(cards, regex) {
 function _averageCmc(cards) {
   let sum = 0, n = 0;
   for (const c of cards) {
-    if (_isLand(c)) continue;
+    if (isLandCard(c)) continue;
     if (typeof c.cmc === "number") { sum += c.cmc; n++; }
   }
   return n === 0 ? 0 : sum / n;
@@ -71,7 +67,7 @@ function _bigCreaturesCount(creatures) {
  * Centralised so each archetype rule reads structured data, not raw
  * card arrays — keeps the rules readable. */
 function archetypeSignals(deck) {
-  const nonLands = deck.filter((c) => !_isLand(c));
+  const nonLands = deck.filter((c) => !isLandCard(c));
   const creatures = deck.filter(_isCreature);
   const auras = deck.filter(_isAura);
   const equipment = deck.filter(_isEquipment);
@@ -93,8 +89,7 @@ function archetypeSignals(deck) {
     boardWipes: _countByOracle(deck, /(destroy|exile) all (creatures?|permanents?|nonland)/i),
     bounce: _countByOracle(deck, /return target.*to (its|their) owner['’]s hand/i),
     cardDraw: deck.filter(drawsCards).length,
-    ramp: _countByOracle(deck, /search your library[^.]*\bland\b/i)
-        + nonLands.filter((c) => Array.isArray(c.produced_mana) && c.produced_mana.length > 0).length,
+    ramp: deck.filter(isRampCard).length,
 
     // Tutors that are NOT land tutors (a "for a card" / "for a <type> card" pattern).
     tutors: _countByOracle(deck, /search your library for a(n)?\s+(creature|instant|sorcery|enchantment|artifact|planeswalker|card)\b/i),

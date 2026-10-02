@@ -33,11 +33,6 @@ const BASIC_LAND_NAMES = new Set([
   "Snow-Covered Mountain", "Snow-Covered Forest", "Snow-Covered Wastes",
 ]);
 
-function _isLand(card) {
-  const tl = (card.type_line || "").toLowerCase();
-  return tl.includes("land");
-}
-
 function isCommanderFormat(fullDeck) {
   const n = fullDeck.length;
   return n >= 90 && n <= 110;
@@ -62,28 +57,8 @@ function deckFormatOf(resolved) {
 
 function countLands(cards) {
   let n = 0;
-  for (const c of cards) if (_isLand(c)) n++;
+  for (const c of cards) if (isLandDrop(c)) n++;
   return n;
-}
-
-/* "Ramp" = anything that nets you mana faster than a basic land drop:
- *   - non-land permanents producing mana (Sol Ring, Signet, Llanowar
- *     Elves, mana dorks…)
- *   - sorceries / instants that fetch a land to the battlefield
- *     (Cultivate, Rampant Growth, Three Visits, Farseek…)
- * The oracle-text regex is permissive on purpose — better to include
- * the occasional false positive than miss obvious ramp pieces. */
-function isRampCard(card) {
-  if (_isLand(card)) return false;
-  if (Array.isArray(card.produced_mana) && card.produced_mana.length > 0) return true;
-  const text = oracleText(card);
-  if (/search your library[^.]*\bland\b/i.test(text)) return true;
-  // "Forest or Plains" / "two basic land cards" style — covers Three
-  // Visits, Nature's Lore, etc. without requiring "basic" verbatim.
-  if (/search your library[^.]*\b(forest|island|swamp|mountain|plains)\b/i.test(text)) {
-    return true;
-  }
-  return false;
 }
 
 function countRamp(cards) {
@@ -93,7 +68,7 @@ function countRamp(cards) {
 }
 
 function isDrawCard(card) {
-  return !_isLand(card) && drawsCards(card);
+  return !isLandCard(card) && drawsCards(card);
 }
 
 function countDraw(cards) {
@@ -120,7 +95,7 @@ const _BOARD_WIPE_PATTERNS = [
 const _OVERLOAD_REMOVAL = new RegExp(String.raw`\b(?:destroy|exile|return) target (?:creature|nonland permanent|permanent)|\bdeals ${_LETHAL_N} damage to target creature`, "i");
 
 function isBoardWipe(card) {
-  if (_isLand(card)) return false;
+  if (isLandCard(card)) return false;
   const t = oracleText(card);
   if (!t) return false;
   if (_BOARD_WIPE_PATTERNS.some((re) => re.test(t))) return true;
@@ -148,7 +123,7 @@ const _EDICT =
 const _CONTROL_STEAL = /\bgain control of target (?![^.]*until end of turn)|\byou control enchanted (?:creature|permanent|artifact|planeswalker)/i;
 
 function isInteractionCard(card) {
-  if (_isLand(card)) return false;
+  if (isLandCard(card)) return false;
   if (isBoardWipe(card)) return false;
   const t = oracleText(card);
   if (!t) return false;
@@ -180,7 +155,7 @@ function countInteraction(cards) {
 function averageCmcOfSpells(cards) {
   let sum = 0, n = 0;
   for (const c of cards) {
-    if (_isLand(c)) continue;
+    if (isLandCard(c)) continue;
     if (typeof c.cmc === "number") {
       sum += c.cmc;
       n++;
@@ -384,8 +359,9 @@ function suggestions(resolved) {
   const isEdh = deckFormatOf(resolved) === "commander";
   const out = [];
 
-  const lands = cards.filter(_isLand);
-  out.push(_build("lands", "Terrains", lands.length,
+  const lands = cards.filter(isLandDrop);
+  const mdfcs = lands.filter(isMdfcLand).length;
+  out.push(_build("lands", mdfcs > 0 ? `Terrains (dont ${mdfcs} MDFC)` : "Terrains", lands.length,
     isEdh ? COMMANDER_TARGETS.lands : null,
     {
       low:  "Trop peu — vise 35–40 pour stabiliser tes drops.",
@@ -431,7 +407,7 @@ function suggestions(resolved) {
 
   // Average CMC only makes sense if there's a non-trivial number of
   // spells — a 5-card "Test deck" would report nonsense.
-  const nonLandCount = cards.filter((c) => !_isLand(c)).length;
+  const nonLandCount = cards.filter((c) => !isLandCard(c)).length;
   if (isEdh && nonLandCount >= 20) {
     const avg = Math.round(averageCmcOfSpells(cards) * 100) / 100;
     out.push(_build("avg-cmc", "CMC moyenne du deck", avg,

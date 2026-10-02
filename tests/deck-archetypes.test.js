@@ -167,7 +167,7 @@ describe("archetypeSignals", () => {
     const deck = [
       card({ type_line: "Artifact", produced_mana: ["C"] }),     // mana rock
       card({ type_line: "Creature — Elf", produced_mana: ["G"] }), // dork
-      card({ type_line: "Sorcery", oracle_text: "Search your library for a basic land card." }),
+      card({ type_line: "Sorcery", oracle_text: "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle." }),
     ];
     expect(archetypeSignals(deck).ramp).toBe(3);
   });

@@ -128,8 +128,22 @@ describe("isRampCard", () => {
     expect(isRampCard(card({
       name: "Cultivate",
       type_line: "Sorcery",
-      oracle_text: "Search your library for up to two basic land cards…",
+      oracle_text: "Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand, then shuffle.",
     }))).toBe(true);
+  });
+
+  it("doesn't count a land tutor that only goes to hand", () => {
+    expect(isRampCard(card({
+      name: "Lay of the Land", type_line: "Sorcery",
+      oracle_text: "Search your library for a basic land card, reveal it, put it into your hand, then shuffle.",
+    }))).toBe(false);
+  });
+
+  it("doesn't count a spell // land MDFC as ramp (its mana is the land side's)", () => {
+    expect(isRampCard(card({
+      name: "Sea Gate Restoration", layout: "modal_dfc", type_line: "Sorcery // Land",
+      produced_mana: ["U"],
+    }))).toBe(false);
   });
 
   it("flags Three-Visits-style fetches that name basic types but not 'land'", () => {
@@ -484,6 +498,14 @@ describe("suggestions (Commander)", () => {
     expect(out.find((s) => s.key === "lands").status).toBe("ok");
     expect(out.find((s) => s.key === "ramp").status).toBe("ok");
     expect(out.find((s) => s.key === "draw").status).toBe("ok");
+  });
+
+  it("counts spell // land MDFCs as land drops and says so in the label", () => {
+    const r = buildResolved({ lands: 34, rocks: 10, draws: 10 });
+    r.deck.push(card({ name: "Sea Gate Restoration", layout: "modal_dfc", type_line: "Sorcery // Land", produced_mana: ["U"] }));
+    const lands = suggestions(r).find((s) => s.key === "lands");
+    expect(lands.current).toBe(35);
+    expect(lands.label).toBe("Terrains (dont 1 MDFC)");
   });
 
   it("lists the distinct cards behind each count", () => {

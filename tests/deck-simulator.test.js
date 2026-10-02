@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   _parseCost, _attemptCast, _canCast, _expandUnits,
-  _isRock, _isDork, _isRampSpell, _isDrawSpell, _isSlowTap, _isCreatureAura, _landSearch,
+  _isRock, _isDork, _isRampSpell, _isDrawSpell, _isSlowTap, _isCreatureAura,
   _cardSource, _producedAmount, _categorize, evaluateHand, _bottomCards,
   _seededRng,
   simulateGame, runSimulations,
 } from "../js/deck-simulator.js";
+import { landSearch as _landSearch } from "../js/card-text.js";
 
 const card = (overrides = {}) => ({
   name: "X", type_line: "Creature — Bear", mana_cost: "", cmc: 0,
@@ -558,5 +559,27 @@ describe("land-search ramp", () => {
       }
     }
     expect(resolved).toBeGreaterThan(0);
+  });
+});
+
+describe("spell // land MDFCs", () => {
+  const seaGate = () => card({
+    name: "Sea Gate", layout: "modal_dfc", type_line: "Sorcery // Land", cmc: 6, mana_cost: "{4}{U}{U}",
+    produced_mana: ["U"], oracle_text: "Draw cards.\n{T}: Add {U}.",
+  });
+
+  it("is played as the land drop only when the hand has no real land", () => {
+    // 7-card deck = the whole deck is the opening hand.
+    const deck = [seaGate(), ...Array.from({ length: 6 }, () => spell(9, "{9}"))];
+    const run = simulateGame(deck, [], { seed: 1, mulligan: false });
+    expect(run.turns[0].playedLand.name).toBe("Sea Gate");
+  });
+  it("stays in hand as a spell when a real land is available", () => {
+    const deck = [seaGate(), forest(), ...Array.from({ length: 5 }, () => spell(9, "{9}"))];
+    const run = simulateGame(deck, [], { seed: 1, mulligan: false });
+    expect(run.turns[0].playedLand.name).not.toBe("Sea Gate");
+  });
+  it("is never a mana rock or dork", () => {
+    expect(_categorize(seaGate())).not.toBe("rock");
   });
 });

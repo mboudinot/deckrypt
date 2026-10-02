@@ -46,8 +46,9 @@ function cardTypeBreakdown(deck) {
   return counts;
 }
 
+/* Front face decides: "Instant // Land" is an Instant. */
 function primaryTypeOf(card) {
-  const tl = (card.type_line || "").toLowerCase();
+  const tl = frontTypeLine(card).toLowerCase();
   if (!tl) return null;
   if (tl.includes("land")) return "Land";
   if (tl.includes("creature")) return "Creature";
@@ -58,14 +59,6 @@ function primaryTypeOf(card) {
   if (tl.includes("enchantment")) return "Enchantment";
   if (tl.includes("artifact")) return "Artifact";
   return null;
-}
-
-/* Mirrors `isLand` in scryfall.js. Duplicated on purpose so each
- * pure module is independently testable without importing the whole
- * Scryfall layer. The cost is two ~one-liner functions; the gain is
- * that tests don't need a stub for any companion module. */
-function isLandCard(card) {
-  return primaryTypeOf(card) === "Land";
 }
 
 /* Top-N creature subtypes ("Human", "Wizard", "Goblin", …). Returns
@@ -331,26 +324,10 @@ const THEME_RULES = [
   },
   {
     key: "ramp", label: "Ramp / accélération",
-    /* Three signatures, all derivable from structured data when
-     * possible:
-     *   1. Non-land permanent that produces mana — `produced_mana`
-     *      array is non-empty on Scryfall data (Sol Ring, Birds).
-     *   2. Land tutors — "search your library for ... land" /
-     *      "search your library for a Forest" etc.
-     *   3. Treasure tokens — instant ramp via tap-and-sacrifice.
-     * Threshold 8 filters out the obligatory Sol Ring + Arcane
-     * Signet duo and only flags decks actually committed to ramp. */
-    match: (c) => {
-      const isLand = primaryTypeOf(c) === "Land";
-      if (!isLand && Array.isArray(c.produced_mana) && c.produced_mana.length > 0) {
-        return true;
-      }
-      const text = oracleText(c);
-      if (/search your library for[^.]*\bland\b/i.test(text)) return true;
-      if (/search your library for[^.]*\b(forest|island|swamp|mountain|plains|basic)\b/i.test(text)) return true;
-      if (/\btreasure tokens?\b/i.test(text)) return true;
-      return false;
-    },
+    /* Mana producers + land-onto-battlefield ramp (shared isRampCard),
+     * plus Treasure makers. Threshold 8 filters out the obligatory
+     * Sol Ring + Arcane Signet duo. */
+    match: (c) => isRampCard(c) || /\btreasure tokens?\b/i.test(oracleText(c)),
     minCount: 8,
   },
 ];

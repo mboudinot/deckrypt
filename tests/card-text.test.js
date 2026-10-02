@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { oracleText, drawsCards } from "../js/card-text.js";
+import { oracleText, drawsCards, isLandCard, isMdfcLand, isLandDrop } from "../js/card-text.js";
 
 describe("oracleText", () => {
   it("returns the top-level oracle_text for single-face cards", () => {
@@ -54,5 +54,25 @@ describe("drawsCards", () => {
     ["a drawn-cards count", "This spell costs {1} less to cast for each card you've drawn this turn."],
   ])("ignores %s", (_name, text) => {
     expect(draws(text)).toBe(false);
+  });
+});
+
+describe("land classification", () => {
+  const seaGate = { layout: "modal_dfc", type_line: "Sorcery // Land" };
+  const pathway = { layout: "modal_dfc", type_line: "Land // Land" };
+  const ixalanFlip = { layout: "transform", type_line: "Legendary Creature — Vampire // Legendary Land" };
+
+  it("reads the front face: a spell // land MDFC isn't a land", () => {
+    expect(isLandCard(seaGate)).toBe(false);
+    expect(isLandCard(pathway)).toBe(true);
+    expect(isLandCard({ type_line: "Basic Land — Forest" })).toBe(true);
+  });
+  it("flags spell // land MDFCs only — not pathways, not transform backs", () => {
+    expect(isMdfcLand(seaGate)).toBe(true);
+    expect(isMdfcLand(pathway)).toBe(false);
+    expect(isMdfcLand(ixalanFlip)).toBe(false);
+  });
+  it("counts both lands and spell // land MDFCs as land drops", () => {
+    expect([seaGate, pathway, ixalanFlip].filter(isLandDrop)).toEqual([seaGate, pathway]);
   });
 });

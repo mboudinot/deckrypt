@@ -36,9 +36,6 @@ const _catCache = new WeakMap();
 const _costCache = new Map();        // string-keyed: many cards share "{2}{G}"
 const _sourceCache = new WeakMap();
 
-function _isLand(card) {
-  return /\bland\b/i.test(card.type_line || "");
-}
 function _isArtifact(card) {
   return /\bartifact\b/i.test(card.type_line || "");
 }
@@ -46,7 +43,9 @@ function _isCreature(card) {
   return /\bcreature\b/i.test(card.type_line || "");
 }
 
+/* An MDFC's produced_mana is its land side's, not a rock / dork ability. */
 function _producesMana(card) {
+  if (isMdfcLand(card)) return false;
   return Array.isArray(card.produced_mana) && card.produced_mana.length > 0;
 }
 
@@ -64,7 +63,7 @@ function _producedAmount(card) {
 }
 
 function _isRock(card) {
-  if (_isLand(card)) return false;
+  if (isLandCard(card)) return false;
   if (!_isArtifact(card)) return false;
   if (_isCreature(card)) return false;
   if (!_producesMana(card)) return false;
@@ -79,52 +78,20 @@ function _isCreatureAura(card) {
   return /Enchant creature/i.test(oracleText(card));
 }
 function _isDork(card) {
-  if (_isLand(card)) return false;
+  if (isLandCard(card)) return false;
   if (!_isCreature(card)) return false;
   if (!_producesMana(card)) return false;
   return (card.cmc ?? 99) <= 3;
 }
-const _BASIC_TYPES = ["Plains", "Island", "Swamp", "Mountain", "Forest"];
-const _COUNT_WORDS = { a: 1, an: 1, one: 1, two: 2, three: 3 };
-
-/* What a land-search card fetches: how many lands, to the battlefield
- * (tapped or not) and/or to hand, and which lands qualify. null when
- * the card doesn't search for lands. Memoised per card. */
-const _rampCache = new WeakMap();
-function _landSearch(card) {
-  if (_rampCache.has(card)) return _rampCache.get(card);
-  const text = oracleText(card);
-  const m = text.match(/search your library for (?:up to )?(a|an|one|two|three)\b([^.]*)/i);
-  let out = null;
-  if (m && /\b(?:lands?|plains|islands?|swamps?|mountains?|forests?)\b/i.test(m[2])) {
-    const count = _COUNT_WORDS[m[1].toLowerCase()];
-    const basicOnly = /\bbasic\b/i.test(m[2]);
-    const types = _BASIC_TYPES.filter((ty) => new RegExp(`\\b${ty}`, "i").test(m[2]));
-    const toBattlefield = /onto the battlefield/i.test(text)
-      ? (/the other into your hand/i.test(text) ? 1 : count) : 0;
-    const toHand = /the other into your hand/i.test(text) ? 1
-      : toBattlefield === 0 && /into your hand/i.test(text) ? count : 0;
-    out = {
-      toBattlefield, toHand,
-      tapped: /onto the battlefield tapped/i.test(text),
-      matches: (land) => _isLand(land)
-        && (!basicOnly || /\bbasic\b/i.test(land.type_line || ""))
-        && (types.length === 0 || types.some((ty) => (land.type_line || "").includes(ty))),
-    };
-  }
-  _rampCache.set(card, out);
-  return out;
-}
-
 /* Ramp = puts a land onto the battlefield (Cultivate, Nature's Lore,
  * Wood Elves). Land tutors to hand don't accelerate, so they don't count. */
 function _isRampSpell(card) {
-  if (_isLand(card) || _isRock(card) || _isDork(card)) return false;
+  if (isLandCard(card) || _isRock(card) || _isDork(card)) return false;
   if ((card.cmc ?? 99) > 5) return false;
-  return (_landSearch(card)?.toBattlefield ?? 0) > 0;
+  return (landSearch(card)?.toBattlefield ?? 0) > 0;
 }
 function _isDrawSpell(card) {
-  if (_isLand(card)) return false;
+  if (isLandCard(card)) return false;
   if ((card.cmc ?? 99) > 6) return false;
   return drawsCards(card);
 }
@@ -136,7 +103,7 @@ function _isDrawSpell(card) {
 function _cardSource(card) {
   if (_sourceCache.has(card)) return _sourceCache.get(card);
   let colors = (card.produced_mana || []).filter((c) => SIM_COLORS.includes(c) || c === "C");
-  if (colors.length === 0 && _isLand(card)) {
+  if (colors.length === 0 && isLandCard(card)) {
     const m = (card.type_line || "").match(/Plains|Island|Swamp|Mountain|Forest/);
     if (m) colors = [BASIC_COLOR[m[0]]];
   }
@@ -267,7 +234,7 @@ function _shuffle(arr, rng) {
 function _aggPips(deck) {
   const tot = { W: 0, U: 0, B: 0, R: 0, G: 0 };
   for (const c of deck) {
-    if (_isLand(c)) continue;
+    if (isLandCard(c)) continue;
     const cost = _parseCost(c.mana_cost || "");
     for (const k of SIM_COLORS) tot[k] += cost[k];
   }
@@ -316,15 +283,14 @@ function _battlefieldSources(battlefield, t) {
  * I could cast right now if I dropped this one". Sort by (best cast
  * priority desc, slow-tap first, color-score desc, hand index). */
 function _pickLand(hand, battlefield, t, neededPips, commandZone, hasCreatureOnBoard) {
-  const landIdxs = [];
-  for (let i = 0; i < hand.length; i++) {
-    if (_isLand(hand[i])) landIdxs.push(i);
-  }
+  // A spell // land MDFC is only played as the land drop when no real land is in hand.
+  let landIdxs = hand.flatMap((c, i) => (isLandCard(c) ? [i] : []));
+  if (landIdxs.length === 0) landIdxs = hand.flatMap((c, i) => (isMdfcLand(c) ? [i] : []));
   if (landIdxs.length === 0) return -1;
   if (landIdxs.length === 1) return landIdxs[0];
 
   const baseSources = _battlefieldSources(battlefield, t);
-  const spells = hand.filter((c) => !_isLand(c));
+  const spells = hand.filter((c) => !isLandCard(c));
   const cmdrCost = commandZone.map((c) => c.mana_cost || "");
 
   const evals = landIdxs.map((i) => {
@@ -380,7 +346,7 @@ function _priority(card, turn) {
 function _categorize(card) {
   if (_catCache.has(card)) return _catCache.get(card);
   let cat;
-  if (_isLand(card)) cat = "land";
+  if (isLandCard(card)) cat = "land";
   else if (_isRock(card)) cat = "rock";
   else if (_isDork(card)) cat = "dork";
   else if (_isRampSpell(card)) cat = "ramp";
@@ -395,8 +361,8 @@ function _categorize(card) {
  * sources) AND a spell castable early: 3 lands + four 7-drops is a mull,
  * so are cheap spells whose colours the hand can't make. */
 function evaluateHand(hand) {
-  const lands = hand.filter(_isLand);
-  const spells = hand.filter((c) => !_isLand(c));
+  const lands = hand.filter(isLandDrop);
+  const spells = hand.filter((c) => !isLandDrop(c));
   const cheapSources = spells.filter((c) => {
     const cat = _categorize(c);
     return (cat === "rock" || cat === "dork") && (c.cmc ?? 99) <= 2;
@@ -421,17 +387,17 @@ function _bottomCards(hand, n) {
   const kept = hand.slice();
   const bottomed = [];
   for (let k = 0; k < n; k++) {
-    const lands = kept.filter(_isLand).length;
+    const lands = kept.filter(isLandDrop).length;
     let idx;
     if (lands > Math.ceil((kept.length - 1) / 2)) {
-      idx = kept.findIndex(_isLand);
+      idx = kept.findIndex(isLandDrop);
     } else {
       idx = -1;
       for (let i = 0; i < kept.length; i++) {
-        if (_isLand(kept[i])) continue;
+        if (isLandDrop(kept[i])) continue;
         if (idx === -1 || (kept[i].cmc ?? 0) > (kept[idx].cmc ?? 0)) idx = i;
       }
-      if (idx === -1) idx = kept.findIndex(_isLand);
+      if (idx === -1) idx = kept.findIndex(isLandDrop);
     }
     bottomed.push(kept.splice(idx, 1)[0]);
   }
@@ -557,7 +523,7 @@ function simulateGame(deckCards, commanders = [], opts = {}) {
       const hasCreatureNow = battlefield.some((p) => _isCreature(p.card));
       const playable = [];
       for (const c of hand) {
-        if (_isLand(c)) continue;
+        if (isLandCard(c)) continue;
         if (_isCreatureAura(c) && !hasCreatureNow) continue;
         if (_canCast(c.mana_cost || "", units)) playable.push(c);
       }
@@ -579,7 +545,7 @@ function simulateGame(deckCards, commanders = [], opts = {}) {
         const src = _cardSource(pick);
         if (src) units.push(..._expandUnits([src]));
       }
-      const search = pickCat === "ramp" ? _landSearch(pick) : null;
+      const search = pickCat === "ramp" ? landSearch(pick) : null;
       const fetched = search
         ? _resolveLandSearch(search, library, hand, battlefield, units, t, neededPips, rng)
         : [];
@@ -587,7 +553,7 @@ function simulateGame(deckCards, commanders = [], opts = {}) {
       if ((pick.cmc ?? 0) >= 5 && firstFiveCmcTurn === null) firstFiveCmcTurn = t;
     }
 
-    if (cast.length === 0 && hand.some((c) => !_isLand(c))) stuckTurns++;
+    if (cast.length === 0 && hand.some((c) => !isLandCard(c))) stuckTurns++;
 
     turns.push({ turn: t, drew, playedLand, cast, manaTotal: totalMana });
   }
@@ -662,7 +628,7 @@ if (typeof module !== "undefined" && module.exports) {
     SIM_COLORS,
     _parseCost: _parseCost,
     _attemptCast, _canCast, _expandUnits,
-    _isRock, _isDork, _isRampSpell, _isDrawSpell, _isSlowTap, _isCreatureAura, _landSearch,
+    _isRock, _isDork, _isRampSpell, _isDrawSpell, _isSlowTap, _isCreatureAura,
     evaluateHand, _bottomCards,
     _cardSource, _producedAmount, _categorize,
     _seededRng, _shuffle,

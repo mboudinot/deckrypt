@@ -143,8 +143,10 @@ function makePlaceholder(name) {
 }
 
 /* Card-data helpers (read directly off Scryfall card objects). */
+/* Front face decides ("Instant // Land" is an instant) — same rule as
+ * isLandCard in card-text.js, which scan.html doesn't load. */
 function isLand(card) {
-  return !!(card.type_line && card.type_line.toLowerCase().includes("land"));
+  return !!(card.type_line && card.type_line.split(" // ")[0].toLowerCase().includes("land"));
 }
 
 /* Return a vetted image URL or null. Only HTTPS URLs hosted on a
