@@ -43,7 +43,10 @@ function _resolveDecksFromCache(decks) {
   const byName = new Map();
   _populateMaps(found, byKey, byName);
   for (const def of pending) {
-    const uncached = _identifiersOf(def).filter((id) => !resolveEntry(id, byKey, byName));
+    // Resolve deck entries (they carry the name); identifiers drop it for set+cn printings.
+    const uncached = [...def.commanders, ...def.cards]
+      .filter((entry) => !resolveEntry(entry, byKey, byName))
+      .map(makeIdentifier);
     const toFetch = uncached.filter((id) => !_decksViewFetched.has(identifierKey(id)));
     if (toFetch.length > 0) {
       missing.push(...toFetch);

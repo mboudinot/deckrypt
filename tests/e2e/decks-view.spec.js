@@ -102,3 +102,22 @@ test("a deck with a card Scryfall doesn't know still renders its tile", async ({
   await expect(tile.locator(".deck-tile-bracket")).toBeVisible();
   await expect(tile.locator(".deck-tile-skeleton")).toHaveCount(0);
 });
+
+test("a deck whose card has an explicit printing not yet cached still renders (regression)", async ({ page }) => {
+  await page.evaluate(() => {
+    const key = "mtg-hand-sim:user-decks-v1";
+    const decks = JSON.parse(localStorage.getItem(key));
+    decks.push({ id: "printing-deck", name: "Deck avec impression", format: "commander",
+      commanders: decks[0].commanders,
+      cards: [{ name: "Lightning Bolt", qty: 1, set: "m10", collector_number: "146" }] });
+    localStorage.setItem(key, JSON.stringify(decks));
+  });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.reload();
+  await page.locator("#commander-zone .card").first().waitFor({ state: "attached" });
+  await openDecksView(page);
+  await expect(page.locator('.deck-tile[data-deck-id="printing-deck"] .deck-tile-name')).toHaveText("Deck avec impression");
+  await expect(page.locator(".deck-tile")).toHaveCount(2);
+  expect(errors).toEqual([]);
+});
