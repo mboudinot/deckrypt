@@ -90,7 +90,10 @@ function renderSideBracket() {
   lab.textContent = result.label;
   const sub = document.createElement("div");
   sub.className = "sub";
-  sub.textContent = `${result.gameChangerCount} Game Changer${result.gameChangerCount > 1 ? "s" : ""} détecté${result.gameChangerCount > 1 ? "s" : ""}`;
+  sub.textContent = [
+    `${result.gameChangerCount} Game Changer${result.gameChangerCount > 1 ? "s" : ""} détecté${result.gameChangerCount > 1 ? "s" : ""}`,
+    ...result.signals.map((sig) => sig.label.toLowerCase()),
+  ].join(" · ");
   info.appendChild(lab);
   info.appendChild(sub);
   head.appendChild(info);

@@ -3,6 +3,7 @@ import {
   manaCurve, cardTypeBreakdown, primaryTypeOf, isLandCard,
   creatureSubtypes, subtypesOf,
   extractTokenIds, tokenSources, cardIdentityKey, dedupeByOracle, gameChangers, bracketEstimate,
+  isMassLandDenial, isExtraTurnCard,
   detectThemes,
 } from "../js/deck-analytics.js";
 
@@ -287,7 +288,70 @@ describe("bracketEstimate", () => {
   });
 
   it("always carries the methodology disclaimer", () => {
-    expect(bracketEstimate([]).note).toMatch(/mass land destruction/i);
+    expect(bracketEstimate([]).note).toMatch(/combos infinis/i);
+  });
+
+  it("mass land denial lifts a 0-GC deck to minBracket 4 and names the card", () => {
+    const out = bracketEstimate([card({ name: "Armageddon", oracle_text: "Destroy all lands." }), card({})]);
+    expect(out.minBracket).toBe(4);
+    expect(out.label).toBe("Optimisé");
+    expect(out.signals).toEqual([expect.objectContaining({ key: "mld", cards: ["Armageddon"] })]);
+  });
+
+  it("an extra-turn card lifts a 0-GC deck to minBracket 2 (Core)", () => {
+    const out = bracketEstimate([card({ name: "Time Warp", oracle_text: "Target player takes an extra turn after this one." })]);
+    expect(out.minBracket).toBe(2);
+    expect(out.label).toBe("Core");
+    expect(out.signals.map((s) => s.key)).toEqual(["extra-turns"]);
+  });
+
+  it("extra turns never lower a bracket the Game Changers already set", () => {
+    const deck = [gc("A"), card({ name: "Time Warp", oracle_text: "Take an extra turn after this one." })];
+    expect(bracketEstimate(deck).minBracket).toBe(3);
+  });
+
+  it("lists each signalling card once, even with duplicate printings", () => {
+    const orb = () => card({ name: "Winter Orb", oracle_text: "Players can't untap more than one land during their untap steps." });
+    expect(bracketEstimate([orb(), orb()]).signals[0].cards).toEqual(["Winter Orb"]);
+  });
+
+  it("no signals on a plain deck", () => {
+    expect(bracketEstimate([card({})]).signals).toEqual([]);
+  });
+});
+
+describe("isMassLandDenial", () => {
+  it.each([
+    ["Armageddon", "Destroy all lands."],
+    ["Jokulhaups", "Destroy all artifacts, creatures, and lands. They can't be regenerated."],
+    ["Ruination", "Destroy all nonbasic lands."],
+    ["Upheaval", "Return all permanents to their owners' hands."],
+    ["Wildfire", "Each player sacrifices four lands. Wildfire deals 4 damage to each creature."],
+    ["Winter Orb", "As long as Winter Orb is untapped, players can't untap more than one land during their untap steps."],
+    ["Back to Basics", "Nonbasic lands don't untap during their controllers' untap steps."],
+    ["Blood Moon", "Nonbasic lands are Mountains."],
+    ["Contamination", "At the beginning of your upkeep, sacrifice Contamination unless you sacrifice a creature.\nIf a land is tapped for mana, it produces {B} instead of any other type."],
+  ])("flags %s", (_name, text) => {
+    expect(isMassLandDenial(card({ oracle_text: text }))).toBe(true);
+  });
+
+  it.each([
+    ["single land removal", "Destroy target land."],
+    ["one-shot tap", "Tap all lands target player controls. They don't untap during their controller's next untap step."],
+    ["creature wipe", "Destroy all nonland permanents."],
+    ["edict of one land", "Each player sacrifices a land."],
+  ])("doesn't flag %s", (_name, text) => {
+    expect(isMassLandDenial(card({ oracle_text: text }))).toBe(false);
+  });
+});
+
+describe("isExtraTurnCard", () => {
+  it("flags 'take an extra turn' wording", () => {
+    expect(isExtraTurnCard(card({ oracle_text: "Take an extra turn after this one." }))).toBe(true);
+    expect(isExtraTurnCard(card({ oracle_text: "Target player takes two extra turns after this one." }))).toBe(true);
+  });
+  it("doesn't flag extra-turn hosers", () => {
+    expect(isExtraTurnCard(card({ oracle_text: "Players can't take extra turns." }))).toBe(false);
   });
 });
 

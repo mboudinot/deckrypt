@@ -416,30 +416,66 @@ function gameChangers(deck) {
   return deck.filter((c) => c.game_changer === true);
 }
 
-/* Best-effort Commander Bracket estimate. Scryfall only exposes the
- * `game_changer` boolean; mass-land-destruction / extra turns /
- * tutors / two-card combos aren't tagged, so we can't fully classify.
- * We give a *lower bound* on the bracket the deck belongs to. */
+/* Mass land denial, per the official bracket definition: destroy /
+ * exile / bounce lands, keep them tapped, or change the mana they make,
+ * for four or more lands per player (so Blood Moon and Winter Orb count). */
+const _MASS_LAND_DENIAL_PATTERNS = [
+  /\b(?:destroy|exile) all [^.]*\blands\b/i,
+  /\breturn all (?:lands|permanents)\b[^.]*\bto (?:their|its) owner/i,
+  /\beach (?:player|opponent) sacrifices (?:all|four|five|six|seven|X|half)\b[^.]*\blands\b/i,
+  /\bcan['’]t untap more than (?:one|two) (?:lands?|permanents?)\b/i,
+  /\blands\b[^.]*\bdon['’]t untap during [^.]*untap steps\b/i,
+  /\bnonbasic lands are (?:Plains|Islands|Swamps|Mountains|Forests)\b/i,
+  /\bif a land is tapped for mana, it produces\b/i,
+];
+
+function isMassLandDenial(card) {
+  const t = oracleText(card);
+  return _MASS_LAND_DENIAL_PATTERNS.some((re) => re.test(t));
+}
+
+function isExtraTurnCard(card) {
+  return /\btakes? \w+ extra turns?\b/i.test(oracleText(card));
+}
+
+const _BRACKET_LABELS = {
+  1: "Exhibition / Core (à valider à la main)",
+  2: "Core",
+  3: "Upgraded",
+  4: "Optimisé",
+};
+
+/* Lower bound on the Commander Bracket. Raised only by binary official
+ * rules: Game Changers count, mass land denial (none in 1–3), extra
+ * turns (none in 1). Combos and turn chaining stay a manual check. */
 function bracketEstimate(deck) {
   const gcCount = gameChangers(deck).length;
-  let minBracket, label;
-  if (gcCount === 0) {
-    minBracket = 1; label = "Exhibition / Core (à valider à la main)";
-  } else if (gcCount <= 3) {
-    minBracket = 3; label = "Upgraded";
-  } else if (gcCount <= 7) {
-    minBracket = 4; label = "Optimisé";
-  } else {
-    minBracket = 4; label = "Optimisé / cEDH";
+  const names = (pred) => [...new Set(deck.filter(pred).map((c) => c.name))];
+  const mld = names(isMassLandDenial);
+  const extraTurns = names(isExtraTurnCard);
+
+  let minBracket = gcCount === 0 ? 1 : gcCount <= 3 ? 3 : 4;
+  const signals = [];
+  if (mld.length > 0) {
+    minBracket = 4;
+    signals.push({ key: "mld", label: "Destruction massive de terrains",
+      detail: "interdite jusqu'au bracket 3", cards: mld });
   }
+  if (extraTurns.length > 0) {
+    minBracket = Math.max(minBracket, 2);
+    signals.push({ key: "extra-turns", label: "Tours supplémentaires",
+      detail: "interdits en bracket 1, à ne pas enchaîner en 2–3", cards: extraTurns });
+  }
+
   return {
     gameChangerCount: gcCount,
     minBracket,
-    label,
+    label: minBracket === 4 && gcCount >= 8 ? "Optimisé / cEDH" : _BRACKET_LABELS[minBracket],
+    signals,
     note:
-      "Estimation basée uniquement sur la liste officielle des Game Changers. " +
-      "Scryfall n'expose pas les autres critères (mass land destruction, tours " +
-      "supplémentaires, tuteurs efficaces, combos infinis) — à vérifier à la main.",
+      "Estimation minimale : Game Changers, destruction massive de terrains et " +
+      "tours supplémentaires sont détectés. Les combos infinis à deux cartes et " +
+      "l'enchaînement des tours supplémentaires restent à vérifier à la main.",
   };
 }
 
@@ -449,6 +485,7 @@ if (typeof module !== "undefined" && module.exports) {
     manaCurve, cardTypeBreakdown, primaryTypeOf, isLandCard,
     creatureSubtypes, subtypesOf,
     extractTokenIds, tokenSources, cardIdentityKey, dedupeByOracle, gameChangers, bracketEstimate,
+    isMassLandDenial, isExtraTurnCard,
     detectThemes, THEME_RULES,
   };
 }

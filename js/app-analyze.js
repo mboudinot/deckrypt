@@ -833,6 +833,19 @@ function renderBracket(deck) {
     meta.appendChild(details);
   }
 
+  if (est.signals.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "bracket-signals";
+    for (const sig of est.signals) {
+      const li = document.createElement("li");
+      const head = document.createElement("strong");
+      head.textContent = `${sig.label} (${sig.detail}) : `;
+      li.append(head, sig.cards.join(", "));
+      list.appendChild(li);
+    }
+    meta.appendChild(list);
+  }
+
   const note = document.createElement("span");
   note.className = "note";
   note.textContent = est.note;

@@ -784,6 +784,7 @@
     grid-row: 3;
     margin-top: 4px;
   }
+  .bracket-panel > .bracket-meta > .bracket-signals { grid-column: 1 / -1; grid-row: 4; }
 }
 /* Analyze view's bracket — large 88×88 circle anchoring the bracket
  * panel. Mirrors the mockup `.bracket-large` class; we kept the name
@@ -841,6 +842,19 @@
   font-weight: 400;
 }
 .bracket-meta .note { color: var(--text-muted); font-size: 0.8rem; line-height: 1.4; }
+/* Official bracket rules the deck trips (mass land denial, extra turns). */
+.bracket-signals {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--warning);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+.bracket-signals strong { color: var(--text); font-weight: 600; }
 
 /* Game-changer accordion. Native <summary> bullet replaced by a
    chevron that rotates on open. Body uses .cards/.card styles so

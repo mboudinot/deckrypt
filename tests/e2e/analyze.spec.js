@@ -98,8 +98,8 @@ test("Bracket panel renders a badge, label and methodology note", async ({ page 
   // The badge holds a single digit (1–4).
   const badgeText = await page.locator("#analyze-bracket .bracket-circle").textContent();
   expect(badgeText.trim()).toMatch(/^[1-5]$/);
-  // The note explains the limitation (Scryfall doesn't expose every criterion).
-  await expect(page.locator(".bracket-meta .note")).toContainText(/mass land destruction/i);
+  // The note names what stays a manual check (combos aren't detectable).
+  await expect(page.locator(".bracket-meta .note")).toContainText(/combos infinis/i);
 });
 
 test("Mana curve renders 8 columns (0..6, 7+)", async ({ page }) => {
